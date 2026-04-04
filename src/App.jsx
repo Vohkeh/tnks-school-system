@@ -97,8 +97,29 @@ function makeTimeSlots(cfg) {
 // ══════════════════════════════════════════════════════════
 // STORAGE
 // ══════════════════════════════════════════════════════════
-async function load(k) { try { const r=await window.storage.get(k); return r?JSON.parse(r.value):null; } catch { return null; } }
-async function save(k,v) { try { await window.storage.set(k,JSON.stringify(v)); } catch {} }
+import { supabase } from './supabase'
+
+async function load(k) {
+  try {
+    const { data, error } = await supabase
+      .from(k)
+      .select('data')
+      .eq('id', k)
+      .single()
+    if (error || !data) return null
+    return JSON.parse(data.data)
+  } catch { return null }
+}
+
+async function save(k, v) {
+  try {
+    await supabase.from(k).upsert({
+      id: k,
+      data: JSON.stringify(v),
+      updated_at: new Date().toISOString()
+    })
+  } catch {}
+}
 
 const DEFAULT_USERS = [
   {id:"u1",name:"Administrator",username:"admin",password:"admin123",role:"admin",email:"admin@tnks.sc.ke",staffType:"teaching",subject:"Administration",phone:"+254 722 000001"},
