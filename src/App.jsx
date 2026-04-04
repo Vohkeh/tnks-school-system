@@ -30,7 +30,7 @@ const MONITORING_TYPES = ["Health","Discipline","Absent - Home","Absent - Sick",
 const SUBJECTS_MAP = {
   PP: ["Language Activities","Mathematical Activities","Environmental Activities","Creative Activities","Religious Education Activities"],
   Lower: ["English Language Activities","Kiswahili Language Activities","Mathematical Activities","Environmental Activities","Religious Education Activities","Creative Activities","Indigenous Language Activities"],
-  Upper: ["English","Kiswahili","Mathematics","Integrated Science","Social Studies","Religious Education (CRE/IRE)","Agriculture and Nutrition","Creative Arts and Sports"],
+  Upper: ["English","Kiswahili","Mathematics","Integrated Science","Social Studies & CRE","Agriculture and Nutrition","Creative Arts and Sports"],
   JSS: ["English","Kiswahili","Mathematics","Integrated Science","Social Studies (History & Geography)","Pre-Technical and Pre-Career Studies","Agriculture and Nutrition","Religious Education (CRE/IRE)","Creative Arts and Sports"],
 };
 
@@ -47,7 +47,7 @@ const LESSONS_PER_WEEK = {
   },
   Upper: {
     "English":5,"Kiswahili":5,"Mathematics":5,"Integrated Science":4,
-    "Social Studies":2,"Religious Education (CRE/IRE)":2,"Agriculture and Nutrition":2,
+    "Social Studies & CRE":4,"Agriculture and Nutrition":2,
     "Creative Arts and Sports":3,
   },
   JSS: {
@@ -489,7 +489,7 @@ function Dashboard({students,results,announcements,fees,staff,users,term,setTerm
 // ══════════════════════════════════════════════════════════
 // STUDENTS
 // ══════════════════════════════════════════════════════════
-function StudentsPage({students,setStudents}) {
+function StudentsPage({students,setStudents,results,setResults,comments,setComments,fees,setFees,monitoring,setMonitoring}) {
   const blank={name:"",admNo:"",class:"Grade 7",gender:"Male",photo:"",email:"",parentPassword:"",dob:"",parentName:"",parentPhone:"",address:""};
   const [form,setForm]=useState(blank); const [editId,setEditId]=useState(null);
   const [search,setSearch]=useState(""); const [filterCls,setFilterCls]=useState("All");
@@ -497,7 +497,14 @@ function StudentsPage({students,setStudents}) {
   const flash=(t,ok=true)=>{setMsg({t,ok});setTimeout(()=>setMsg({t:"",ok:true}),2800);};
   function doSave(){if(!form.name.trim()||!form.admNo.trim()) return flash("Name and admission number required.",false); if(editId){setStudents(p=>p.map(s=>s.id===editId?{...s,...form}:s));setEditId(null);flash("Learner updated!");}else{if(students.find(s=>s.admNo===form.admNo)) return flash("Admission number already exists.",false); setStudents(p=>[...p,{...form,id:Date.now().toString(),status:"active",enrollDate:new Date().toLocaleDateString("en-KE")}]);flash("Learner added!");} setForm(blank);setTab("list");}
   function doEdit(s){setForm({name:s.name,admNo:s.admNo,class:s.class,gender:s.gender||"Male",photo:s.photo||"",email:s.email||"",parentPassword:s.parentPassword||"",dob:s.dob||"",parentName:s.parentName||"",parentPhone:s.parentPhone||"",address:s.address||""});setEditId(s.id);setTab("add");}
-  function doDel(id){if(confirm("Delete this learner?")) setStudents(p=>p.filter(s=>s.id!==id));}
+  function doDel(id){
+    if(!confirm("Delete this learner and ALL their records (results, fees, comments)?")) return;
+    setStudents(p=>p.filter(s=>s.id!==id));
+    setResults(p=>p.filter(r=>r.studentId!==id));
+    setComments(p=>(p||[]).filter(c=>c.studentId!==id));
+    setFees(p=>(p||[]).filter(f=>f.studentId!==id));
+    setMonitoring(p=>(p||[]).filter(m=>m.studentId!==id));
+  }
   const filtered=students.filter(s=>{const q=search.toLowerCase(); return (s.name.toLowerCase().includes(q)||s.admNo.toLowerCase().includes(q))&&(filterCls==="All"||s.class===filterCls);});
   const th={textAlign:"left",padding:"10px 12px",fontWeight:"bold",fontSize:11,color:"#1d4ed8",background:"#eff6ff",letterSpacing:.5};
   const td={padding:"9px 12px",fontSize:12,color:"#374151",borderTop:"1px solid #f1f5f9"};
@@ -1532,8 +1539,7 @@ function TimetableSetup({staff,setupData,setSetupData}) {
 // ══════════════════════════════════════════════════════════
 // TIMETABLEMASTER — Professional Scheduling Engine
 // ══════════════════════════════════════════════════════════
-function TimetablePage({students,staff,user}){
-  const [tt,setTt]=useState({});
+function TimetablePage({students,staff,user,timetable:tt,setTimetable:setTt}){
   const [tab,setTab]=useState("setup");
   const [setupStep,setSetupStep]=useState(1); // TimetableMaster 9-step wizard
   const [selCls,setSelCls]=useState("Grade 7");
@@ -1554,6 +1560,7 @@ function TimetablePage({students,staff,user}){
   const [conflictMap,setConflictMap]=useState({});
   const [daySchedule,setDaySchedule]=useState(DEFAULT_CFG.schedule);
   const [editSchedIdx,setEditSchedIdx]=useState(null);
+  const [subView,setSubView]=useState("byclass");
 
   // TimetableMaster Step 1 — Basic Info
   const [ttName,setTtName]=useState("TNKS Timetable 2025");
@@ -2519,137 +2526,181 @@ function TimetablePage({students,staff,user}){
       {tab==="subjects"&&(
         <div style={{display:"grid",gap:16}}>
           <div style={{background:"linear-gradient(135deg,#eff6ff,#dbeafe)",border:"1px solid #bfdbfe",borderRadius:10,padding:"12px 16px",fontSize:12,color:"#1d4ed8",lineHeight:1.8}}>
-            <b>Grade 4–9:</b> Assign a teacher · Edit lessons per week · Toggle double lesson (2P = 2 consecutive periods) · Set period availability.<br/>
+            <b>Grade 4–9:</b> Assign a teacher per subject · Edit lessons/week · Toggle double period.<br/>
             <b>PP1–Grade 3:</b> Assign one class teacher who covers all subjects.
           </div>
-          <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
-            <select value={selCls} onChange={e=>setSelCls(e.target.value)} style={{border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px 12px",fontSize:13,fontFamily:F}}>
-              {ALL_CLASSES.map(c=><option key={c} value={c}>{c}</option>)}
-            </select>
-            <span style={{fontSize:12,color:"#64748b",fontWeight:"bold",padding:"6px 12px",background:"#f1f5f9",borderRadius:8}}>
-              {isUpper?"Subject teachers":"Class teacher"} · {subs.length} subjects · {subs.reduce((a,s)=>a+getClsLpw(selCls,s),0)} lessons/week total
+
+          {/* View toggle: by Class or by Subject */}
+          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+            {[["byclass","🏫 By Class"],["bysubject","📚 By Subject"],["byteacher","👤 By Teacher"]].map(([v,l])=>(
+              <button key={v} onClick={()=>setSubView&&setSubView(v)}
+                style={{padding:"7px 16px",border:"none",borderRadius:8,cursor:"pointer",fontFamily:F,fontSize:12,fontWeight:"bold",
+                  background:subView===v?"linear-gradient(135deg,#1e3a5f,#1d4ed8)":"#f1f5f9",
+                  color:subView===v?"white":"#64748b"}}>
+                {l}
+              </button>
+            ))}
+            <span style={{fontSize:11,color:"#94a3b8",marginLeft:8}}>
+              {allTeachers.length} teachers · {ALL_CLASSES.length} classes
             </span>
           </div>
 
-          {!isUpper&&(
-            <div style={{background:"white",borderRadius:14,padding:20,boxShadow:"0 2px 12px rgba(0,0,0,.07)"}}>
-              <div style={{fontWeight:"bold",color:"#1e3a5f",marginBottom:12,fontSize:14}}>🧑‍🏫 Class Teacher — {selCls}</div>
-              <select value={getClsTeacher(selCls)} onChange={e=>setClsTeacher(selCls,e.target.value)} style={{width:"100%",maxWidth:320,border:"1.5px solid #e2e8f0",borderRadius:8,padding:"9px 10px",fontSize:13,fontFamily:F}}>
-                <option value="">-- Select class teacher --</option>
-                {allTeachers.map(t=><option key={t} value={t}>{t}</option>)}
-              </select>
-              {getClsTeacher(selCls)&&<div style={{marginTop:10,fontSize:12,color:"#15803d",fontWeight:"bold"}}>✅ {getClsTeacher(selCls)} — all subjects in {selCls}</div>}
-              {/* Still allow lpw editing for lower/PP classes */}
-              <div style={{marginTop:18}}>
-                <div style={{fontWeight:"bold",color:"#1e3a5f",marginBottom:10,fontSize:13}}>📚 Lessons per Week per Subject</div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:8}}>
-                  {subs.map(sub=>(
-                    <div key={sub} style={{background:"#f8fafc",borderRadius:9,padding:"10px 12px",border:"1px solid #e2e8f0"}}>
-                      <div style={{fontWeight:"bold",fontSize:12,color:"#1e3a5f",marginBottom:6}}>{sub}</div>
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <label style={{fontSize:10,color:"#64748b",fontWeight:"bold"}}>Lessons/Wk:</label>
-                        <div style={{display:"flex",alignItems:"center",gap:4}}>
-                          <button onClick={()=>setClsLpw(selCls,sub,getClsLpw(selCls,sub)-1)} style={{width:24,height:24,border:"1px solid #e2e8f0",borderRadius:5,background:"#f1f5f9",cursor:"pointer",fontFamily:F,fontSize:14,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
-                          <span style={{fontWeight:"bold",color:"#1d4ed8",fontSize:15,minWidth:20,textAlign:"center"}}>{getClsLpw(selCls,sub)}</span>
-                          <button onClick={()=>setClsLpw(selCls,sub,getClsLpw(selCls,sub)+1)} style={{width:24,height:24,border:"1px solid #e2e8f0",borderRadius:5,background:"#f1f5f9",cursor:"pointer",fontFamily:F,fontSize:14,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
-                        </div>
-                      </div>
+          {/* BY CLASS VIEW */}
+          {(!subView||subView==="byclass")&&ALL_CLASSES.map(cls=>{
+            const clsSubs=getSubs(cls);
+            const isUp=["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(cls);
+            const totalLpw=clsSubs.reduce((a,s)=>a+getClsLpw(cls,s),0);
+            const assigned=isUp?clsSubs.filter(s=>getSubTeacher(cls,s)).length:(getClsTeacher(cls)?clsSubs.length:0);
+            const complete=assigned===clsSubs.length;
+            return(
+              <div key={cls} style={{background:"white",borderRadius:14,boxShadow:"0 2px 12px rgba(0,0,0,.07)",overflow:"hidden",border:`2px solid ${complete?"#bbf7d0":"#e2e8f0"}`}}>
+                {/* Class header */}
+                <div style={{padding:"12px 18px",background:complete?"linear-gradient(135deg,#f0fdf4,#dcfce7)":"linear-gradient(135deg,#f8fafc,#f1f5f9)",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:12}}>
+                    <div style={{width:36,height:36,borderRadius:10,background:complete?"#15803d":"#1e3a5f",color:"white",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:"bold",fontSize:13}}>
+                      {cls.replace("Grade ","G").replace("PP","")||cls[0]}
                     </div>
-                  ))}
+                    <div>
+                      <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:14}}>{cls}</div>
+                      <div style={{fontSize:11,color:"#64748b"}}>{clsSubs.length} subjects · {totalLpw} lessons/week</div>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                    <span style={{fontSize:11,fontWeight:"bold",padding:"3px 10px",borderRadius:20,background:complete?"#dcfce7":"#fef3c7",color:complete?"#15803d":"#b45309"}}>
+                      {complete?"✅ Complete":`${assigned}/${clsSubs.length} assigned`}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            </div>
-          )}
 
-          {isUpper&&(
-            <div style={{background:"white",borderRadius:14,boxShadow:"0 2px 12px rgba(0,0,0,.07)",overflow:"hidden"}}>
-              <div style={{padding:"14px 18px",background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)",color:"white",fontWeight:"bold",fontSize:13}}>
-                📚 {selCls} — Subject · Teacher · Lessons/Week · Double Period · Availability
-              </div>
-              <div style={{overflowX:"auto"}}>
-                <table style={{width:"100%",borderCollapse:"collapse",minWidth:820}}>
-                  <thead>
-                    <tr style={{background:"#f8fafc"}}>
-                      <th style={{padding:"10px 14px",fontSize:11,textAlign:"left",color:"#1e3a5f",fontWeight:"bold",minWidth:160}}>Subject</th>
-                      <th style={{padding:"10px 14px",fontSize:11,textAlign:"left",color:"#1e3a5f",fontWeight:"bold",minWidth:180}}>Teacher</th>
-                      <th style={{padding:"10px 12px",fontSize:11,textAlign:"center",color:"#b45309",fontWeight:"bold",minWidth:100}}>Lessons/Wk</th>
-                      <th style={{padding:"10px 12px",fontSize:11,textAlign:"center",color:"#7c3aed",fontWeight:"bold",minWidth:90}}>Double (2P)</th>
-                      {LESSON_SLOTS.map(s=>(
-                        <th key={s.period} style={{padding:"8px 4px",fontSize:9,textAlign:"center",color:"#64748b",fontWeight:"bold",minWidth:40}}>
-                          {s.label}<br/><span style={{fontSize:8,color:"#94a3b8"}}>{s.start}</span>
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {subs.map((sub,si)=>{
-                      const avail=getAvail(selCls,sub);
-                      const teacher=getSubTeacher(selCls,sub);
-                      const n=getClsLpw(selCls,sub);
-                      const dbl=getClsDouble(selCls,sub);
-                      return(
-                        <tr key={sub} style={{background:si%2===0?"white":"#fafafa",borderTop:"1px solid #f1f5f9"}}>
-                          <td style={{padding:"10px 14px"}}>
-                            <div style={{fontWeight:"bold",fontSize:12,color:"#1e3a5f"}}>{sub}</div>
-                          </td>
-                          <td style={{padding:"8px 10px"}}>
-                            <select value={teacher} onChange={e=>setSubTeacher(selCls,sub,e.target.value)} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:7,padding:"6px 8px",fontSize:12,fontFamily:F}}>
+                {/* Class teacher for PP/Lower */}
+                {!isUp&&(
+                  <div style={{padding:"12px 18px",borderBottom:"1px solid #f1f5f9"}}>
+                    <label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:6}}>🧑‍🏫 CLASS TEACHER</label>
+                    <select value={getClsTeacher(cls)} onChange={e=>setClsTeacher(cls,e.target.value)}
+                      style={{width:"100%",maxWidth:300,border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px 10px",fontSize:13,fontFamily:F}}>
+                      <option value="">-- Select class teacher --</option>
+                      {allTeachers.map(t=><option key={t} value={t}>{t}</option>)}
+                    </select>
+                    {getClsTeacher(cls)&&<div style={{marginTop:6,fontSize:11,color:"#15803d",fontWeight:"bold"}}>✅ {getClsTeacher(cls)}</div>}
+                  </div>
+                )}
+
+                {/* Subject rows */}
+                <div style={{padding:"10px 18px",display:"grid",gap:8}}>
+                  {clsSubs.map(sub=>{
+                    const teacher=isUp?getSubTeacher(cls,sub):getClsTeacher(cls);
+                    const n=getClsLpw(cls,sub);
+                    const dbl=getClsDouble(cls,sub);
+                    const assigned=isUp?!!getSubTeacher(cls,sub):!!getClsTeacher(cls);
+                    return(
+                      <div key={sub} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:assigned?"#f0fdf4":"#fafafa",borderRadius:10,border:`1px solid ${assigned?"#bbf7d0":"#e2e8f0"}`,flexWrap:"wrap"}}>
+                        {/* Subject name */}
+                        <div style={{flex:2,minWidth:140}}>
+                          <div style={{fontWeight:"bold",fontSize:12,color:"#1e3a5f"}}>{sub}</div>
+                          <div style={{fontSize:10,color:"#64748b",marginTop:1}}>{n} lessons/wk {dbl?"· 2P":""}</div>
+                        </div>
+                        {/* Teacher dropdown — only for upper classes */}
+                        {isUp&&(
+                          <div style={{flex:2,minWidth:160}}>
+                            <select value={getSubTeacher(cls,sub)} onChange={e=>setSubTeacher(cls,sub,e.target.value)}
+                              style={{width:"100%",border:`1.5px solid ${assigned?"#86efac":"#e2e8f0"}`,borderRadius:8,padding:"6px 8px",fontSize:12,fontFamily:F,background:"white"}}>
                               <option value="">— Assign teacher —</option>
                               {allTeachers.map(t=><option key={t} value={t}>{t}</option>)}
                             </select>
-                          </td>
-                          {/* Lessons per week — editable with +/- */}
-                          <td style={{padding:"8px 10px",textAlign:"center"}}>
-                            <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>
-                              <button onClick={()=>setClsLpw(selCls,sub,n-1)}
-                                style={{width:24,height:24,border:"1px solid #e2e8f0",borderRadius:6,background:"#f1f5f9",cursor:"pointer",fontFamily:F,fontSize:14,fontWeight:"bold",display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
-                              <span style={{fontWeight:"bold",color:"#b45309",fontSize:16,minWidth:22,textAlign:"center"}}>{n}</span>
-                              <button onClick={()=>setClsLpw(selCls,sub,n+1)}
-                                style={{width:24,height:24,border:"1px solid #e2e8f0",borderRadius:6,background:"#f1f5f9",cursor:"pointer",fontFamily:F,fontSize:14,fontWeight:"bold",display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
-                            </div>
-                          </td>
-                          {/* Double lesson toggle */}
-                          <td style={{padding:"8px 10px",textAlign:"center"}}>
-                            <button
-                              onClick={()=>toggleClsDouble(selCls,sub)}
-                              title={dbl?"Double lesson ON — 2 consecutive periods":"Double lesson OFF — single periods only"}
-                              style={{
-                                padding:"5px 12px",border:"none",borderRadius:8,cursor:"pointer",fontFamily:F,fontSize:11,fontWeight:"bold",
-                                background:dbl?"linear-gradient(135deg,#7c3aed,#4c1d95)":"#f1f5f9",
-                                color:dbl?"white":"#64748b",
-                                boxShadow:dbl?"0 2px 6px rgba(124,58,237,.3)":"none",
-                                transition:"all .15s",
-                              }}>
-                              {dbl?"2P ✓":"—"}
-                            </button>
-                          </td>
-                          {LESSON_SLOTS.map(slot=>{
-                            const checked=avail.includes(slot.period);
-                            return(
-                              <td key={slot.period} style={{textAlign:"center",padding:"6px 2px"}}>
-                                <button
-                                  onClick={()=>toggleAvail(selCls,sub,slot.period)}
-                                  title={`${slot.label} ${checked?"✓ allowed":"✗ blocked"}`}
-                                  style={{width:28,height:28,borderRadius:7,border:`2px solid ${checked?"#15803d":"#e2e8f0"}`,background:checked?"#15803d":"white",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto",transition:"all .12s",fontSize:12}}
-                                >
-                                  {checked&&"✓"}
-                                </button>
-                              </td>
-                            );
-                          })}
-                        </tr>
+                          </div>
+                        )}
+                        {/* Lessons per week +/- */}
+                        <div style={{display:"flex",alignItems:"center",gap:5}}>
+                          <button onClick={()=>setClsLpw(cls,sub,n-1)} style={{width:26,height:26,border:"1px solid #e2e8f0",borderRadius:6,background:"#f1f5f9",cursor:"pointer",fontFamily:F,fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+                          <span style={{fontWeight:"bold",color:"#b45309",fontSize:14,minWidth:20,textAlign:"center"}}>{n}</span>
+                          <button onClick={()=>setClsLpw(cls,sub,n+1)} style={{width:26,height:26,border:"1px solid #e2e8f0",borderRadius:6,background:"#f1f5f9",cursor:"pointer",fontFamily:F,fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+                        </div>
+                        {/* Double period toggle */}
+                        <button onClick={()=>toggleClsDouble(cls,sub)}
+                          style={{padding:"5px 12px",border:"none",borderRadius:8,cursor:"pointer",fontFamily:F,fontSize:11,fontWeight:"bold",
+                            background:dbl?"linear-gradient(135deg,#7c3aed,#4c1d95)":"#f1f5f9",
+                            color:dbl?"white":"#64748b",whiteSpace:"nowrap"}}>
+                          {dbl?"2P ✓":"1P"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* BY SUBJECT VIEW */}
+          {subView==="bysubject"&&(()=>{
+            const allSubjects=[...new Set(ALL_CLASSES.flatMap(c=>getSubs(c)))];
+            return allSubjects.map(sub=>{
+              const classes=ALL_CLASSES.filter(c=>getSubs(c).includes(sub));
+              const teachers=[...new Set(classes.map(c=>getSubTeacher(c,sub)||getClsTeacher(c)).filter(Boolean))];
+              return(
+                <div key={sub} style={{background:"white",borderRadius:14,boxShadow:"0 2px 12px rgba(0,0,0,.07)",overflow:"hidden"}}>
+                  <div style={{padding:"12px 18px",background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)",color:"white",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <div style={{fontWeight:"bold",fontSize:13}}>{sub}</div>
+                    <div style={{fontSize:11,opacity:.8}}>{classes.length} classes · {teachers.length} teacher(s)</div>
+                  </div>
+                  <div style={{padding:"10px 18px",display:"grid",gap:6}}>
+                    {classes.map(cls=>{
+                      const isUp=["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(cls);
+                      const teacher=isUp?getSubTeacher(cls,sub):getClsTeacher(cls);
+                      const n=getClsLpw(cls,sub);
+                      return(
+                        <div key={cls} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:"#f8fafc",borderRadius:8,flexWrap:"wrap"}}>
+                          <span style={{fontWeight:"bold",fontSize:12,color:"#1e3a5f",minWidth:80}}>{cls}</span>
+                          <span style={{fontSize:11,color:"#64748b"}}>{n} lessons/wk</span>
+                          {isUp?(
+                            <select value={teacher} onChange={e=>setSubTeacher(cls,sub,e.target.value)}
+                              style={{flex:1,minWidth:140,border:"1.5px solid #e2e8f0",borderRadius:7,padding:"5px 8px",fontSize:12,fontFamily:F}}>
+                              <option value="">— Assign teacher —</option>
+                              {allTeachers.map(t=><option key={t} value={t}>{t}</option>)}
+                            </select>
+                          ):(
+                            <span style={{fontSize:11,color:teacher?"#15803d":"#94a3b8",fontWeight:"bold"}}>{teacher||"No class teacher"}</span>
+                          )}
+                        </div>
                       );
                     })}
-                  </tbody>
-                </table>
+                  </div>
+                </div>
+              );
+            });
+          })()}
+
+          {/* BY TEACHER VIEW */}
+          {subView==="byteacher"&&allTeachers.map(teacher=>{
+            const lessons=[];
+            ALL_CLASSES.forEach(cls=>{
+              const isUp=["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(cls);
+              getSubs(cls).forEach(sub=>{
+                const t=isUp?getSubTeacher(cls,sub):getClsTeacher(cls);
+                if(t===teacher) lessons.push({cls,sub,n:getClsLpw(cls,sub)});
+              });
+            });
+            const total=lessons.reduce((a,l)=>a+l.n,0);
+            const over=total>30;
+            return(
+              <div key={teacher} style={{background:"white",borderRadius:14,boxShadow:"0 2px 12px rgba(0,0,0,.07)",overflow:"hidden",border:`2px solid ${over?"#fecaca":"#e2e8f0"}`}}>
+                <div style={{padding:"12px 18px",background:over?"linear-gradient(135deg,#fee2e2,#fef2f2)":"linear-gradient(135deg,#f8fafc,#f1f5f9)",display:"flex",alignItems:"center",gap:12}}>
+                  <div style={{width:38,height:38,borderRadius:"50%",background:over?"#b91c1c":"#1e3a5f",color:"white",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:"bold",fontSize:16}}>{teacher[0]}</div>
+                  <div>
+                    <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:14}}>{teacher}</div>
+                    <div style={{fontSize:11,color:over?"#b91c1c":"#64748b",fontWeight:over?"bold":"normal"}}>{total} lessons/week {over?"⚠️ Heavy load":""} · {lessons.length} assignments</div>
+                  </div>
+                </div>
+                <div style={{padding:"10px 18px",display:"flex",gap:8,flexWrap:"wrap"}}>
+                  {lessons.length?lessons.map((l,i)=>(
+                    <div key={i} style={{background:"#eff6ff",borderRadius:8,padding:"6px 12px",fontSize:11}}>
+                      <div style={{fontWeight:"bold",color:"#1e3a5f"}}>{l.cls}</div>
+                      <div style={{color:"#64748b"}}>{l.sub.split(" ").slice(0,2).join(" ")} · {l.n}×/wk</div>
+                    </div>
+                  )):<span style={{fontSize:12,color:"#94a3b8"}}>No subjects assigned yet.</span>}
+                </div>
               </div>
-              <div style={{padding:"8px 16px",background:"#f0fdf4",fontSize:11,color:"#15803d",borderTop:"1px solid #f1f5f9",display:"flex",gap:16,flexWrap:"wrap"}}>
-                <span>✅ Green checkbox = period allowed · White = blocked</span>
-                <span style={{color:"#7c3aed",fontWeight:"bold"}}>2P = double (2 consecutive periods in one block)</span>
-                <span style={{color:"#b45309",fontWeight:"bold"}}>Total lessons this class: {subs.reduce((a,s)=>a+getClsLpw(selCls,s),0)}/week</span>
-              </div>
-            </div>
-          )}
+            );
+          })}
         </div>
       )}
 
@@ -2945,27 +2996,239 @@ function StaffPage({staff,setStaff,users,setUsers}) {
 // ══════════════════════════════════════════════════════════
 // TEACHERS ON DUTY
 // ══════════════════════════════════════════════════════════
-function DutyPage({staff,user}) {
-  const [duties,setDuties]=useState([]); const [tab,setTab]=useState("today");
-  const [form,setForm]=useState({teacherId:"",day:"Monday",dutyType:"Morning Duty",startTime:"06:30",endTime:"07:30",term:"Term 1",note:""});
+function DutyPage({staff,user,students}) {
+  const teachingStaff=(staff||[]).filter(s=>s.staffType==="teaching");
+  const [duties,setDuties]=useState([]);
+  const [stuDutyRoster,setStuDutyRoster]=useState([]);
+  const [tab,setTab]=useState("teacher");
+  const [availability,setAvailability]=useState({}); // teacherId -> {canEvening:bool}
   const [msg,setMsg]=useState({t:"",ok:true});
-  useEffect(()=>{load("tnks_duties").then(d=>{if(d) setDuties(d);});},[]);
-  useEffect(()=>{save("tnks_duties",duties);},[duties]);
+  const [term,setTerm]=useState("Term 1");
+  const [selCls,setSelCls]=useState("Grade 7");
   const flash=(t,ok=true)=>{setMsg({t,ok});setTimeout(()=>setMsg({t:"",ok:true}),2500);};
-  function doAdd(){if(!form.teacherId) return flash("Select a teacher.",false); const t=(staff||[]).find(s=>s.id===form.teacherId); setDuties(p=>[...p,{...form,id:Date.now().toString(),teacherName:t?.name||"—",addedBy:user.name}]); flash("✅ Duty assigned!"); setForm({...form,teacherId:"",note:""});}
+
+  useEffect(()=>{
+    load("tnks_duties").then(d=>{if(d) setDuties(d);});
+    load("tnks_teacher_avail").then(d=>{if(d) setAvailability(d);});
+    load("tnks_stu_roster").then(d=>{if(d) setStuDutyRoster(d);});
+  },[]);
+  useEffect(()=>{save("tnks_duties",duties);},[duties]);
+  useEffect(()=>{save("tnks_teacher_avail",availability);},[availability]);
+  useEffect(()=>{save("tnks_stu_roster",stuDutyRoster);},[stuDutyRoster]);
+
+  function toggleEvening(tid){
+    setAvailability(p=>({...p,[tid]:{...p[tid],canEvening:!(p[tid]?.canEvening??true)}}));
+  }
+  function canEvening(tid){return availability[tid]?.canEvening??true;}
+
+  // AUTO-GENERATE TEACHER DUTY ROSTER
+  function autoGenTeacherRoster(){
+    if(!teachingStaff.length) return flash("Add staff first.",false);
+    const morningDuties=["Morning Duty","Gate Duty","Dining Hall Duty"];
+    const eveningDuties=["Preps Supervision","Evening Duty","Dining Hall Duty"];
+    const generated=[];
+    DAYS.forEach((day,di)=>{
+      // Morning duties — all teachers eligible
+      morningDuties.forEach((dt,i)=>{
+        const idx=(di*morningDuties.length+i)%teachingStaff.length;
+        const t=teachingStaff[idx];
+        generated.push({id:`${day}-${dt}-morning-${Date.now()}-${di}-${i}`,teacherId:t.id,teacherName:t.name,day,dutyType:dt,session:"Morning",startTime:"06:00",endTime:"07:00",term,auto:true});
+      });
+      // Evening duties — only teachers who can do evening
+      const eveningStaff=teachingStaff.filter(t=>canEvening(t.id));
+      if(eveningStaff.length>0){
+        eveningDuties.forEach((dt,i)=>{
+          const idx=(di*eveningDuties.length+i)%eveningStaff.length;
+          const t=eveningStaff[idx];
+          generated.push({id:`${day}-${dt}-evening-${Date.now()}-${di}-${i}`,teacherId:t.id,teacherName:t.name,day,dutyType:dt,session:"Evening",startTime:"19:00",endTime:"22:00",term,auto:true});
+        });
+      }
+    });
+    setDuties(generated);
+    flash("✅ Teacher duty roster generated!");
+  }
+
+  // AUTO-GENERATE STUDENT DUTY ROSTER
+  function autoGenStudentRoster(){
+    const classStudents=students.filter(s=>s.class===selCls&&s.status!=="transferred");
+    if(!classStudents.length) return flash("No students in selected class.",false);
+    const generated=[];
+    DAYS.forEach((day,di)=>{
+      STUDENT_DUTIES.forEach((dt,i)=>{
+        const idx=(di*STUDENT_DUTIES.length+i)%classStudents.length;
+        const s=classStudents[idx];
+        generated.push({id:`stu-${day}-${dt}-${Date.now()}-${di}-${i}`,studentId:s.id,studentName:s.name,class:selCls,day,dutyType:dt,term,auto:true});
+      });
+    });
+    setStuDutyRoster(prev=>[...prev.filter(r=>r.class!==selCls||r.term!==term),...generated]);
+    flash(`✅ Student duty roster generated for ${selCls}!`);
+  }
+
+  function printRoster(type){
+    const isTeacher=type==="teacher";
+    const rows=isTeacher
+      ? DAYS.map(day=>({day,duties:duties.filter(d=>d.day===day&&d.term===term)}))
+      : DAYS.map(day=>({day,duties:stuDutyRoster.filter(d=>d.day===day&&d.class===selCls&&d.term===term)}));
+    const html=`<h3>${isTeacher?"Teacher":"Student ("+selCls+")"} Duty Roster — ${term}</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:11px;">
+      <thead><tr style="background:#1e3a5f;color:white;">
+        <th style="padding:8px;">Day</th>
+        <th style="padding:8px;">Duty</th>
+        <th style="padding:8px;">${isTeacher?"Teacher":"Student"}</th>
+        <th style="padding:8px;">Session</th>
+        <th style="padding:8px;">Time</th>
+      </tr></thead>
+      <tbody>${rows.flatMap(({day,duties:ds})=>ds.map((d,i)=>`
+        <tr style="background:${i%2===0?"white":"#f8fafc"}">
+          <td style="padding:6px 8px;font-weight:bold;">${i===0?day:""}</td>
+          <td style="padding:6px 8px;">${d.dutyType}</td>
+          <td style="padding:6px 8px;font-weight:bold;">${isTeacher?d.teacherName:d.studentName}</td>
+          <td style="padding:6px 8px;">${d.session||"—"}</td>
+          <td style="padding:6px 8px;">${d.startTime||"—"}${d.endTime?" – "+d.endTime:""}</td>
+        </tr>`)).join("")}
+      </tbody>
+    </table>`;
+    printWindow(`${isTeacher?"Teacher":"Student"} Duty Roster — ${term}`, html, null);
+  }
+
   const today=DAYS[new Date().getDay()-1]||"Monday";
-  const todayD=duties.filter(d=>d.day===today);
   const th={textAlign:"left",padding:"9px 12px",fontWeight:"bold",fontSize:11,color:"#1d4ed8",background:"#eff6ff"};
   const td={padding:"8px 12px",fontSize:12,borderTop:"1px solid #f1f5f9"};
+
   return (
     <div style={{padding:24}}>
-      <PageH title="🛡️ Teachers on Duty" sub="Weekly duty roster and assignments"/>
-      <div style={{display:"flex",gap:8,marginBottom:16}}>
-        {[["today","📅 Today"],["roster","📋 Weekly Roster"],user?.role==="admin"&&["assign","➕ Assign"]].filter(Boolean).map(([t,l])=><Btn key={t} onClick={()=>setTab(t)} v={tab===t?"primary":"ghost"} style={{fontSize:12}}>{l}</Btn>)}
+      <PageH title="🛡️ Duty Roster" sub="Teacher & student duty assignments — auto-generated">
+        <Sel value={term} onChange={setTerm} options={TERMS}/>
+      </PageH>
+
+      <div style={{display:"flex",gap:8,marginBottom:18,flexWrap:"wrap"}}>
+        {[["teacher","👨‍🏫 Teacher Roster"],["students","🎒 Student Roster"],["availability","⚙️ Teacher Availability"]].map(([t,l])=>
+          <Btn key={t} onClick={()=>setTab(t)} v={tab===t?"primary":"ghost"} style={{fontSize:12}}>{l}</Btn>
+        )}
       </div>
-      {tab==="today"&&<><div style={{background:"linear-gradient(135deg,#1e3a5f,#15803d)",borderRadius:14,padding:"16px 20px",marginBottom:16,color:"white",display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><div style={{fontSize:14,fontWeight:"bold"}}>Today: {today}</div><div style={{fontSize:12,opacity:.8}}>{new Date().toLocaleDateString("en-KE",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</div></div><div style={{fontSize:36}}>🛡️</div></div>{todayD.length?<div style={{display:"grid",gap:10}}>{todayD.map(d=><Card key={d.id} style={{borderLeft:"4px solid #1d4ed8",padding:"14px 18px"}}><div style={{display:"flex",justifyContent:"space-between"}}><div><div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:14}}>{d.teacherName}</div><div style={{fontSize:12,color:"#64748b",marginTop:3}}>{d.dutyType} · {d.startTime} – {d.endTime}</div>{d.note&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4}}>{d.note}</div>}</div><span style={{background:"#eff6ff",color:"#1d4ed8",fontSize:11,padding:"4px 12px",borderRadius:20,fontWeight:"bold",alignSelf:"flex-start"}}>{d.dutyType}</span></div></Card>)}</div>:<Empty icon="🛡️" text="No duties assigned for today"/>}</>}
-      {tab==="roster"&&<div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:650}}><thead><tr style={{background:"#1e3a5f"}}>{["Duty Type",...DAYS].map(h=><th key={h} style={{padding:"10px 12px",color:"white",fontSize:12,textAlign:"left"}}>{h}</th>)}</tr></thead><tbody>{DUTY_TYPES.map((dt,i)=><tr key={dt} style={{background:i%2===0?"white":"#fafafa"}}><td style={{padding:"10px 12px",fontWeight:"bold",fontSize:12,color:"#1e3a5f",borderRight:"2px solid #eff6ff"}}>{dt}</td>{DAYS.map(day=>{const d=duties.filter(x=>x.day===day&&x.dutyType===dt); return(<td key={day} style={{padding:"8px 12px",verticalAlign:"top"}}>{d.length?d.map(x=><div key={x.id} style={{background:"#eff6ff",borderRadius:6,padding:"4px 8px",marginBottom:4,fontSize:11}}><div style={{fontWeight:"bold",color:"#1d4ed8"}}>{x.teacherName}</div><div style={{color:"#64748b"}}>{x.startTime}–{x.endTime}</div>{user?.role==="admin"&&<button onClick={()=>setDuties(p=>p.filter(y=>y.id!==x.id))} style={{background:"none",border:"none",color:"#b91c1c",cursor:"pointer",fontSize:10,padding:0}}>✕ Remove</button>}</div>):<span style={{fontSize:11,color:"#cbd5e1"}}>—</span>}</td>);})}</tr>)}</tbody></table></div>}
-      {tab==="assign"&&user?.role==="admin"&&<Card><div style={{fontWeight:"bold",color:"#1e3a5f",marginBottom:14,fontSize:14}}>Assign Duty to Teacher</div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}><div><label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:3}}>TEACHER *</label><select value={form.teacherId} onChange={e=>setForm({...form,teacherId:e.target.value})} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px",fontSize:13,fontFamily:F}}><option value="">-- Select teacher --</option>{(staff||[]).filter(s=>s.staffType==="teaching").map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div><Sel label="DAY" value={form.day} onChange={v=>setForm({...form,day:v})} options={DAYS}/><Sel label="DUTY TYPE" value={form.dutyType} onChange={v=>setForm({...form,dutyType:v})} options={DUTY_TYPES}/><Sel label="TERM" value={form.term} onChange={v=>setForm({...form,term:v})} options={TERMS}/><div><label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:3}}>START TIME</label><input type="time" value={form.startTime} onChange={e=>setForm({...form,startTime:e.target.value})} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px",fontSize:13,fontFamily:F}}/></div><div><label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:3}}>END TIME</label><input type="time" value={form.endTime} onChange={e=>setForm({...form,endTime:e.target.value})} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px",fontSize:13,fontFamily:F}}/></div><Inp label="NOTE (optional)" value={form.note} onChange={v=>setForm({...form,note:v})} placeholder="Any notes..."/></div>{msg.t&&<div style={{marginTop:10,fontSize:13,color:msg.ok?"#15803d":"#b91c1c",fontWeight:"bold"}}>{msg.t}</div>}<div style={{marginTop:14}}><Btn onClick={doAdd} v="primary">➕ Assign Duty</Btn></div></Card>}
+
+      {msg.t&&<div style={{background:msg.ok?"#f0fdf4":"#fef2f2",border:`1px solid ${msg.ok?"#bbf7d0":"#fecaca"}`,borderRadius:10,padding:"10px 16px",marginBottom:14,color:msg.ok?"#15803d":"#b91c1c",fontWeight:"bold",fontSize:13}}>{msg.t}</div>}
+
+      {/* ── TEACHER ROSTER ── */}
+      {tab==="teacher"&&(
+        <div style={{display:"grid",gap:16}}>
+          {user?.role==="admin"&&(
+            <Card style={{background:"linear-gradient(135deg,#eff6ff,#dbeafe)",border:"1px solid #bfdbfe"}}>
+              <div style={{fontWeight:"bold",color:"#1e3a5f",marginBottom:8,fontSize:14}}>⚡ Auto-Generate Teacher Duty Roster</div>
+              <div style={{fontSize:12,color:"#64748b",marginBottom:12}}>Automatically assigns morning & evening duties across all {teachingStaff.length} teaching staff for the week. Evening duties respect availability settings.</div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                <Btn onClick={autoGenTeacherRoster} v="primary">⚡ Generate Roster</Btn>
+                <Btn onClick={()=>printRoster("teacher")} v="ghost">🖨️ Print Roster</Btn>
+                {duties.length>0&&<Btn onClick={()=>{if(confirm("Clear all teacher duties?"))setDuties([]);}} v="ghost" style={{color:"#b91c1c"}}>🗑️ Clear</Btn>}
+              </div>
+            </Card>
+          )}
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",minWidth:700}}>
+              <thead>
+                <tr style={{background:"#1e3a5f"}}>
+                  <th style={{padding:"10px 12px",color:"white",fontSize:12,textAlign:"left"}}>Day</th>
+                  <th style={{padding:"10px 12px",color:"white",fontSize:12,textAlign:"left"}}>Session</th>
+                  <th style={{padding:"10px 12px",color:"white",fontSize:12,textAlign:"left"}}>Duty</th>
+                  <th style={{padding:"10px 12px",color:"white",fontSize:12,textAlign:"left"}}>Teacher</th>
+                  <th style={{padding:"10px 12px",color:"white",fontSize:12,textAlign:"left"}}>Time</th>
+                  {user?.role==="admin"&&<th style={{padding:"10px 12px",color:"white",fontSize:12}}>Action</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {duties.filter(d=>d.term===term).length?
+                  DAYS.flatMap(day=>{
+                    const dayDuties=duties.filter(d=>d.day===day&&d.term===term);
+                    return dayDuties.map((d,i)=>(
+                      <tr key={d.id} style={{background:i%2===0?"white":"#fafafa",borderTop:i===0?"2px solid #e2e8f0":"1px solid #f1f5f9"}}>
+                        <td style={{...td,fontWeight:"bold",color:"#1e3a5f"}}>{i===0?day:""}</td>
+                        <td style={td}><span style={{fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:"bold",background:d.session==="Evening"?"#fef3c7":"#eff6ff",color:d.session==="Evening"?"#b45309":"#1d4ed8"}}>{d.session||"Day"}</span></td>
+                        <td style={{...td,fontWeight:"bold"}}>{d.dutyType}</td>
+                        <td style={td}>{d.teacherName}</td>
+                        <td style={{...td,fontFamily:"monospace",fontSize:11}}>{d.startTime} – {d.endTime}</td>
+                        {user?.role==="admin"&&<td style={td}><button onClick={()=>setDuties(p=>p.filter(x=>x.id!==d.id))} style={{background:"none",border:"none",color:"#b91c1c",cursor:"pointer",fontSize:13}}>✕</button></td>}
+                      </tr>
+                    ));
+                  })
+                :<tr><td colSpan={6} style={{padding:40,textAlign:"center",color:"#94a3b8"}}>No duties yet. Click "Generate Roster" above.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── STUDENT ROSTER ── */}
+      {tab==="students"&&(
+        <div style={{display:"grid",gap:16}}>
+          {user?.role==="admin"&&(
+            <Card style={{background:"linear-gradient(135deg,#f0fdf4,#dcfce7)",border:"1px solid #bbf7d0"}}>
+              <div style={{fontWeight:"bold",color:"#15803d",marginBottom:8,fontSize:14}}>⚡ Auto-Generate Student Duty Roster</div>
+              <div style={{fontSize:12,color:"#64748b",marginBottom:12}}>Rotates student duties across the week for the selected class.</div>
+              <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                <Sel value={selCls} onChange={setSelCls} options={ALL_CLASSES}/>
+                <Btn onClick={autoGenStudentRoster} v="green">⚡ Generate for {selCls}</Btn>
+                <Btn onClick={()=>printRoster("student")} v="ghost">🖨️ Print</Btn>
+              </div>
+            </Card>
+          )}
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}>
+              <thead>
+                <tr style={{background:"#15803d"}}>
+                  {["Day","Duty","Student","Class"].map(h=><th key={h} style={{padding:"10px 12px",color:"white",fontSize:12,textAlign:"left"}}>{h}</th>)}
+                  {user?.role==="admin"&&<th style={{padding:"10px 12px",color:"white",fontSize:12}}>Action</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {stuDutyRoster.filter(d=>d.class===selCls&&d.term===term).length?
+                  DAYS.flatMap(day=>{
+                    const dayDuties=stuDutyRoster.filter(d=>d.day===day&&d.class===selCls&&d.term===term);
+                    return dayDuties.map((d,i)=>(
+                      <tr key={d.id} style={{background:i%2===0?"white":"#fafafa",borderTop:i===0?"2px solid #e2e8f0":"1px solid #f1f5f9"}}>
+                        <td style={{...td,fontWeight:"bold",color:"#15803d"}}>{i===0?day:""}</td>
+                        <td style={{...td,fontWeight:"bold"}}>{d.dutyType}</td>
+                        <td style={td}>{d.studentName}</td>
+                        <td style={td}><span style={{background:"#f0fdf4",color:"#15803d",fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:"bold"}}>{d.class}</span></td>
+                        {user?.role==="admin"&&<td style={td}><button onClick={()=>setStuDutyRoster(p=>p.filter(x=>x.id!==d.id))} style={{background:"none",border:"none",color:"#b91c1c",cursor:"pointer",fontSize:13}}>✕</button></td>}
+                      </tr>
+                    ));
+                  })
+                :<tr><td colSpan={5} style={{padding:40,textAlign:"center",color:"#94a3b8"}}>No student duties for {selCls}. Generate above.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── TEACHER AVAILABILITY ── */}
+      {tab==="availability"&&(
+        <Card>
+          <div style={{fontWeight:"bold",color:"#1e3a5f",marginBottom:4,fontSize:14}}>⚙️ Teacher Evening Duty Availability</div>
+          <div style={{fontSize:12,color:"#64748b",marginBottom:16}}>Toggle which teachers can be assigned evening duties. Teachers with evening unavailability will only be assigned morning duties.</div>
+          <div style={{display:"grid",gap:10}}>
+            {teachingStaff.map(t=>{
+              const eve=canEvening(t.id);
+              return(
+                <div key={t.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px",background:eve?"#f0fdf4":"#fef2f2",borderRadius:10,border:`1px solid ${eve?"#bbf7d0":"#fecaca"}`}}>
+                  <div>
+                    <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:13}}>{t.name}</div>
+                    <div style={{fontSize:11,color:"#64748b"}}>{t.subject||"—"}</div>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <span style={{fontSize:11,fontWeight:"bold",color:eve?"#15803d":"#b91c1c"}}>{eve?"✅ Can do Evening":"🚫 Morning Only"}</span>
+                    {user?.role==="admin"&&(
+                      <button onClick={()=>toggleEvening(t.id)} style={{background:eve?"#15803d":"#94a3b8",color:"white",border:"none",borderRadius:20,padding:"5px 14px",cursor:"pointer",fontSize:11,fontWeight:"bold",fontFamily:F}}>
+                        {eve?"Remove Evening":"Allow Evening"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {!teachingStaff.length&&<Empty icon="👨‍🏫" text="No teaching staff added yet. Add staff first."/>}
+          </div>
+        </Card>
+      )}
     </div>
   );
 }
@@ -3511,12 +3774,13 @@ export default function App() {
   const [examType,setExamType]=useState("End Term Exam");
   const [logo,setLogo]=useState(null);
   const [monitoring,setMonitoring]=useState([]);
+  const [timetable,setTimetable]=useState({});
 
   useEffect(()=>{
     (async()=>{
-      const [u,s,r,c,a,f,st,lg,mon]=await Promise.all([load("tnks_users"),load("tnks_students"),load("tnks_results"),load("tnks_comments"),load("tnks_announcements"),load("tnks_fees"),load("tnks_staff"),load("tnks_logo"),load("tnks_monitoring")]);
+      const [u,s,r,c,a,f,st,lg,mon,tt]=await Promise.all([load("tnks_users"),load("tnks_students"),load("tnks_results"),load("tnks_comments"),load("tnks_announcements"),load("tnks_fees"),load("tnks_staff"),load("tnks_logo"),load("tnks_monitoring"),load("tnks_timetable")]);
       if(u) setUsers(u); if(s) setStudents(s); if(r) setResults(r);
-      if(c) setComments(c); if(a) setAnnouncements(a); if(f) setFees(f); if(st) setStaff(st); if(lg) setLogo(lg); if(mon) setMonitoring(mon);
+      if(c) setComments(c); if(a) setAnnouncements(a); if(f) setFees(f); if(st) setStaff(st); if(lg) setLogo(lg); if(mon) setMonitoring(mon); if(tt) setTimetable(tt);
       setReady(true);
     })();
   },[]);
@@ -3529,6 +3793,7 @@ export default function App() {
   useEffect(()=>{if(ready) save("tnks_fees",fees);},[fees,ready]);
   useEffect(()=>{if(ready) save("tnks_staff",staff);},[staff,ready]);
   useEffect(()=>{if(ready) save("tnks_monitoring",monitoring);},[monitoring,ready]);
+  useEffect(()=>{if(ready) save("tnks_timetable",timetable);},[timetable,ready]);
   useEffect(()=>{
     const handler=(e)=>setView(e.detail);
     window.addEventListener("tnks-nav",handler);
@@ -3555,20 +3820,20 @@ export default function App() {
       <Sidebar view={view} setView={setView} user={user} onLogout={()=>{setUser(null);setView("dashboard");}} logo={logo}/>
       <main style={{flex:1,overflowY:"auto"}}>
         {view==="dashboard"&&<Dashboard {...ctx}/>}
-        {view==="students"&&<StudentsPage students={students} setStudents={setStudents} fees={fees} setFees={setFees}/>}
+        {view==="students"&&<StudentsPage students={students} setStudents={setStudents} results={results} setResults={setResults} comments={comments} setComments={setComments} fees={fees} setFees={setFees} monitoring={monitoring} setMonitoring={setMonitoring}/>}
         {view==="admissions"&&<AdmissionsPage students={students} setStudents={setStudents}/>}
         {view==="results"&&<ResultsPage {...ctx}/>}
         {view==="analytics"&&<AnalyticsPage {...ctx}/>}
         {view==="reports"&&<ReportsPage {...ctx}/>}
         {view==="fees"&&<FeesPage students={students} fees={fees} setFees={setFees} user={user} logo={logo}/>}
         {view==="feestructure"&&<FeeStructurePage user={user}/>}
-        {view==="timetable"&&<TimetablePage students={students} staff={staff} user={user}/>}
+        {view==="timetable"&&<TimetablePage students={students} staff={staff} user={user} timetable={timetable} setTimetable={setTimetable}/>}
         {view==="monitoring"&&<LearnerMonitoringPage students={students} user={user} monitoring={monitoring} setMonitoring={setMonitoring}/>}
         {view==="attendance"&&<AttendancePage {...ctx}/>}
         {view==="timeinout"&&<TimeInOutPage students={students} staff={staff} user={user}/>}
         {view==="staff"&&user.role==="admin"&&<StaffPage staff={staff} setStaff={setStaff} users={users} setUsers={setUsers}/>}
         {view==="staff"&&user.role!=="admin"&&<div style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Admin access required.</div>}
-        {view==="duty"&&<DutyPage staff={staff} user={user}/>}
+        {view==="duty"&&<DutyPage staff={staff} user={user} students={students}/>}
         {view==="council"&&<CouncilPage students={students} user={user}/>}
         {view==="library"&&<LibraryPage/>}
         {view==="events"&&<EventsPage user={user}/>}
