@@ -543,8 +543,75 @@ function ResultsPage({students,results,setResults,comments,setComments,users,ter
   const subs=getSubs(cls); const curSub=sub||subs[0]||"";
   const clsStu=students.filter(s=>s.class===cls).sort((a,b)=>a.name.localeCompare(b.name));
   useEffect(()=>{const m={}; clsStu.forEach(s=>{const r=results.find(r=>r.studentId===s.id&&r.class===cls&&r.subject===curSub&&r.term===term&&r.year===year&&r.examType===examType); if(r) m[s.id]=r.marks;}); setMarks(m);},[cls,curSub,term,year,examType,results.length]);
-  function doSave(){const next=[...results.filter(r=>!(r.class===cls&&r.subject===curSub&&r.term===term&&r.year===year&&r.examType===examType))]; clsStu.forEach(s=>{const m=marks[s.id]; if(m!==""&&m!==undefined&&m!==null&&!isNaN(parseFloat(m))) next.push({id:`${s.id}-${cls}-${curSub}-${term}-${year}-${examType}`,studentId:s.id,class:cls,subject:curSub,term,year,examType,marks:parseFloat(m)});}); setResults(next); setMsg("✅ Results saved!"); setTimeout(()=>setMsg(""),2500);}
-  function saveCm(){if(!cmText.trim()){setCmMsg("Enter a comment.");return;} const nc={id:`${cmStu.id}-${term}-${year}-${examType}`,studentId:cmStu.id,term,year,examType,text:cmText.trim(),teacher:user?.name||"Teacher",date:new Date().toLocaleDateString("en-KE")}; setComments(p=>[...(p||[]).filter(c=>c.id!==nc.id),nc]); setCmMsg("✅ Saved!"); setTimeout(()=>{setCmMsg("");setCmMode(false);},1500);}
+
+  function autoComment(name, avg) {
+    const n = name.split(" ")[0];
+    if(avg>=90) return [
+      `${n} has demonstrated an outstanding performance this term. Keep up the excellent work!`,
+      `Exceptional achievement! ${n} continues to set a high standard for peers. Well done!`,
+      `${n} has excelled across all areas this term. A truly commendable performance.`,
+    ][Math.floor(Math.random()*3)];
+    if(avg>=75) return [
+      `${n} has performed very well this term. With continued effort, even greater heights are achievable.`,
+      `Great performance by ${n}! Keep maintaining this momentum and strive for excellence.`,
+      `${n} has shown impressive dedication this term. Keep it up!`,
+    ][Math.floor(Math.random()*3)];
+    if(avg>=58) return [
+      `${n} has met expectations this term. More consistent effort will lead to better results.`,
+      `A satisfactory performance from ${n}. Focus and hard work will make a big difference next term.`,
+      `${n} is progressing well. Let us work together to push for even higher scores.`,
+    ][Math.floor(Math.random()*3)];
+    if(avg>=41) return [
+      `${n} has shown some improvement but needs to work harder to meet full expectations.`,
+      `${n} should dedicate more time to revision and seek help where needed. You can do better!`,
+      `Moderate performance from ${n} this term. Greater effort and focus are required going forward.`,
+    ][Math.floor(Math.random()*3)];
+    if(avg>=21) return [
+      `${n} needs to improve significantly. Regular attendance, revision, and seeking teacher support are encouraged.`,
+      `${n} is facing challenges this term. Let us work together to identify areas needing improvement.`,
+      `More effort is needed from ${n}. Please dedicate adequate time to studies and ask for help when needed.`,
+    ][Math.floor(Math.random()*3)];
+    return [
+      `${n} requires urgent attention and support. Please consult with the class teacher for an improvement plan.`,
+      `${n} has not performed as expected. Immediate and consistent effort is needed to improve next term.`,
+      `${n} needs significant support. Parents/guardians are encouraged to follow up on the learner's progress at home.`,
+    ][Math.floor(Math.random()*3)];
+  }
+
+  function doSave(){
+    const next=[...results.filter(r=>!(r.class===cls&&r.subject===curSub&&r.term===term&&r.year===year&&r.examType===examType))];
+    clsStu.forEach(s=>{
+      const m=marks[s.id];
+      if(m!==""&&m!==undefined&&m!==null&&!isNaN(parseFloat(m)))
+        next.push({id:`${s.id}-${cls}-${curSub}-${term}-${year}-${examType}`,studentId:s.id,class:cls,subject:curSub,term,year,examType,marks:parseFloat(m)});
+    });
+    setResults(next);
+
+    // Auto-generate comments for all students who have marks across all subjects
+    const newComments=[...(comments||[])];
+    clsStu.forEach(s=>{
+      // Get all results for this student including the ones just saved
+      const allSr=next.filter(r=>r.studentId===s.id&&r.term===term&&r.year===year&&r.examType===examType);
+      const srMap={}; allSr.forEach(r=>{srMap[r.subject]=r;});
+      const deduped=Object.values(srMap);
+      if(deduped.length===0) return;
+      const avg=deduped.reduce((a,b)=>a+b.marks,0)/deduped.length;
+      const existingIdx=newComments.findIndex(c=>c.studentId===s.id&&c.term===term&&c.year===year&&c.examType===examType);
+      const nc={
+        id:`${s.id}-${term}-${year}-${examType}`,
+        studentId:s.id,term,year,examType,
+        text:autoComment(s.name,avg),
+        teacher:"Class Teacher",
+        date:new Date().toLocaleDateString("en-KE")
+      };
+      if(existingIdx>=0) newComments[existingIdx]=nc;
+      else newComments.push(nc);
+    });
+    setComments(newComments);
+    setMsg("✅ Results saved & comments generated!"); setTimeout(()=>setMsg(""),3000);
+  }
+
+  function saveCm(){if(!cmText.trim()){setCmMsg("Enter a comment.");return;} const nc={id:`${cmStu.id}-${term}-${year}-${examType}`,studentId:cmStu.id,term,year,examType,text:cmText.trim(),teacher:"Class Teacher",date:new Date().toLocaleDateString("en-KE")}; setComments(p=>[...(p||[]).filter(c=>c.id!==nc.id),nc]); setCmMsg("✅ Saved!"); setTimeout(()=>{setCmMsg("");setCmMode(false);},1500);}
   const th={textAlign:"left",padding:"10px 14px",fontWeight:"bold",fontSize:11,color:"#1d4ed8",background:"#eff6ff",letterSpacing:.5};
   const td={padding:"8px 12px",fontSize:13,color:"#374151",borderTop:"1px solid #f1f5f9"};
   return (
@@ -622,28 +689,36 @@ function AnalyticsPage({students,results,term,setTerm,year,setYear,examType,setE
 // ══════════════════════════════════════════════════════════
 function printWindow(title, bodyHTML, logo) {
   const w = window.open("", "_blank", "width=900,height=700");
-  const logoTag = logo ? `<img src="${logo}" style="height:64px;margin-bottom:6px;"/>` : "";
-  const watermark = `<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);opacity:0.04;pointer-events:none;z-index:0;font-size:72px;font-weight:900;color:#1e3a5f;white-space:nowrap;font-family:Georgia,serif;">${SCHOOL.motto}</div>`;
-  const logoWm = logo ? `<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);opacity:0.04;pointer-events:none;z-index:0;"><img src="${logo}" style="width:280px;height:280px;object-fit:contain;"/></div>` : "";
+  const logoTag = logo ? `<img id="school-logo" src="${logo}" style="height:72px;margin-bottom:6px;display:block;margin-left:auto;margin-right:auto;"/>` : "";
+  const logoWm = logo ? `<img src="${logo}" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);opacity:0.06;pointer-events:none;z-index:0;width:300px;height:300px;object-fit:contain;"/>` : `<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);opacity:0.04;pointer-events:none;z-index:0;font-size:80px;font-weight:900;color:#1e3a5f;white-space:nowrap;font-family:Georgia,serif;">${SCHOOL.motto}</div>`;
   w.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>
     *{box-sizing:border-box;}
-    body{margin:0;font-family:Georgia,serif;background:white;}
-    @media print{@page{margin:10mm;} .no-print{display:none!important;}}
-    .school-header{text-align:center;border-bottom:3px solid #1e3a5f;padding-bottom:14px;margin-bottom:16px;}
-    .school-header h1{margin:4px 0;font-size:18px;color:#1e3a5f;}
-    .school-header p{margin:2px 0;font-size:10px;color:#64748b;}
-    .motto{font-size:12px;font-style:italic;color:#15803d;font-weight:bold;}
+    body{margin:0;padding:16px;font-family:Georgia,serif;background:white;}
+    @media print{@page{margin:12mm;} .no-print{display:none!important;}}
+    .school-header{text-align:center;border-bottom:3px double #1e3a5f;padding-bottom:12px;margin-bottom:20px;}
+    .school-header h1{margin:6px 0 2px;font-size:20px;color:#1e3a5f;letter-spacing:0.5px;}
+    .school-header p{margin:2px 0;font-size:10px;color:#555;}
+    .motto{font-size:13px;font-style:italic;color:#15803d;font-weight:bold;margin-top:4px;}
   </style></head><body>
-  ${watermark}${logoWm}
+  ${logoWm}
   <div class="school-header">
     ${logoTag}
     <h1>${SCHOOL.name}</h1>
     <p>${SCHOOL.location}</p>
-    <p>${SCHOOL.phone} | ${SCHOOL.email} | ${SCHOOL.website}</p>
+    <p>${SCHOOL.phone} &nbsp;|&nbsp; ${SCHOOL.email} &nbsp;|&nbsp; ${SCHOOL.website}</p>
     <p class="motto">"${SCHOOL.motto}"</p>
   </div>
+  <div style="position:relative;z-index:1;">
   ${bodyHTML}
-  <script>window.onload=()=>window.print()<\/script>
+  </div>
+  <script>
+    function doPrint(){window.print();}
+    ${logo ? `
+    var img=document.getElementById('school-logo');
+    if(img && !img.complete){img.onload=doPrint;img.onerror=doPrint;}
+    else{setTimeout(doPrint,300);}
+    ` : `setTimeout(doPrint,200);`}
+  <\/script>
   </body></html>`);
   w.document.close();
 }
@@ -662,7 +737,9 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
   // Compute class rankings for position column
   function getClassRankings(classStudents) {
     return classStudents.map(s=>{
-      const sr=results.filter(r=>r.studentId===s.id&&r.term===term&&r.year===year&&r.examType===examType);
+      const rawSr=results.filter(r=>r.studentId===s.id&&r.term===term&&r.year===year&&r.examType===examType);
+      const srMap={}; rawSr.forEach(r=>{srMap[r.subject]=r;});
+      const sr=Object.values(srMap);
       const total=sr.reduce((a,b)=>a+b.marks,0);
       const avg=sr.length?total/sr.length:0;
       return {...s,total,avg,subs:sr};
@@ -671,7 +748,10 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
 
   function buildReportHTML(student, allInClass) {
     const subs=getSubs(student.class);
-    const sr=results.filter(r=>r.studentId===student.id&&r.term===term&&r.year===year&&r.examType===examType);
+    // Deduplicate: keep only one result per subject (latest by array order)
+    const rawSr=results.filter(r=>r.studentId===student.id&&r.term===term&&r.year===year&&r.examType===examType);
+    const srMap={}; rawSr.forEach(r=>{srMap[r.subject]=r;}); // last one per subject wins
+    const sr=Object.values(srMap);
     const comment=(comments||[]).find(c=>c.studentId===student.id&&c.term===term&&c.year===year&&c.examType===examType);
     const total=sr.reduce((a,b)=>a+b.marks,0);
     const avg=sr.length?total/sr.length:0;
@@ -854,7 +934,9 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
 }
 function ReportCard({student,results,comments,term,year,examType,isParent,logo,students}) {
   const subs=getSubs(student.class);
-  const sr=results.filter(r=>r.studentId===student.id&&r.term===term&&r.year===year&&r.examType===examType);
+  const rawSr=results.filter(r=>r.studentId===student.id&&r.term===term&&r.year===year&&r.examType===examType);
+  const srMap={}; rawSr.forEach(r=>{srMap[r.subject]=r;});
+  const sr=Object.values(srMap);
   const comment=(comments||[]).find(c=>c.studentId===student.id&&c.term===term&&c.year===year&&c.examType===examType);
   const total=sr.reduce((a,b)=>a+b.marks,0);
   const avg=sr.length?total/sr.length:0;
