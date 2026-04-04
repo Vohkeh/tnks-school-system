@@ -1,6 +1,11 @@
-import { supabase } from './supabase'
 import { useState, useEffect, useRef, useCallback } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, RadarChart, Radar, PolarGrid, PolarAngleAxis } from "recharts";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  "https://hqusooghcafguejukfex.supabase.co",
+  "sb_publishable_Wwrgf9CzLq0qUSxrfTXGmw_UZ1V3ehP"
+);
 
 // ══════════════════════════════════════════════════════════
 // CONSTANTS
@@ -98,27 +103,16 @@ function makeTimeSlots(cfg) {
 // ══════════════════════════════════════════════════════════
 // STORAGE
 // ══════════════════════════════════════════════════════════
-import { supabase } from './supabase'
-
 async function load(k) {
   try {
-    const { data, error } = await supabase
-      .from(k)
-      .select('data')
-      .eq('id', k)
-      .single()
-    if (error || !data) return null
-    return JSON.parse(data.data)
-  } catch { return null }
+    const { data, error } = await supabase.from(k).select('data').eq('id', k).single();
+    if (error || !data) return null;
+    return JSON.parse(data.data);
+  } catch { return null; }
 }
-
 async function save(k, v) {
   try {
-    await supabase.from(k).upsert({
-      id: k,
-      data: JSON.stringify(v),
-      updated_at: new Date().toISOString()
-    })
+    await supabase.from(k).upsert({ id: k, data: JSON.stringify(v), updated_at: new Date().toISOString() });
   } catch {}
 }
 
