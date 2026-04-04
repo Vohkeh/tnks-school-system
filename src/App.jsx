@@ -107,12 +107,14 @@ async function load(k) {
   try {
     const { data, error } = await supabase.from(k).select('data').eq('id', k).single();
     if (error || !data) return null;
+    if (k === 'tnks_logo') return data.data; // logo stored as plain text
     return JSON.parse(data.data);
   } catch { return null; }
 }
 async function save(k, v) {
   try {
-    await supabase.from(k).upsert({ id: k, data: JSON.stringify(v), updated_at: new Date().toISOString() });
+    const val = k === 'tnks_logo' ? (v || null) : JSON.stringify(v);
+    await supabase.from(k).upsert({ id: k, data: val, updated_at: new Date().toISOString() });
   } catch {}
 }
 
