@@ -31,7 +31,7 @@ const SUBJECTS_MAP = {
   PP: ["Language Activities","Mathematical Activities","Environmental Activities","Creative Activities","Religious Education Activities"],
   Lower: ["English Language Activities","Kiswahili Language Activities","Mathematical Activities","Environmental Activities","Religious Education Activities","Creative Activities","Indigenous Language Activities"],
   Upper: ["English","Kiswahili","Mathematics","Integrated Science","Social Studies","Religious Education (CRE/IRE)","Agriculture and Nutrition","Creative Arts and Sports"],
-  JSS: ["English","Kiswahili","Mathematics","Integrated Science","History","Geography","Pre-Technical and Pre-Career Studies","Agriculture and Nutrition","Religious Education (CRE/IRE)","Creative Arts and Sports"],
+  JSS: ["English","Kiswahili","Mathematics","Integrated Science","Social Studies (History & Geography)","Pre-Technical and Pre-Career Studies","Agriculture and Nutrition","Religious Education (CRE/IRE)","Creative Arts and Sports"],
 };
 
 // Lessons per week per subject (CBC curriculum guidelines)
@@ -53,7 +53,7 @@ const LESSONS_PER_WEEK = {
   JSS: {
     "English":5,"Kiswahili":5,"Mathematics":5,
     "Integrated Science":5,   // includes 1 double lesson per week
-    "History":2,"Geography":2,
+    "Social Studies (History & Geography)":4,
     "Pre-Technical and Pre-Career Studies":3,"Agriculture and Nutrition":2,
     "Religious Education (CRE/IRE)":2,"Creative Arts and Sports":3,
   },
@@ -618,90 +618,254 @@ function AnalyticsPage({students,results,term,setTerm,year,setYear,examType,setE
 }
 
 // ══════════════════════════════════════════════════════════
+// UNIVERSAL PRINT HELPER — school header + motto watermark
+// ══════════════════════════════════════════════════════════
+function printWindow(title, bodyHTML, logo) {
+  const w = window.open("", "_blank", "width=900,height=700");
+  const logoTag = logo ? `<img src="${logo}" style="height:64px;margin-bottom:6px;"/>` : "";
+  const watermark = `<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);opacity:0.04;pointer-events:none;z-index:0;font-size:72px;font-weight:900;color:#1e3a5f;white-space:nowrap;font-family:Georgia,serif;">${SCHOOL.motto}</div>`;
+  const logoWm = logo ? `<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);opacity:0.04;pointer-events:none;z-index:0;"><img src="${logo}" style="width:280px;height:280px;object-fit:contain;"/></div>` : "";
+  w.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>
+    *{box-sizing:border-box;}
+    body{margin:0;font-family:Georgia,serif;background:white;}
+    @media print{@page{margin:10mm;} .no-print{display:none!important;}}
+    .school-header{text-align:center;border-bottom:3px solid #1e3a5f;padding-bottom:14px;margin-bottom:16px;}
+    .school-header h1{margin:4px 0;font-size:18px;color:#1e3a5f;}
+    .school-header p{margin:2px 0;font-size:10px;color:#64748b;}
+    .motto{font-size:12px;font-style:italic;color:#15803d;font-weight:bold;}
+  </style></head><body>
+  ${watermark}${logoWm}
+  <div class="school-header">
+    ${logoTag}
+    <h1>${SCHOOL.name}</h1>
+    <p>${SCHOOL.location}</p>
+    <p>${SCHOOL.phone} | ${SCHOOL.email} | ${SCHOOL.website}</p>
+    <p class="motto">"${SCHOOL.motto}"</p>
+  </div>
+  ${bodyHTML}
+  <script>window.onload=()=>window.print()<\/script>
+  </body></html>`);
+  w.document.close();
+}
+
+// ══════════════════════════════════════════════════════════
 // REPORT FORMS
 // ══════════════════════════════════════════════════════════
 function ReportsPage({students,results,comments,term,setTerm,year,setYear,examType,setExamType,logo}) {
-  const [cls,setCls]=useState("Grade 7"); const [selId,setSelId]=useState("");
+  const [cls,setCls]=useState("Grade 7");
+  const [selId,setSelId]=useState("");
   const [showDl,setShowDl]=useState(false);
+  const [printMode,setPrintMode]=useState("results"); // "results" | "grades"
   const clsStu=students.filter(s=>s.class===cls).sort((a,b)=>a.name.localeCompare(b.name));
   const sel=selId?students.find(s=>s.id===selId):null;
 
-  function buildReportHTML(student,isWatermark){
+  // Compute class rankings for position column
+  function getClassRankings(classStudents) {
+    return classStudents.map(s=>{
+      const sr=results.filter(r=>r.studentId===s.id&&r.term===term&&r.year===year&&r.examType===examType);
+      const total=sr.reduce((a,b)=>a+b.marks,0);
+      const avg=sr.length?total/sr.length:0;
+      return {...s,total,avg,subs:sr};
+    }).sort((a,b)=>b.avg-a.avg).map((s,i)=>({...s,position:i+1}));
+  }
+
+  function buildReportHTML(student, allInClass) {
     const subs=getSubs(student.class);
     const sr=results.filter(r=>r.studentId===student.id&&r.term===term&&r.year===year&&r.examType===examType);
     const comment=(comments||[]).find(c=>c.studentId===student.id&&c.term===term&&c.year===year&&c.examType===examType);
-    const avg=sr.length?sr.reduce((a,b)=>a+b.marks,0)/sr.length:0;
+    const total=sr.reduce((a,b)=>a+b.marks,0);
+    const avg=sr.length?total/sr.length:0;
     const og=getGrade(avg);
-    const wm=isWatermark&&logo?`<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);opacity:0.05;pointer-events:none;"><img src="${logo}" style="width:300px;height:300px;object-fit:contain;"/></div>`:"";
-    const rows=subs.map(s=>{const r=sr.find(x=>x.subject===s);const g=r?getGrade(r.marks):null;return`<tr style="background:${subs.indexOf(s)%2===0?"white":"#f8fafc"}"><td style="padding:7px 10px;font-size:11px;">${s}</td><td style="padding:7px 10px;font-weight:bold;text-align:center;">${r?r.marks:"—"}</td><td style="padding:7px 10px;">${g?`<span style="background:${g.bg};color:${g.col};font-size:10px;padding:2px 7px;border-radius:12px;font-weight:bold;">${g.g}</span>`:"—"}</td><td style="padding:7px 10px;text-align:center;">${g?g.pts:"—"}</td><td style="padding:7px 10px;font-size:10px;color:#64748b;">${g?g.lbl:"—"}</td></tr>`;}).join("");
-    return`<div style="font-family:Georgia,serif;page-break-after:always;padding:20px;position:relative;max-width:680px;margin:0 auto;">${wm}
-    <div style="text-align:center;border-bottom:2px solid #1e3a5f;padding-bottom:12px;margin-bottom:12px;">
-      ${logo?`<img src="${logo}" style="height:56px;margin-bottom:6px;"/><br/>`:""}
-      <strong style="font-size:16px;color:#1e3a5f;">${SCHOOL.name}</strong><br/>
-      <span style="font-size:10px;color:#64748b;">${SCHOOL.location} · ${SCHOOL.phone}</span><br/>
-      <span style="font-size:11px;font-style:italic;color:#15803d;">"${SCHOOL.motto}"</span><br/>
-      <span style="background:#1e3a5f;color:white;font-size:11px;padding:3px 16px;border-radius:16px;display:inline-block;margin-top:4px;">${examType.toUpperCase()} — ${term.toUpperCase()} ${year}</span>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;margin-bottom:12px;">
-      <div><b>Name:</b> ${student.name}</div><div><b>Adm. No:</b> ${student.admNo}</div>
-      <div><b>Class:</b> ${student.class}</div><div><b>Gender:</b> ${student.gender||"—"}</div>
-    </div>
-    <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:12px;">
-      <thead><tr style="background:#1e3a5f;color:white;">${["Subject","Marks","Grade","Points","Remarks"].map(h=>`<th style="padding:7px 10px;text-align:left;">${h}</th>`).join("")}</tr></thead>
-      <tbody>${rows}<tr style="background:#f0fdf4;font-weight:bold;"><td style="padding:7px 10px;">AVERAGE</td><td style="padding:7px 10px;text-align:center;">${avg>0?avg.toFixed(1):"—"}</td><td style="padding:7px 10px;">${avg>0?`<span style="background:${og.bg};color:${og.col};font-size:10px;padding:2px 7px;border-radius:12px;font-weight:bold;">${og.g}</span>`:"—"}</td><td style="padding:7px 10px;text-align:center;">${avg>0?og.pts:"—"}</td><td style="padding:7px 10px;font-size:10px;">${avg>0?og.lbl:"—"}</td></tr></tbody>
-    </table>
-    <div style="border:1px solid #e2e8f0;border-radius:6px;padding:10px;margin-bottom:10px;font-size:11px;"><b>Teacher's Comment:</b> ${comment?comment.text:"No comment recorded."}</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:10px;">
-      ${["Class Teacher","Head Teacher","Parent/Guardian"].map(l=>`<div style="text-align:center;"><div style="border-top:1px solid #374151;padding-top:4px;font-size:10px;color:#64748b;">${l}</div></div>`).join("")}
-    </div></div>`;
+    const ranked=allInClass||[];
+    const pos=ranked.find(x=>x.id===student.id)?.position||"—";
+    const outOf=ranked.length||"—";
+    const rows=subs.map((s,idx)=>{
+      const r=sr.find(x=>x.subject===s);
+      const g=r?getGrade(r.marks):null;
+      return `<tr style="background:${idx%2===0?"white":"#f8fafc"}">
+        <td style="padding:7px 10px;font-size:11px;">${s}</td>
+        <td style="padding:7px 10px;font-weight:bold;text-align:center;">${r?r.marks:"—"}</td>
+        <td style="padding:7px 10px;">${g?`<span style="background:${g.bg};color:${g.col};font-size:10px;padding:2px 7px;border-radius:12px;font-weight:bold;">${g.g}</span>`:"—"}</td>
+        <td style="padding:7px 10px;text-align:center;">${g?g.pts:"—"}</td>
+        <td style="padding:7px 10px;font-size:10px;color:#64748b;">${g?g.lbl:"—"}</td>
+      </tr>`;
+    }).join("");
+    return `<div style="page-break-after:always;padding:20px 24px;max-width:700px;margin:0 auto;position:relative;">
+      <div style="background:#1e3a5f;color:white;text-align:center;padding:4px 0;font-size:12px;font-weight:bold;border-radius:16px;margin-bottom:12px;letter-spacing:1px;">${examType.toUpperCase()} — ${term.toUpperCase()} ${year}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;margin-bottom:12px;border:1px solid #e2e8f0;border-radius:6px;padding:10px;">
+        <div><b>Name:</b> ${student.name}</div><div><b>Adm. No:</b> ${student.admNo||"—"}</div>
+        <div><b>Class:</b> ${student.class}</div><div><b>Gender:</b> ${student.gender||"—"}</div>
+        <div><b>Position:</b> <span style="font-weight:bold;color:#1e3a5f;">${pos} / ${outOf}</span></div>
+        <div><b>Total Marks:</b> <span style="font-weight:bold;">${sr.length?total.toFixed(0):"—"}</span></div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:12px;">
+        <thead><tr style="background:#1e3a5f;color:white;">${["Subject","Marks","Grade","Points","Remarks"].map(h=>`<th style="padding:7px 10px;text-align:left;">${h}</th>`).join("")}</tr></thead>
+        <tbody>${rows}
+          <tr style="background:#f0fdf4;font-weight:bold;border-top:2px solid #1e3a5f;">
+            <td style="padding:7px 10px;">TOTAL</td>
+            <td style="padding:7px 10px;text-align:center;font-size:13px;">${sr.length?total.toFixed(0):"—"}</td>
+            <td colspan="3" style="padding:7px 10px;font-size:10px;color:#64748b;">Sum of all subject marks</td>
+          </tr>
+          <tr style="background:#eff6ff;font-weight:bold;">
+            <td style="padding:7px 10px;">AVERAGE</td>
+            <td style="padding:7px 10px;text-align:center;font-size:13px;">${avg>0?avg.toFixed(1):"—"}</td>
+            <td style="padding:7px 10px;">${avg>0?`<span style="background:${og.bg};color:${og.col};font-size:10px;padding:2px 7px;border-radius:12px;font-weight:bold;">${og.g}</span>`:"—"}</td>
+            <td style="padding:7px 10px;text-align:center;">${avg>0?og.pts:"—"}</td>
+            <td style="padding:7px 10px;font-size:10px;">${avg>0?og.lbl:"—"}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="border:1px solid #e2e8f0;border-radius:6px;padding:10px;margin-bottom:12px;font-size:11px;">
+        <b>Teacher's Comment:</b> ${comment?comment.text:"No comment recorded."}
+        ${comment?`<div style="font-size:9px;color:#94a3b8;margin-top:4px;">— ${comment.teacher} (${comment.date})</div>`:""}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:14px;">
+        ${["Class Teacher","Head Teacher","Parent/Guardian"].map(l=>`<div style="text-align:center;"><div style="border-top:1px solid #374151;padding-top:4px;font-size:10px;color:#64748b;">${l}</div><div style="font-size:9px;color:#94a3b8;margin-top:12px;">Signature & Date</div></div>`).join("")}
+      </div>
+      <div style="margin-top:12px;background:#f8fafc;border-radius:6px;padding:8px 10px;">
+        <span style="font-size:9px;font-weight:bold;color:#374151;">CBC Grading: </span>
+        ${[{g:"EE1",r:"90-100"},{g:"EE2",r:"75-89"},{g:"ME1",r:"58-74"},{g:"ME2",r:"41-57"},{g:"AE1",r:"31-40"},{g:"AE2",r:"21-30"},{g:"BE1",r:"11-20"},{g:"BE2",r:"0-10"}].map(({g,r})=>{const gd=getGrade(g==="EE1"?95:g==="EE2"?80:g==="ME1"?65:g==="ME2"?50:g==="AE1"?35:g==="AE2"?25:g==="BE1"?15:5);return`<span style="font-size:9px;background:${gd.bg};color:${gd.col};padding:1px 5px;border-radius:8px;font-weight:bold;margin-right:3px;">${g}:${r}</span>`;}).join("")}
+      </div>
+    </div>`;
+  }
+
+  // Build a class results table (marks) sorted by position
+  function buildClassResultsHTML(classStudents, className) {
+    const subs=getSubs(className);
+    const ranked=getClassRankings(classStudents);
+    const rows=ranked.map((s,i)=>{
+      const sr=s.subs;
+      return `<tr style="background:${i%2===0?"white":"#f8fafc"}">
+        <td style="padding:6px 8px;font-weight:bold;color:${i<3?"#b45309":"#374151"};">${i===0?"🥇":i===1?"🥈":i===2?"🥉":i+1}</td>
+        <td style="padding:6px 8px;font-weight:bold;">${s.name}</td>
+        <td style="padding:6px 8px;font-size:10px;">${s.admNo||"—"}</td>
+        ${subs.map(su=>{const r=sr.find(x=>x.subject===su);return`<td style="padding:6px 8px;text-align:center;font-weight:bold;">${r?r.marks:"—"}</td>`;}).join("")}
+        <td style="padding:6px 8px;text-align:center;font-weight:bold;background:#fef3c7;">${s.subs.length?s.total.toFixed(0):"—"}</td>
+        <td style="padding:6px 8px;text-align:center;font-weight:bold;background:#eff6ff;">${s.avg>0?s.avg.toFixed(1):"—"}</td>
+      </tr>`;
+    }).join("");
+    return `<div style="margin-bottom:32px;">
+      <div style="background:#1e3a5f;color:white;padding:8px 14px;font-weight:bold;font-size:13px;border-radius:8px 8px 0 0;">${className} — ${examType} · ${term} ${year}</div>
+      <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:10px;min-width:600px;">
+        <thead><tr style="background:#eff6ff;">
+          <th style="padding:6px 8px;text-align:left;">Pos</th>
+          <th style="padding:6px 8px;text-align:left;">Name</th>
+          <th style="padding:6px 8px;text-align:left;">Adm</th>
+          ${subs.map(s=>`<th style="padding:6px 8px;text-align:center;max-width:60px;">${s.split(" ").slice(0,2).join(" ")}</th>`).join("")}
+          <th style="padding:6px 8px;text-align:center;background:#fef3c7;">Total</th>
+          <th style="padding:6px 8px;text-align:center;background:#eff6ff;">Avg</th>
+        </tr></thead>
+        <tbody>${rows}${!ranked.length?`<tr><td colspan="${subs.length+5}" style="padding:20px;text-align:center;color:#94a3b8;">No results entered.</td></tr>`:""}</tbody>
+      </table></div>
+    </div>`;
+  }
+
+  // Build a class GRADES table sorted by position
+  function buildClassGradesHTML(classStudents, className) {
+    const subs=getSubs(className);
+    const ranked=getClassRankings(classStudents);
+    const rows=ranked.map((s,i)=>{
+      const sr=s.subs;
+      const og=s.avg>0?getGrade(s.avg):null;
+      return `<tr style="background:${i%2===0?"white":"#f8fafc"}">
+        <td style="padding:6px 8px;font-weight:bold;color:${i<3?"#b45309":"#374151"};">${i===0?"🥇":i===1?"🥈":i===2?"🥉":i+1}</td>
+        <td style="padding:6px 8px;font-weight:bold;">${s.name}</td>
+        ${subs.map(su=>{const r=sr.find(x=>x.subject===su);const g=r?getGrade(r.marks):null;return`<td style="padding:6px 8px;text-align:center;">${g?`<span style="background:${g.bg};color:${g.col};font-size:9px;padding:1px 5px;border-radius:8px;font-weight:bold;">${g.g}</span>`:"—"}</td>`;}).join("")}
+        <td style="padding:6px 8px;text-align:center;">${og?`<span style="background:${og.bg};color:${og.col};font-size:9px;padding:2px 7px;border-radius:8px;font-weight:bold;">${og.g}</span>`:"—"}</td>
+        <td style="padding:6px 8px;text-align:center;font-weight:bold;">${og?og.pts:"—"}</td>
+      </tr>`;
+    }).join("");
+    return `<div style="margin-bottom:32px;">
+      <div style="background:#15803d;color:white;padding:8px 14px;font-weight:bold;font-size:13px;border-radius:8px 8px 0 0;">${className} — Grades · ${examType} · ${term} ${year}</div>
+      <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:10px;min-width:600px;">
+        <thead><tr style="background:#f0fdf4;">
+          <th style="padding:6px 8px;text-align:left;">Pos</th>
+          <th style="padding:6px 8px;text-align:left;">Name</th>
+          ${subs.map(s=>`<th style="padding:6px 8px;text-align:center;max-width:60px;">${s.split(" ").slice(0,2).join(" ")}</th>`).join("")}
+          <th style="padding:6px 8px;text-align:center;">Overall</th>
+          <th style="padding:6px 8px;text-align:center;">Pts</th>
+        </tr></thead>
+        <tbody>${rows}${!ranked.length?`<tr><td colspan="${subs.length+4}" style="padding:20px;text-align:center;color:#94a3b8;">No results entered.</td></tr>`:""}</tbody>
+      </table></div>
+    </div>`;
   }
 
   function printSingle(student){
-    const w=window.open("","_blank","width=820,height=700");
-    w.document.write(`<!DOCTYPE html><html><head><title>Report - ${student.name}</title><style>body{margin:0;}@media print{@page{margin:10mm;}}</style></head><body>${buildReportHTML(student,true)}<script>window.onload=()=>window.print()<\/script></body></html>`);
-    w.document.close();
+    const classStudents=students.filter(s=>s.class===student.class).sort((a,b)=>a.name.localeCompare(b.name));
+    const ranked=getClassRankings(classStudents);
+    printWindow(`Report — ${student.name}`, buildReportHTML(student, ranked), logo);
   }
   function printClass(){
-    const w=window.open("","_blank","width=820,height=700");
-    const body=clsStu.map(s=>buildReportHTML(s,true)).join("");
-    w.document.write(`<!DOCTYPE html><html><head><title>${cls} Reports — ${term} ${year}</title><style>body{margin:0;}@media print{@page{margin:10mm;}}</style></head><body>${body}<script>window.onload=()=>window.print()<\/script></body></html>`);
-    w.document.close();
+    const ranked=getClassRankings(clsStu);
+    const body=ranked.map(s=>buildReportHTML(s,ranked)).join("");
+    printWindow(`${cls} Reports — ${term} ${year}`, body, logo);
   }
   function printSchool(){
-    const allStu=students.slice().sort((a,b)=>a.class.localeCompare(b.class)||a.name.localeCompare(b.name));
-    const w=window.open("","_blank","width=820,height=700");
-    const body=allStu.map(s=>buildReportHTML(s,true)).join("");
-    w.document.write(`<!DOCTYPE html><html><head><title>All Reports — ${term} ${year}</title><style>body{margin:0;}@media print{@page{margin:10mm;}}</style></head><body>${body}<script>window.onload=()=>window.print()<\/script></body></html>`);
-    w.document.close();
+    const body=ALL_CLASSES.map(c=>{
+      const stu=students.filter(s=>s.class===c).sort((a,b)=>a.name.localeCompare(b.name));
+      const ranked=getClassRankings(stu);
+      return ranked.map(s=>buildReportHTML(s,ranked)).join("");
+    }).join("");
+    printWindow(`All School Reports — ${term} ${year}`, body, logo);
+  }
+  function printClassResults(className, mode){
+    const stu=students.filter(s=>s.class===className).sort((a,b)=>a.name.localeCompare(b.name));
+    const html=mode==="grades"?buildClassGradesHTML(stu,className):buildClassResultsHTML(stu,className);
+    printWindow(`${className} ${mode==="grades"?"Grades":"Results"} — ${term} ${year}`, html, logo);
+  }
+  function printSchoolResults(mode){
+    const html=ALL_CLASSES.map(c=>{
+      const stu=students.filter(s=>s.class===c).sort((a,b)=>a.name.localeCompare(b.name));
+      return mode==="grades"?buildClassGradesHTML(stu,c):buildClassResultsHTML(stu,c);
+    }).join("");
+    printWindow(`Full School ${mode==="grades"?"Grades":"Results"} — ${term} ${year}`, html, logo);
   }
 
   return (
     <div style={{padding:24}}>
       <PageH title="Report Forms" sub="Generate CBC learner progress report cards">
-        <div style={{display:"flex",gap:8,alignItems:"center",position:"relative"}}>
+        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
           {sel&&<Btn onClick={()=>printSingle(sel)} v="green" style={{fontSize:12}}>🖨️ Print This Report</Btn>}
+          {/* Print Reports dropdown */}
           <div style={{position:"relative"}}>
-            <Btn onClick={()=>setShowDl(s=>!s)} v="teal" style={{fontSize:12}}>⬇️ Download Results</Btn>
-            {showDl&&<div style={{position:"absolute",top:"100%",right:0,zIndex:200,background:"white",border:"1px solid #e2e8f0",borderRadius:12,boxShadow:"0 8px 24px rgba(0,0,0,.12)",padding:8,minWidth:220,marginTop:4}}>
-              <button onClick={()=>{printClass();setShowDl(false);}} style={{width:"100%",display:"block",padding:"9px 14px",background:"none",border:"none",cursor:"pointer",textAlign:"left",fontSize:12,fontFamily:F,color:"#374151",borderRadius:8}} onMouseEnter={e=>e.target.style.background="#f1f5f9"} onMouseLeave={e=>e.target.style.background="none"}>🏫 All {cls} Reports (Whole Class)</button>
-              <div style={{borderTop:"1px solid #f1f5f9",marginTop:4,paddingTop:4}}>
-                <button onClick={()=>{printSchool();setShowDl(false);}} style={{width:"100%",display:"block",padding:"9px 14px",background:"#1e3a5f",border:"none",cursor:"pointer",textAlign:"left",fontSize:12,fontFamily:F,color:"white",borderRadius:8,fontWeight:"bold"}}>🎓 All School Reports</button>
-              </div>
+            <Btn onClick={()=>setShowDl(s=>!s)} v="teal" style={{fontSize:12}}>📄 Print Reports ▾</Btn>
+            {showDl&&<div style={{position:"absolute",top:"100%",right:0,zIndex:200,background:"white",border:"1px solid #e2e8f0",borderRadius:12,boxShadow:"0 8px 24px rgba(0,0,0,.12)",padding:8,minWidth:240,marginTop:4}}>
+              <div style={{fontSize:10,color:"#94a3b8",padding:"4px 10px",fontWeight:"bold",letterSpacing:.5}}>REPORT CARDS</div>
+              <button onClick={()=>{printClass();setShowDl(false);}} style={{width:"100%",display:"block",padding:"8px 14px",background:"none",border:"none",cursor:"pointer",textAlign:"left",fontSize:12,fontFamily:F,color:"#374151",borderRadius:8}} onMouseEnter={e=>e.target.style.background="#f1f5f9"} onMouseLeave={e=>e.target.style.background="none"}>🏫 {cls} — All Report Cards</button>
+              <button onClick={()=>{printSchool();setShowDl(false);}} style={{width:"100%",display:"block",padding:"8px 14px",background:"none",border:"none",cursor:"pointer",textAlign:"left",fontSize:12,fontFamily:F,color:"#374151",borderRadius:8}} onMouseEnter={e=>e.target.style.background="#f1f5f9"} onMouseLeave={e=>e.target.style.background="none"}>🎓 Whole School Report Cards</button>
+              <div style={{borderTop:"1px solid #f1f5f9",margin:"6px 0"}}/>
+              <div style={{fontSize:10,color:"#94a3b8",padding:"4px 10px",fontWeight:"bold",letterSpacing:.5}}>RESULTS (MARKS)</div>
+              <button onClick={()=>{printClassResults(cls,"results");setShowDl(false);}} style={{width:"100%",display:"block",padding:"8px 14px",background:"none",border:"none",cursor:"pointer",textAlign:"left",fontSize:12,fontFamily:F,color:"#374151",borderRadius:8}} onMouseEnter={e=>e.target.style.background="#f1f5f9"} onMouseLeave={e=>e.target.style.background="none"}>📊 {cls} — Results by Position</button>
+              <button onClick={()=>{printSchoolResults("results");setShowDl(false);}} style={{width:"100%",display:"block",padding:"8px 14px",background:"none",border:"none",cursor:"pointer",textAlign:"left",fontSize:12,fontFamily:F,color:"#374151",borderRadius:8}} onMouseEnter={e=>e.target.style.background="#f1f5f9"} onMouseLeave={e=>e.target.style.background="none"}>📊 All Classes — Results</button>
+              <div style={{borderTop:"1px solid #f1f5f9",margin:"6px 0"}}/>
+              <div style={{fontSize:10,color:"#94a3b8",padding:"4px 10px",fontWeight:"bold",letterSpacing:.5}}>GRADES</div>
+              <button onClick={()=>{printClassResults(cls,"grades");setShowDl(false);}} style={{width:"100%",display:"block",padding:"8px 14px",background:"none",border:"none",cursor:"pointer",textAlign:"left",fontSize:12,fontFamily:F,color:"#374151",borderRadius:8}} onMouseEnter={e=>e.target.style.background="#f1f5f9"} onMouseLeave={e=>e.target.style.background="none"}>🎯 {cls} — Grades by Position</button>
+              <button onClick={()=>{printSchoolResults("grades");setShowDl(false);}} style={{width:"100%",display:"block",padding:"8px 14px",background:"#15803d",border:"none",cursor:"pointer",textAlign:"left",fontSize:12,fontFamily:F,color:"white",borderRadius:8,fontWeight:"bold"}} >🎯 All Classes — Grades</button>
             </div>}
           </div>
         </div>
       </PageH>
       <Card style={{marginBottom:18}}><div style={{display:"flex",gap:12,flexWrap:"wrap"}}><Sel label="CLASS" value={cls} onChange={v=>{setCls(v);setSelId("");}} options={ALL_CLASSES}/><div><label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:3}}>STUDENT</label><select value={selId} onChange={e=>setSelId(e.target.value)} style={{border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px 10px",fontSize:13,fontFamily:F,minWidth:200}}><option value="">-- Select student --</option>{clsStu.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div><Sel label="TERM" value={term} onChange={setTerm} options={TERMS}/><Sel label="EXAM TYPE" value={examType} onChange={setExamType} options={EXAM_TYPES}/><Sel label="YEAR" value={year} onChange={setYear} options={YEARS}/></div></Card>
-      {sel?<ReportCard student={sel} results={results} comments={comments} term={term} year={year} examType={examType} logo={logo}/>:<Empty icon="📋" text="Select a student to view their report"/>}
+      {sel?<ReportCard student={sel} results={results} comments={comments} term={term} year={year} examType={examType} logo={logo} students={students}/>:<Empty icon="📋" text="Select a student to view their report"/>}
     </div>
   );
 }
-function ReportCard({student,results,comments,term,year,examType,isParent,logo}) {
+function ReportCard({student,results,comments,term,year,examType,isParent,logo,students}) {
   const subs=getSubs(student.class);
   const sr=results.filter(r=>r.studentId===student.id&&r.term===term&&r.year===year&&r.examType===examType);
   const comment=(comments||[]).find(c=>c.studentId===student.id&&c.term===term&&c.year===year&&c.examType===examType);
-  const avg=sr.length?sr.reduce((a,b)=>a+b.marks,0)/sr.length:0;
+  const total=sr.reduce((a,b)=>a+b.marks,0);
+  const avg=sr.length?total/sr.length:0;
   const og=getGrade(avg);
+  // Compute position in class
+  const classStudents=(students||[]).filter(s=>s.class===student.class);
+  const classRanked=classStudents.map(s=>{
+    const r2=results.filter(r=>r.studentId===s.id&&r.term===term&&r.year===year&&r.examType===examType);
+    return {...s,avg:r2.length?r2.reduce((a,b)=>a+b.marks,0)/r2.length:0};
+  }).sort((a,b)=>b.avg-a.avg);
+  const position=classRanked.findIndex(s=>s.id===student.id)+1||"—";
   return (
     <Card style={{maxWidth:700,margin:"0 auto",fontFamily:F}}>
       <div style={{textAlign:"center",borderBottom:"2px solid #1e3a5f",paddingBottom:14,marginBottom:14}}>
@@ -709,7 +873,13 @@ function ReportCard({student,results,comments,term,year,examType,isParent,logo})
         <div style={{fontSize:13,fontWeight:"bold",background:"#1e3a5f",color:"white",display:"inline-block",padding:"4px 20px",borderRadius:20,letterSpacing:1}}>{examType.toUpperCase()} — {term.toUpperCase()} {year}</div>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:16,marginBottom:16}}>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,fontSize:12}}><div><b>Name:</b> {student.name}</div><div><b>Adm. No:</b> {student.admNo}</div><div><b>Class:</b> {student.class}</div><div><b>Gender:</b> {student.gender||"—"}</div><div><b>Term:</b> {term}</div><div><b>Year:</b> {year}</div></div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,fontSize:12}}>
+          <div><b>Name:</b> {student.name}</div><div><b>Adm. No:</b> {student.admNo}</div>
+          <div><b>Class:</b> {student.class}</div><div><b>Gender:</b> {student.gender||"—"}</div>
+          <div><b>Term:</b> {term}</div><div><b>Year:</b> {year}</div>
+          <div><b>Position:</b> <span style={{fontWeight:"bold",color:"#1e3a5f"}}>{position} / {classStudents.length}</span></div>
+          <div><b>Total Marks:</b> <span style={{fontWeight:"bold"}}>{sr.length?total.toFixed(0):"—"}</span></div>
+        </div>
         <Avatar name={student.name} photo={student.photo} size={72}/>
       </div>
       <table style={{width:"100%",borderCollapse:"collapse",marginBottom:14}}>
@@ -717,7 +887,20 @@ function ReportCard({student,results,comments,term,year,examType,isParent,logo})
         <tbody>
           {subs.map((s,i)=>{const r=sr.find(x=>x.subject===s); const g=r?getGrade(r.marks):null; return(<tr key={s} style={{background:i%2===0?"white":"#fafafa"}}><td style={{padding:"7px 12px",fontSize:12}}>{s}</td><td style={{padding:"7px 12px",fontSize:13,fontWeight:"bold",textAlign:"center"}}>{r?r.marks:"—"}</td><td style={{padding:"7px 12px"}}>{g?<span style={{background:g.bg,color:g.col,fontSize:11,padding:"2px 8px",borderRadius:20,fontWeight:"bold"}}>{g.g}</span>:<span style={{color:"#94a3b8"}}>—</span>}</td><td style={{padding:"7px 12px",textAlign:"center",fontSize:12}}>{g?g.pts:"—"}</td><td style={{padding:"7px 12px",fontSize:11,color:"#64748b"}}>{g?g.lbl:"—"}</td></tr>);})}
         </tbody>
-        <tfoot><tr style={{background:"#f0fdf4",fontWeight:"bold"}}><td style={{padding:"8px 12px",fontSize:12}}>TOTAL / AVERAGE</td><td style={{padding:"8px 12px",fontSize:14,fontWeight:"bold",textAlign:"center"}}>{avg>0?avg.toFixed(1):"—"}</td><td style={{padding:"8px 12px"}}>{avg>0?<span style={{background:og.bg,color:og.col,fontSize:12,padding:"3px 10px",borderRadius:20,fontWeight:"bold"}}>{og.g}</span>:"—"}</td><td style={{padding:"8px 12px",textAlign:"center",fontSize:12}}>{avg>0?og.pts:"—"}</td><td style={{padding:"8px 12px",fontSize:11}}>{avg>0?og.lbl:"—"}</td></tr></tfoot>
+        <tfoot>
+          <tr style={{background:"#fef3c7",fontWeight:"bold"}}>
+            <td style={{padding:"8px 12px",fontSize:12}}>TOTAL MARKS</td>
+            <td style={{padding:"8px 12px",fontSize:14,fontWeight:"bold",textAlign:"center"}}>{sr.length?total.toFixed(0):"—"}</td>
+            <td colSpan={3} style={{padding:"8px 12px",fontSize:11,color:"#64748b"}}>Sum of all subjects</td>
+          </tr>
+          <tr style={{background:"#f0fdf4",fontWeight:"bold"}}>
+            <td style={{padding:"8px 12px",fontSize:12}}>AVERAGE</td>
+            <td style={{padding:"8px 12px",fontSize:14,fontWeight:"bold",textAlign:"center"}}>{avg>0?avg.toFixed(1):"—"}</td>
+            <td style={{padding:"8px 12px"}}>{avg>0?<span style={{background:og.bg,color:og.col,fontSize:12,padding:"3px 10px",borderRadius:20,fontWeight:"bold"}}>{og.g}</span>:"—"}</td>
+            <td style={{padding:"8px 12px",textAlign:"center",fontSize:12}}>{avg>0?og.pts:"—"}</td>
+            <td style={{padding:"8px 12px",fontSize:11}}>{avg>0?og.lbl:"—"}</td>
+          </tr>
+        </tfoot>
       </table>
       <div style={{border:"1px solid #e2e8f0",borderRadius:8,padding:12,marginBottom:14}}><div style={{fontSize:12,fontWeight:"bold",color:"#1e3a5f",marginBottom:6}}>Teacher's Comment</div><div style={{fontSize:12,color:"#374151",minHeight:36}}>{comment?comment.text:<i style={{color:"#94a3b8"}}>No comment recorded.</i>}</div>{comment&&<div style={{fontSize:10,color:"#94a3b8",marginTop:6}}>— {comment.teacher} ({comment.date})</div>}</div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16,marginTop:14}}>{["Class Teacher","Head Teacher","Parent/Guardian"].map(l=><div key={l} style={{textAlign:"center"}}><div style={{borderTop:"1px solid #374151",marginBottom:4,paddingTop:4,fontSize:11,color:"#64748b"}}>{l}</div></div>)}</div>
@@ -749,30 +932,14 @@ function FeesPage({students,fees,setFees,user,logo}) {
   const getBalance=(f)=>(parseFloat(f.amount)||0)-(parseFloat(f.paid)||0);
 
   function printStatement(title,rows,totals){
-    const logoTag=logo?`<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);opacity:0.05;z-index:0;"><img src="${logo}" style="width:320px;height:320px;object-fit:contain;"/></div>`:"";
-    const w=window.open("","_blank","width=900,height=700");
-    w.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>
-      body{font-family:Georgia,serif;padding:24px;position:relative;}
-      table{width:100%;border-collapse:collapse;font-size:12px;}
-      th{background:#1e3a5f;color:white;padding:8px 10px;text-align:left;}
-      td{padding:7px 10px;border-bottom:1px solid #e2e8f0;}
-      tr:nth-child(even){background:#f8fafc;}
-      .header{text-align:center;margin-bottom:20px;border-bottom:2px solid #1e3a5f;padding-bottom:12px;}
-      .totals{background:#f0fdf4;font-weight:bold;}
-      @media print{body{padding:12px;}}
-    </style></head><body>
-    ${logoTag}
-    <div class="header">
-      ${logo?`<img src="${logo}" style="height:60px;margin-bottom:8px;"/><br/>`:""}
-      <h2 style="margin:0;color:#1e3a5f;">${SCHOOL.name}</h2>
-      <div style="font-size:12px;color:#64748b;">${SCHOOL.address} · ${SCHOOL.phone}</div>
-      <h3 style="margin:8px 0 0;">${title}</h3>
-      <div style="font-size:11px;color:#94a3b8;">Generated: ${new Date().toLocaleString("en-KE")}</div>
-    </div>
-    <table><thead><tr>${rows[0].map(h=>`<th>${h}</th>`).join("")}</tr></thead>
-    <tbody>${rows.slice(1).map((r,i)=>`<tr class="${i===rows.length-2?"totals":""}">${r.map(c=>`<td>${c}</td>`).join("")}</tr>`).join("")}</tbody></table>
-    <script>window.onload=()=>{window.print();}<\/script></body></html>`);
-    w.document.close();
+    const tableHTML=`<h3 style="margin:0 0 12px;color:#1e3a5f;">${title}</h3>
+    <div style="font-size:11px;color:#94a3b8;margin-bottom:12px;">Generated: ${new Date().toLocaleString("en-KE")}</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead><tr>${rows[0].map(h=>`<th style="background:#1e3a5f;color:white;padding:8px 10px;text-align:left;">${h}</th>`).join("")}</tr></thead>
+      <tbody>${rows.slice(1).map((r,i)=>`<tr style="background:${i===rows.length-2?"#f0fdf4":i%2===0?"white":"#f8fafc"};${i===rows.length-2?"font-weight:bold;":""}">${r.map(c=>`<td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;">${c}</td>`).join("")}</tr>`).join("")}
+      </tbody>
+    </table>`;
+    printWindow(title, tableHTML, logo);
   }
 
   function downloadGradeStatement(cls){
