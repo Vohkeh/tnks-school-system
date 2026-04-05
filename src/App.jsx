@@ -27,12 +27,21 @@ const STUDENT_TYPES = ["Day Scholar","Boarder","Bus (Route A)","Bus (Route B)","
 const HEALTH_STATUSES = ["Healthy","Sick - In School","Sick - Sent Home","Hospitalised","Recovering"];
 const DISCIPLINE_LEVELS = ["Good","Minor Issue","Warning","Suspension Risk","Suspended","Expelled"];
 const MONITORING_TYPES = ["Health","Discipline","Absent - Home","Absent - Sick","Absent - Other","Late","Left Early"];
+// Subjects for TIMETABLE (all separate)
+const TIMETABLE_SUBJECTS_MAP = {
+  PP: ["Language Activities","Mathematical Activities","Environmental Activities","Creative Activities","Religious Education Activities"],
+  Lower: ["English Language Activities","Kiswahili Language Activities","Mathematical Activities","Environmental Activities","Religious Education Activities","Creative Activities","Indigenous Language Activities"],
+  Upper: ["English","Kiswahili","Mathematics","Integrated Science","Social Studies","Religious Education (CRE/IRE)","Agriculture and Nutrition","Creative Arts and Sports"],
+  JSS: ["English","Kiswahili","Mathematics","Integrated Science","History","Geography","Pre-Technical and Pre-Career Studies","Agriculture and Nutrition","Religious Education (CRE/IRE)","Creative Arts and Sports"],
+};
+// Subjects for RESULTS ENTRY (SST+CRE merged for Upper, History+Geography merged for JSS)
 const SUBJECTS_MAP = {
   PP: ["Language Activities","Mathematical Activities","Environmental Activities","Creative Activities","Religious Education Activities"],
   Lower: ["English Language Activities","Kiswahili Language Activities","Mathematical Activities","Environmental Activities","Religious Education Activities","Creative Activities","Indigenous Language Activities"],
   Upper: ["English","Kiswahili","Mathematics","Integrated Science","Social Studies & CRE","Agriculture and Nutrition","Creative Arts and Sports"],
   JSS: ["English","Kiswahili","Mathematics","Integrated Science","Social Studies (History & Geography)","Pre-Technical and Pre-Career Studies","Agriculture and Nutrition","Religious Education (CRE/IRE)","Creative Arts and Sports"],
 };
+function getTimetableSubs(cls) { return TIMETABLE_SUBJECTS_MAP[cg(cls)]||[]; }
 
 // Lessons per week per subject (CBC curriculum guidelines)
 const LESSONS_PER_WEEK = {
@@ -60,7 +69,7 @@ const LESSONS_PER_WEEK = {
 };
 // Double-lesson subjects (one of their weekly lessons is a double/2-period block)
 const DOUBLE_LESSON_SUBJECTS = {
-  JSS: ["Integrated Science","Pre-Technical and Pre-Career Studies"],
+  JSS: ["Integrated Science"],
   Upper: ["Integrated Science"],
 };
 function getLessonsPerWeek(cls) {
@@ -1539,71 +1548,41 @@ function TimetableSetup({staff,setupData,setSetupData}) {
 // ══════════════════════════════════════════════════════════
 // TIMETABLEMASTER — Professional Scheduling Engine
 // ══════════════════════════════════════════════════════════
-function TimetablePage({students,staff,user,timetable:tt,setTimetable:setTt}){
+function TimetablePage({students,staff,user,timetable:tt,setTimetable:setTt,ttSetup,setTtSetup}){
+  const upd=(key,val)=>setTtSetup(p=>({...p,[key]:val}));
+  const ttName=ttSetup.name; const setTtName=v=>upd("name",v);
+  const ttDesc=ttSetup.desc; const setTtDesc=v=>upd("desc",v);
+  const ttSession=ttSetup.session; const setTtSession=v=>upd("session",v);
+  const ttStartDate=ttSetup.startDate; const setTtStartDate=v=>upd("startDate",v);
+  const ttEndDate=ttSetup.endDate; const setTtEndDate=v=>upd("endDate",v);
+  const setupData=ttSetup.setupData; const setSetupData=v=>upd("setupData",typeof v==="function"?v(ttSetup.setupData):v);
+  const customLpw=ttSetup.customLpw; const setCustomLpw=v=>upd("customLpw",typeof v==="function"?v(ttSetup.customLpw):v);
+  const customDouble=ttSetup.customDouble; const setCustomDouble=v=>upd("customDouble",typeof v==="function"?v(ttSetup.customDouble):v);
+  const bellPeriods=ttSetup.bellPeriods; const setBellPeriods=v=>upd("bellPeriods",typeof v==="function"?v(ttSetup.bellPeriods):v);
+  const workingDays=ttSetup.workingDays; const setWorkingDays=v=>upd("workingDays",typeof v==="function"?v(ttSetup.workingDays):v);
+  const rooms=ttSetup.rooms; const setRooms=v=>upd("rooms",typeof v==="function"?v(ttSetup.rooms):v);
+  const daySchedule=ttSetup.daySchedule; const setDaySchedule=v=>upd("daySchedule",typeof v==="function"?v(ttSetup.daySchedule):v);
+  const satSchedule=ttSetup.satSchedule; const setSatSchedule=v=>upd("satSchedule",typeof v==="function"?v(ttSetup.satSchedule):v);
+  const sunSchedule=ttSetup.sunSchedule; const setSunSchedule=v=>upd("sunSchedule",typeof v==="function"?v(ttSetup.sunSchedule):v);
   const [tab,setTab]=useState("setup");
-  const [setupStep,setSetupStep]=useState(1); // TimetableMaster 9-step wizard
+  const [setupStep,setSetupStep]=useState(1);
   const [selCls,setSelCls]=useState("Grade 7");
   const [editCell,setEditCell]=useState(null);
   const [editVal,setEditVal]=useState({});
   const [msg,setMsg]=useState("");
   const [msgType,setMsgType]=useState("ok");
   const [weekendView,setWeekendView]=useState(false);
-  const [setupData,setSetupData]=useState({subjectTeachers:{},subjectAvailability:{},classTeachers:{}});
-  // Editable lessons-per-week and double-lesson per class+subject
-  const [customLpw,setCustomLpw]=useState({}); // key: "cls::sub" => number
-  const [customDouble,setCustomDouble]=useState({}); // key: "cls::sub" => bool
   const [filterTeacher,setFilterTeacher]=useState("All");
   const [dragSrc,setDragSrc]=useState(null);
   const [dragOver,setDragOver]=useState(null);
   const [generating,setGenerating]=useState(false);
   const [genProgress,setGenProgress]=useState(0);
   const [conflictMap,setConflictMap]=useState({});
-  const [daySchedule,setDaySchedule]=useState(DEFAULT_CFG.schedule);
   const [editSchedIdx,setEditSchedIdx]=useState(null);
   const [subView,setSubView]=useState("byclass");
-
-  // TimetableMaster Step 1 — Basic Info
-  const [ttName,setTtName]=useState("TNKS Timetable 2025");
-  const [ttDesc,setTtDesc]=useState("");
-  const [ttSession,setTtSession]=useState("2024-2025");
-  const [ttStartDate,setTtStartDate]=useState("");
-  const [ttEndDate,setTtEndDate]=useState("");
-
-  // TimetableMaster Step 2 — Bell Schedule (fully editable periods + breaks)
-  const [bellPeriods,setBellPeriods]=useState([
-    {id:1,type:"period",name:"Period 1",start:"07:00",end:"07:40"},
-    {id:2,type:"period",name:"Period 2",start:"07:40",end:"08:20"},
-    {id:3,type:"break",name:"Short Break ☕",start:"08:20",end:"08:30"},
-    {id:4,type:"period",name:"Period 3",start:"08:30",end:"09:10"},
-    {id:5,type:"period",name:"Period 4",start:"09:10",end:"09:50"},
-    {id:6,type:"break",name:"Long Break 🧘",start:"09:50",end:"10:10"},
-    {id:7,type:"period",name:"Period 5",start:"10:10",end:"10:50"},
-    {id:8,type:"period",name:"Period 6",start:"10:50",end:"11:30"},
-    {id:9,type:"break",name:"Lunch 🍽️",start:"11:30",end:"12:10"},
-    {id:10,type:"period",name:"Period 7",start:"12:10",end:"12:50"},
-    {id:11,type:"period",name:"Period 8",start:"12:50",end:"13:30"},
-  ]);
-  const [workingDays,setWorkingDays]=useState(["Monday","Tuesday","Wednesday","Thursday","Friday"]);
   const [editBellIdx,setEditBellIdx]=useState(null);
-
-  // TimetableMaster Step 3 — Staff (uses existing staff)
-  // TimetableMaster Step 4 — Grades (uses ALL_CLASSES)
-  // TimetableMaster Step 5 — Rooms
-  const [rooms,setRooms]=useState([
-    {id:1,name:"Main Classroom"},
-    {id:2,name:"Science Lab"},
-    {id:3,name:"Computer Lab"},
-    {id:4,name:"Library"},
-  ]);
   const [newRoom,setNewRoom]=useState("");
-
-  // TimetableMaster Step 6 — Subjects (uses getSubs per class)
-  // TimetableMaster Step 7 — Lessons (uses setupData)
-
-  // Weekend schedule — FULLY EDITABLE (activity + time)
-  const [satSchedule,setSatSchedule]=useState(DEFAULT_CFG.weekendSchedule.Saturday.map((s,i)=>({...s,id:i})));
-  const [sunSchedule,setSunSchedule]=useState(DEFAULT_CFG.weekendSchedule.Sunday.map((s,i)=>({...s,id:i})));
-  const [editWeekendCell,setEditWeekendCell]=useState(null); // {day,idx}
+  const [editWeekendCell,setEditWeekendCell]=useState(null);
   const [weekendEditVal,setWeekendEditVal]=useState({});
 
   const FT="'Nunito',Georgia,sans-serif";
@@ -1709,7 +1688,7 @@ function TimetablePage({students,staff,user,timetable:tt,setTimetable:setTt}){
       let prog=0;
       ALL_CLASSES.forEach(cls=>{
         prog+=8;setGenProgress(Math.min(prog,95));
-        const clsSubs=getSubs(cls);
+        const clsSubs=getTimetableSubs(cls);
         const upper=["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(cls);
         const clsTeacher=getClsTeacher(cls);
         const clsLpw=getLessonsPerWeek(cls);
@@ -1845,10 +1824,10 @@ function TimetablePage({students,staff,user,timetable:tt,setTimetable:setTt}){
   // Color palette for subjects
   const palette=["#dbeafe","#d1fae5","#fef3c7","#fee2e2","#f3e8ff","#ccfbf1","#fce7f3","#e0f2fe","#fef9c3","#ffe4e6","#ecfdf5","#faf5ff"];
   const colMap={};
-  getSubs(selCls).forEach((s,i)=>{colMap[s]=palette[i%palette.length];});
+  getTimetableSubs(selCls).forEach((s,i)=>{colMap[s]=palette[i%palette.length];});
   // global colMap for teacher view
   const allSubs=[];
-  ALL_CLASSES.forEach(c=>getSubs(c).forEach(s=>{if(!allSubs.includes(s))allSubs.push(s);}));
+  ALL_CLASSES.forEach(c=>getTimetableSubs(c).forEach(s=>{if(!allSubs.includes(s))allSubs.push(s);}));
   const globalColMap={};allSubs.forEach((s,i)=>{globalColMap[s]=palette[i%palette.length];});
 
   const clsTT=tt[selCls]||{};
@@ -2496,12 +2475,12 @@ function TimetablePage({students,staff,user,timetable:tt,setTimetable:setTt}){
             {/* Subject colour legend + weekly allocation */}
             <div style={{padding:"12px 16px",borderTop:"1px solid #f1f5f9",display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
               <span style={{fontSize:11,fontWeight:"bold",color:"#1e3a5f"}}>Legend:</span>
-              {subs.slice(0,6).map(s=><span key={s} style={{fontSize:10,background:colMap[s]||"#f8fafc",padding:"2px 8px",borderRadius:20,color:"#1e3a5f",fontWeight:"bold",border:"1px solid rgba(0,0,0,.08)"}}>{s.split(" ")[0]}</span>)}
+              {getTimetableSubs(selCls).slice(0,6).map(s=><span key={s} style={{fontSize:10,background:colMap[s]||"#f8fafc",padding:"2px 8px",borderRadius:20,color:"#1e3a5f",fontWeight:"bold",border:"1px solid rgba(0,0,0,.08)"}}>{s.split(" ")[0]}</span>)}
               {totalConflicts>0&&<span style={{fontSize:10,background:"#fee2e2",color:"#b91c1c",padding:"2px 8px",borderRadius:20,fontWeight:"bold",border:"2px solid #b91c1c"}}>⚠️ Conflict</span>}
             </div>
 
             {/* Lessons per week bar */}
-            {(()=>{const entries=getSubs(selCls).map(s=>[s,getClsLpw(selCls,s)]);if(!entries.length)return null;return(
+            {(()=>{const entries=getTimetableSubs(selCls).map(s=>[s,getClsLpw(selCls,s)]);if(!entries.length)return null;return(
               <div style={{padding:"10px 16px",borderTop:"1px solid #f1f5f9",background:"#fafafa"}}>
                 <div style={{fontSize:10,fontWeight:"bold",color:"#94a3b8",marginBottom:6,letterSpacing:.5}}>WEEKLY ALLOCATION — {selCls} · Total: {entries.reduce((a,[,n])=>a+n,0)} lessons</div>
                 <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
@@ -2547,7 +2526,7 @@ function TimetablePage({students,staff,user,timetable:tt,setTimetable:setTt}){
 
           {/* BY CLASS VIEW */}
           {(!subView||subView==="byclass")&&ALL_CLASSES.map(cls=>{
-            const clsSubs=getSubs(cls);
+            const clsSubs=getTimetableSubs(cls);
             const isUp=["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(cls);
             const totalLpw=clsSubs.reduce((a,s)=>a+getClsLpw(cls,s),0);
             const assigned=isUp?clsSubs.filter(s=>getSubTeacher(cls,s)).length:(getClsTeacher(cls)?clsSubs.length:0);
@@ -2632,9 +2611,9 @@ function TimetablePage({students,staff,user,timetable:tt,setTimetable:setTt}){
 
           {/* BY SUBJECT VIEW */}
           {subView==="bysubject"&&(()=>{
-            const allSubjects=[...new Set(ALL_CLASSES.flatMap(c=>getSubs(c)))];
+            const allSubjects=[...new Set(ALL_CLASSES.flatMap(c=>getTimetableSubs(c)))];
             return allSubjects.map(sub=>{
-              const classes=ALL_CLASSES.filter(c=>getSubs(c).includes(sub));
+              const classes=ALL_CLASSES.filter(c=>getTimetableSubs(c).includes(sub));
               const teachers=[...new Set(classes.map(c=>getSubTeacher(c,sub)||getClsTeacher(c)).filter(Boolean))];
               return(
                 <div key={sub} style={{background:"white",borderRadius:14,boxShadow:"0 2px 12px rgba(0,0,0,.07)",overflow:"hidden"}}>
@@ -2674,7 +2653,7 @@ function TimetablePage({students,staff,user,timetable:tt,setTimetable:setTt}){
             const lessons=[];
             ALL_CLASSES.forEach(cls=>{
               const isUp=["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(cls);
-              getSubs(cls).forEach(sub=>{
+              getTimetableSubs(cls).forEach(sub=>{
                 const t=isUp?getSubTeacher(cls,sub):getClsTeacher(cls);
                 if(t===teacher) lessons.push({cls,sub,n:getClsLpw(cls,sub)});
               });
@@ -2996,25 +2975,13 @@ function StaffPage({staff,setStaff,users,setUsers}) {
 // ══════════════════════════════════════════════════════════
 // TEACHERS ON DUTY
 // ══════════════════════════════════════════════════════════
-function DutyPage({staff,user,students}) {
+function DutyPage({staff,user,students,duties,setDuties,teacherAvail:availability,setTeacherAvail:setAvailability,stuRoster:stuDutyRoster,setStuRoster:setStuDutyRoster}) {
   const teachingStaff=(staff||[]).filter(s=>s.staffType==="teaching");
-  const [duties,setDuties]=useState([]);
-  const [stuDutyRoster,setStuDutyRoster]=useState([]);
   const [tab,setTab]=useState("teacher");
-  const [availability,setAvailability]=useState({}); // teacherId -> {canEvening:bool}
   const [msg,setMsg]=useState({t:"",ok:true});
   const [term,setTerm]=useState("Term 1");
   const [selCls,setSelCls]=useState("Grade 7");
   const flash=(t,ok=true)=>{setMsg({t,ok});setTimeout(()=>setMsg({t:"",ok:true}),2500);};
-
-  useEffect(()=>{
-    load("tnks_duties").then(d=>{if(d) setDuties(d);});
-    load("tnks_teacher_avail").then(d=>{if(d) setAvailability(d);});
-    load("tnks_stu_roster").then(d=>{if(d) setStuDutyRoster(d);});
-  },[]);
-  useEffect(()=>{save("tnks_duties",duties);},[duties]);
-  useEffect(()=>{save("tnks_teacher_avail",availability);},[availability]);
-  useEffect(()=>{save("tnks_stu_roster",stuDutyRoster);},[stuDutyRoster]);
 
   function toggleEvening(tid){
     setAvailability(p=>({...p,[tid]:{...p[tid],canEvening:!(p[tid]?.canEvening??true)}}));
@@ -3236,14 +3203,11 @@ function DutyPage({staff,user,students}) {
 // ══════════════════════════════════════════════════════════
 // STUDENT COUNCIL & DUTIES
 // ══════════════════════════════════════════════════════════
-function CouncilPage({students,user}) {
-  const [council,setCouncil]=useState([]); const [stuDuties,setStuDuties]=useState([]); const [tab,setTab]=useState("council");
+function CouncilPage({students,user,council,setCouncil,stuDuties,setStuDuties}) {
+  const [tab,setTab]=useState("council");
   const [cForm,setCForm]=useState({studentId:"",position:"Head Boy",term:"Term 1",year:String(new Date().getFullYear())});
   const [dForm,setDForm]=useState({studentId:"",dutyType:"Dining Hall",day:"Monday",term:"Term 1"});
   const [msg,setMsg]=useState({t:"",ok:true});
-  useEffect(()=>{load("tnks_council").then(d=>{if(d) setCouncil(d);}); load("tnks_studuties").then(d=>{if(d) setStuDuties(d);});},[]);
-  useEffect(()=>{save("tnks_council",council);},[council]);
-  useEffect(()=>{save("tnks_studuties",stuDuties);},[stuDuties]);
   const flash=(t,ok=true)=>{setMsg({t,ok});setTimeout(()=>setMsg({t:"",ok:true}),2500);};
   function addCouncil(){if(!cForm.studentId) return flash("Select a student.",false); if(council.find(c=>c.position===cForm.position&&c.term===cForm.term&&c.year===cForm.year)) return flash("Position already filled for this term.",false); const s=students.find(x=>x.id===cForm.studentId); setCouncil(p=>[...p,{...cForm,id:Date.now().toString(),studentName:s?.name||"—",studentClass:s?.class||"—"}]); flash("✅ Council member added!"); setCForm({...cForm,studentId:""});}
   function addDuty(){if(!dForm.studentId) return flash("Select a student.",false); const s=students.find(x=>x.id===dForm.studentId); setStuDuties(p=>[...p,{...dForm,id:Date.now().toString(),studentName:s?.name||"—",studentClass:s?.class||"—"}]); flash("✅ Duty assigned!"); setDForm({...dForm,studentId:""});}
@@ -3268,8 +3232,8 @@ function CouncilPage({students,user}) {
 // ══════════════════════════════════════════════════════════
 // LIBRARY
 // ══════════════════════════════════════════════════════════
-function LibraryPage() {
-  const [books,setBooks]=useState([]); const [borrows,setBorrows]=useState([]); const [tab,setTab]=useState("catalogue");
+function LibraryPage({books,setBooks,borrows,setBorrows}) {
+  const [tab,setTab]=useState("catalogue");
   const blank={title:"",author:"",isbn:"",category:"Textbook",copies:1,available:1};
   const [form,setForm]=useState(blank); const [msg,setMsg]=useState({t:"",ok:true});
   const [bbId,setBbId]=useState(""); const [bStu,setBStu]=useState(""); const [bDue,setBDue]=useState("");
@@ -3293,8 +3257,8 @@ function LibraryPage() {
 // ══════════════════════════════════════════════════════════
 // EVENTS
 // ══════════════════════════════════════════════════════════
-function EventsPage({user}) {
-  const [events,setEvents]=useState([]); const blank={title:"",date:"",time:"",venue:"",description:"",type:"Academic",audience:"All"};
+function EventsPage({user,events,setEvents}) {
+  const blank={title:"",date:"",time:"",venue:"",description:"",type:"Academic",audience:"All"};
   const [form,setForm]=useState(blank); const [msg,setMsg]=useState({t:"",ok:true}); const [tab,setTab]=useState("calendar");
   const flash=(t,ok=true)=>{setMsg({t,ok});setTimeout(()=>setMsg({t:"",ok:true}),2500);};
   function doSave(){if(!form.title||!form.date) return flash("Title and date required.",false); setEvents(p=>[...p,{...form,id:Date.now().toString(),addedBy:user.name}]); setForm(blank); flash("✅ Event added!");}
@@ -3775,12 +3739,60 @@ export default function App() {
   const [logo,setLogo]=useState(null);
   const [monitoring,setMonitoring]=useState([]);
   const [timetable,setTimetable]=useState({});
+  // Timetable setup state (persisted so settings survive navigation)
+  const [ttSetup,setTtSetup]=useState({
+    name:"TNKS Timetable 2025",desc:"",session:"2024-2025",startDate:"",endDate:"",
+    setupData:{subjectTeachers:{},subjectAvailability:{},classTeachers:{}},
+    customLpw:{},customDouble:{},
+    bellPeriods:[
+      {id:1,type:"period",name:"Period 1",start:"07:00",end:"07:40"},
+      {id:2,type:"period",name:"Period 2",start:"07:40",end:"08:20"},
+      {id:3,type:"break",name:"Short Break ☕",start:"08:20",end:"08:30"},
+      {id:4,type:"period",name:"Period 3",start:"08:30",end:"09:10"},
+      {id:5,type:"period",name:"Period 4",start:"09:10",end:"09:50"},
+      {id:6,type:"break",name:"Long Break 🧘",start:"09:50",end:"10:10"},
+      {id:7,type:"period",name:"Period 5",start:"10:10",end:"10:50"},
+      {id:8,type:"period",name:"Period 6",start:"10:50",end:"11:30"},
+      {id:9,type:"break",name:"Lunch 🍽️",start:"11:30",end:"12:10"},
+      {id:10,type:"period",name:"Period 7",start:"12:10",end:"12:50"},
+      {id:11,type:"period",name:"Period 8",start:"12:50",end:"13:30"},
+    ],
+    workingDays:["Monday","Tuesday","Wednesday","Thursday","Friday"],
+    rooms:[{id:1,name:"Main Classroom"},{id:2,name:"Science Lab"},{id:3,name:"Computer Lab"},{id:4,name:"Library"}],
+    daySchedule:DEFAULT_CFG.schedule,
+    satSchedule:DEFAULT_CFG.weekendSchedule.Saturday.map((s,i)=>({...s,id:i})),
+    sunSchedule:DEFAULT_CFG.weekendSchedule.Sunday.map((s,i)=>({...s,id:i})),
+  });
+  // Library
+  const [books,setBooks]=useState([]);
+  const [borrows,setBorrows]=useState([]);
+  // Events
+  const [events,setEvents]=useState([]);
+  // Council & student duties
+  const [council,setCouncil]=useState([]);
+  const [stuDuties,setStuDuties]=useState([]);
+  // Teacher duties & roster
+  const [duties,setDuties]=useState([]);
+  const [teacherAvail,setTeacherAvail]=useState({});
+  const [stuRoster,setStuRoster]=useState([]);
 
   useEffect(()=>{
     (async()=>{
-      const [u,s,r,c,a,f,st,lg,mon,tt]=await Promise.all([load("tnks_users"),load("tnks_students"),load("tnks_results"),load("tnks_comments"),load("tnks_announcements"),load("tnks_fees"),load("tnks_staff"),load("tnks_logo"),load("tnks_monitoring"),load("tnks_timetable")]);
+      const [u,s,r,c,a,f,st,lg,mon,tt,tts,bk,br,ev,co,sd,du,ta,sr]=await Promise.all([
+        load("tnks_users"),load("tnks_students"),load("tnks_results"),load("tnks_comments"),
+        load("tnks_announcements"),load("tnks_fees"),load("tnks_staff"),load("tnks_logo"),
+        load("tnks_monitoring"),load("tnks_timetable"),load("tnks_ttsetup"),
+        load("tnks_books"),load("tnks_borrows"),load("tnks_events"),
+        load("tnks_council"),load("tnks_studuties"),load("tnks_duties"),
+        load("tnks_teacher_avail"),load("tnks_stu_roster"),
+      ]);
       if(u) setUsers(u); if(s) setStudents(s); if(r) setResults(r);
-      if(c) setComments(c); if(a) setAnnouncements(a); if(f) setFees(f); if(st) setStaff(st); if(lg) setLogo(lg); if(mon) setMonitoring(mon); if(tt) setTimetable(tt);
+      if(c) setComments(c); if(a) setAnnouncements(a); if(f) setFees(f);
+      if(st) setStaff(st); if(lg) setLogo(lg); if(mon) setMonitoring(mon);
+      if(tt) setTimetable(tt); if(tts) setTtSetup(prev=>({...prev,...tts}));
+      if(bk) setBooks(bk); if(br) setBorrows(br); if(ev) setEvents(ev);
+      if(co) setCouncil(co); if(sd) setStuDuties(sd);
+      if(du) setDuties(du); if(ta) setTeacherAvail(ta); if(sr) setStuRoster(sr);
       setReady(true);
     })();
   },[]);
@@ -3794,6 +3806,15 @@ export default function App() {
   useEffect(()=>{if(ready) save("tnks_staff",staff);},[staff,ready]);
   useEffect(()=>{if(ready) save("tnks_monitoring",monitoring);},[monitoring,ready]);
   useEffect(()=>{if(ready) save("tnks_timetable",timetable);},[timetable,ready]);
+  useEffect(()=>{if(ready) save("tnks_ttsetup",ttSetup);},[ttSetup,ready]);
+  useEffect(()=>{if(ready) save("tnks_books",books);},[books,ready]);
+  useEffect(()=>{if(ready) save("tnks_borrows",borrows);},[borrows,ready]);
+  useEffect(()=>{if(ready) save("tnks_events",events);},[events,ready]);
+  useEffect(()=>{if(ready) save("tnks_council",council);},[council,ready]);
+  useEffect(()=>{if(ready) save("tnks_studuties",stuDuties);},[stuDuties,ready]);
+  useEffect(()=>{if(ready) save("tnks_duties",duties);},[duties,ready]);
+  useEffect(()=>{if(ready) save("tnks_teacher_avail",teacherAvail);},[teacherAvail,ready]);
+  useEffect(()=>{if(ready) save("tnks_stu_roster",stuRoster);},[stuRoster,ready]);
   useEffect(()=>{
     const handler=(e)=>setView(e.detail);
     window.addEventListener("tnks-nav",handler);
@@ -3827,16 +3848,16 @@ export default function App() {
         {view==="reports"&&<ReportsPage {...ctx}/>}
         {view==="fees"&&<FeesPage students={students} fees={fees} setFees={setFees} user={user} logo={logo}/>}
         {view==="feestructure"&&<FeeStructurePage user={user}/>}
-        {view==="timetable"&&<TimetablePage students={students} staff={staff} user={user} timetable={timetable} setTimetable={setTimetable}/>}
+        {view==="timetable"&&<TimetablePage students={students} staff={staff} user={user} timetable={timetable} setTimetable={setTimetable} ttSetup={ttSetup} setTtSetup={setTtSetup}/>}
         {view==="monitoring"&&<LearnerMonitoringPage students={students} user={user} monitoring={monitoring} setMonitoring={setMonitoring}/>}
         {view==="attendance"&&<AttendancePage {...ctx}/>}
         {view==="timeinout"&&<TimeInOutPage students={students} staff={staff} user={user}/>}
         {view==="staff"&&user.role==="admin"&&<StaffPage staff={staff} setStaff={setStaff} users={users} setUsers={setUsers}/>}
         {view==="staff"&&user.role!=="admin"&&<div style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Admin access required.</div>}
-        {view==="duty"&&<DutyPage staff={staff} user={user} students={students}/>}
-        {view==="council"&&<CouncilPage students={students} user={user}/>}
-        {view==="library"&&<LibraryPage/>}
-        {view==="events"&&<EventsPage user={user}/>}
+        {view==="duty"&&<DutyPage staff={staff} user={user} students={students} duties={duties} setDuties={setDuties} teacherAvail={teacherAvail} setTeacherAvail={setTeacherAvail} stuRoster={stuRoster} setStuRoster={setStuRoster}/>}
+        {view==="council"&&<CouncilPage students={students} user={user} council={council} setCouncil={setCouncil} stuDuties={stuDuties} setStuDuties={setStuDuties}/>}
+        {view==="library"&&<LibraryPage books={books} setBooks={setBooks} borrows={borrows} setBorrows={setBorrows}/>}
+        {view==="events"&&<EventsPage user={user} events={events} setEvents={setEvents}/>}
         {view==="noticeboard"&&<NoticeBoard {...ctx}/>}
         {view==="settings"&&user.role==="admin"&&<SettingsPage users={users} setUsers={setUsers} logo={logo} setLogo={setLogo}/>}
         {view==="settings"&&user.role!=="admin"&&<div style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Admin access required.</div>}
