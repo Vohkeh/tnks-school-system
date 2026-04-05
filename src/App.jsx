@@ -132,19 +132,6 @@ const DEFAULT_USERS = [
   {id:"u2",name:"Gitonga Kelvin",username:"kelvin",password:"kelvin123",role:"teacher",email:"kelvin@tnks.sc.ke",staffType:"teaching",subject:"Mathematics",phone:"+254 722 000002"},
 ];
 const DEFAULT_CFG = {
-  // 8 main lessons 07:00–12:20 (40min each), 3 breaks inserted
-  // Break 1 (Short): after P2, 10min
-  // Break 2 (Long):  after P4, 20min
-  // Break 3 (Lunch): after P6, 40min
-  mainStart:"07:00", mainLessons:8, lessonDuration:40,
-  break1After:2, break1Mins:10,   // Short break after lesson 2
-  break2After:4, break2Mins:20,   // Long break after lesson 4
-  break3After:6, break3Mins:40,   // Lunch break after lesson 6
-  // Morning lessons start at 07:00 (no assembly block before lessons)
-  morningPrepsStart:"07:00", morningPrepsEnd:"07:00",
-  assemblyStart:"07:00", assemblyEnd:"07:00",
-  // Evening lessons 19:00–22:00 (3 lessons of 40min + breaks)
-  eveningStart:"19:00", eveningLessons:3,
   // Full day schedule (display only, editable)
   schedule:[
     {time:"05:00–06:30",activity:"Wake Up & Morning Routine",icon:"🌅",editable:false},
@@ -194,11 +181,6 @@ const DEFAULT_CFG = {
       {time:"19:00–22:00",activity:"Evening Studies",icon:"🌙"},
     ],
   },
-  // Legacy fields kept for compatibility
-  lessons:8,duration:40,startH:7,startM:0,breakAfter:4,breakMins:20,
-  morningStart:"07:00", morningLessons:1, eveningLessons:3,
-  shortBreakMins:10, longBreakMins:20, lunchBreakMins:40,
-  eveningStart:"19:00",
 };
 const DEFAULT_FEE_STRUCTURE = {
   "Day Scholar":{term1:12000,term2:12000,term3:10000},
@@ -705,14 +687,21 @@ function AnalyticsPage({students,results,term,setTerm,year,setYear,examType,setE
 // ══════════════════════════════════════════════════════════
 // UNIVERSAL PRINT HELPER — school header + motto watermark
 // ══════════════════════════════════════════════════════════
-function printWindow(title, bodyHTML, logo) {
-  const w = window.open("", "_blank", "width=900,height=700");
+// ── Detect if running inside Median (or any WebView) ──────
+function isMedian() {
+  return typeof window.median !== "undefined" || /median|gonative/i.test(navigator.userAgent);
+}
+
+// ── Build full HTML document string ───────────────────────
+function buildHTMLDoc(title, bodyHTML, logo) {
   const logoTag = logo ? `<img id="school-logo" src="${logo}" style="height:72px;margin-bottom:6px;display:block;margin-left:auto;margin-right:auto;"/>` : "";
-  const logoWm = logo ? `<img src="${logo}" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);opacity:0.06;pointer-events:none;z-index:0;width:300px;height:300px;object-fit:contain;"/>` : `<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);opacity:0.04;pointer-events:none;z-index:0;font-size:80px;font-weight:900;color:#1e3a5f;white-space:nowrap;font-family:Georgia,serif;">${SCHOOL.motto}</div>`;
-  w.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>
+  const logoWm = logo
+    ? `<img src="${logo}" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);opacity:0.06;pointer-events:none;z-index:0;width:300px;height:300px;object-fit:contain;"/>`
+    : `<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);opacity:0.04;pointer-events:none;z-index:0;font-size:80px;font-weight:900;color:#1e3a5f;white-space:nowrap;font-family:Georgia,serif;">${SCHOOL.motto}</div>`;
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>${title}</title><style>
     *{box-sizing:border-box;}
     body{margin:0;padding:16px;font-family:Georgia,serif;background:white;}
-    @media print{@page{margin:12mm;} .no-print{display:none!important;}}
+    @media print{@page{margin:12mm;size:A4;} .no-print{display:none!important;} body{padding:0;}}
     .school-header{text-align:center;border-bottom:3px double #1e3a5f;padding-bottom:12px;margin-bottom:20px;}
     .school-header h1{margin:6px 0 2px;font-size:20px;color:#1e3a5f;letter-spacing:0.5px;}
     .school-header p{margin:2px 0;font-size:10px;color:#555;}
@@ -726,19 +715,54 @@ function printWindow(title, bodyHTML, logo) {
     <p>${SCHOOL.phone} &nbsp;|&nbsp; ${SCHOOL.email} &nbsp;|&nbsp; ${SCHOOL.website}</p>
     <p class="motto">"${SCHOOL.motto}"</p>
   </div>
-  <div style="position:relative;z-index:1;">
-  ${bodyHTML}
-  </div>
-  <script>
-    function doPrint(){window.print();}
-    ${logo ? `
-    var img=document.getElementById('school-logo');
-    if(img && !img.complete){img.onload=doPrint;img.onerror=doPrint;}
-    else{setTimeout(doPrint,300);}
-    ` : `setTimeout(doPrint,200);`}
-  <\/script>
-  </body></html>`);
-  w.document.close();
+  <div style="position:relative;z-index:1;">${bodyHTML}</div>
+  </body></html>`;
+}
+
+// ── Main print/download function ───────────────────────────
+function printWindow(title, bodyHTML, logo) {
+  const html = buildHTMLDoc(title, bodyHTML, logo);
+  const safeTitle = title.replace(/[^a-z0-9\-_\s]/gi,"").replace(/\s+/g,"-").slice(0,60);
+  const filename = `${safeTitle}-${new Date().toLocaleDateString("en-KE").replace(/\//g,"-")}.html`;
+
+  if (isMedian()) {
+    // ── Median / WebView: download file to phone storage ──
+    try {
+      const blob = new Blob([html], {type:"text/html"});
+      const url = URL.createObjectURL(blob);
+      // Try Median's native download bridge first
+      if (typeof window.median !== "undefined" && window.median.share) {
+        window.median.share.sharePage({url, filename});
+      } else {
+        // Fallback: create a download link and click it
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(()=>URL.revokeObjectURL(url), 3000);
+      }
+    } catch(e) {
+      // Last resort: data URI
+      const dataUri = "data:text/html;charset=utf-8," + encodeURIComponent(html);
+      const a = document.createElement("a");
+      a.href = dataUri;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+  } else {
+    // ── Browser: open new tab and auto-print ──────────────
+    const w = window.open("", "_blank", "width=900,height=700");
+    if (!w) { alert("Please allow pop-ups for this site to print documents."); return; }
+    w.document.write(html.replace("</body>", `<script>
+      function doPrint(){window.print();}
+      ${logo ? `var img=document.getElementById('school-logo');if(img&&!img.complete){img.onload=doPrint;img.onerror=doPrint;}else{setTimeout(doPrint,300);}` : `setTimeout(doPrint,200);`}
+    <\/script></body>`));
+    w.document.close();
+  }
 }
 
 // ══════════════════════════════════════════════════════════
