@@ -910,15 +910,16 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
   }
   function printClassResults(className, mode){
     const stu=students.filter(s=>s.class===className).sort((a,b)=>a.name.localeCompare(b.name));
-    const html=mode==="grades"?buildClassGradesHTML(stu,className):buildClassResultsHTML(stu,className);
+    const html=`<div style="page-break-after:always;">${mode==="grades"?buildClassGradesHTML(stu,className):buildClassResultsHTML(stu,className)}</div>`;
     printWindow(`${className} ${mode==="grades"?"Grades":"Results"} — ${term} ${year}`, html, logo);
   }
   function printSchoolResults(mode){
     const html=ALL_CLASSES.map(c=>{
       const stu=students.filter(s=>s.class===c).sort((a,b)=>a.name.localeCompare(b.name));
-      return mode==="grades"?buildClassGradesHTML(stu,c):buildClassResultsHTML(stu,c);
-    }).join("");
-    printWindow(`Full School ${mode==="grades"?"Grades":"Results"} — ${term} ${year}`, html, logo);
+      if(!stu.length) return "";
+      return `<div style="page-break-after:always;">${mode==="grades"?buildClassGradesHTML(stu,c):buildClassResultsHTML(stu,c)}</div>`;
+    }).filter(Boolean).join("");
+    printWindow(`Full School ${mode==="grades"?"Grades":"Results"} — ${term} ${year}`, html||"<p>No data.</p>", logo);
   }
 
   return (
@@ -1042,23 +1043,63 @@ function FeesPage({students,fees,setFees,user,logo}) {
     printWindow(title, tableHTML, logo);
   }
 
-  function downloadGradeStatement(cls){
-    const clsFees=(fees||[]).filter(f=>{const s=students.find(x=>x.id===f.studentId);return s&&s.class===cls;});
-    const rows=[["Student","Class","Fee Type","Term","Year","Due (KES)","Paid (KES)","Balance (KES)","Status"]];
-    clsFees.forEach(f=>{const s=students.find(x=>x.id===f.studentId);const bal=getBalance(f);rows.push([s?.name||"—",s?.class||"—",f.feeType,f.term,f.year,(f.amount||0).toLocaleString(),(f.paid||0).toLocaleString(),bal.toLocaleString(),bal>0?"OUTSTANDING":"CLEAR"]);});
-    const tDue=clsFees.reduce((a,b)=>a+(b.amount||0),0);
-    const tPaid=clsFees.reduce((a,b)=>a+(b.paid||0),0);
-    rows.push(["TOTALS","","","","",tDue.toLocaleString(),tPaid.toLocaleString(),(tDue-tPaid).toLocaleString(),""]);
-    printStatement(`Fee Statement — ${cls}`,rows);
+  function buildStudentFeeHTML(student) {
+    const sFees=(fees||[]).filter(f=>f.studentId===student.id);
+    if(!sFees.length) return "";
+    const tDue=sFees.reduce((a,b)=>a+(b.amount||0),0);
+    const tPaid=sFees.reduce((a,b)=>a+(b.paid||0),0);
+    const tBal=tDue-tPaid;
+    const rows=sFees.map((f,i)=>{
+      const bal=getBalance(f);
+      return `<tr style="background:${i%2===0?"white":"#f8fafc"}">
+        <td style="padding:7px 10px;">${f.feeType}</td>
+        <td style="padding:7px 10px;">${f.term}</td>
+        <td style="padding:7px 10px;">${f.year}</td>
+        <td style="padding:7px 10px;text-align:right;font-weight:bold;">KES ${(f.amount||0).toLocaleString()}</td>
+        <td style="padding:7px 10px;text-align:right;color:#15803d;font-weight:bold;">KES ${(f.paid||0).toLocaleString()}</td>
+        <td style="padding:7px 10px;text-align:right;font-weight:bold;color:${bal>0?"#b91c1c":"#15803d"};">KES ${bal.toLocaleString()}</td>
+        <td style="padding:7px 10px;text-align:center;"><span style="background:${bal>0?"#fee2e2":"#dcfce7"};color:${bal>0?"#b91c1c":"#15803d"};padding:2px 8px;border-radius:12px;font-size:10px;font-weight:bold;">${bal>0?"OUTSTANDING":"CLEAR"}</span></td>
+      </tr>`;
+    }).join("");
+    return `<div style="page-break-after:always;padding:20px 24px;max-width:700px;margin:0 auto;">
+      <div style="background:#1e3a5f;color:white;text-align:center;padding:6px 0;font-size:12px;font-weight:bold;border-radius:16px;margin-bottom:14px;letter-spacing:1px;">FEE STATEMENT</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;margin-bottom:14px;border:1px solid #e2e8f0;border-radius:6px;padding:10px;">
+        <div><b>Name:</b> ${student.name}</div><div><b>Adm. No:</b> ${student.admNo||"—"}</div>
+        <div><b>Class:</b> ${student.class}</div><div><b>Type:</b> ${student.studentType||"—"}</div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:14px;">
+        <thead><tr style="background:#1e3a5f;color:white;">${["Fee Type","Term","Year","Amount Due","Paid","Balance","Status"].map(h=>`<th style="padding:7px 10px;text-align:left;">${h}</th>`).join("")}</tr></thead>
+        <tbody>${rows}
+          <tr style="background:#f0fdf4;font-weight:bold;border-top:2px solid #1e3a5f;">
+            <td colspan="3" style="padding:7px 10px;">TOTALS</td>
+            <td style="padding:7px 10px;text-align:right;">KES ${tDue.toLocaleString()}</td>
+            <td style="padding:7px 10px;text-align:right;color:#15803d;">KES ${tPaid.toLocaleString()}</td>
+            <td style="padding:7px 10px;text-align:right;color:${tBal>0?"#b91c1c":"#15803d"};">KES ${tBal.toLocaleString()}</td>
+            <td style="padding:7px 10px;text-align:center;"><span style="background:${tBal>0?"#fee2e2":"#dcfce7"};color:${tBal>0?"#b91c1c":"#15803d"};padding:2px 8px;border-radius:12px;font-size:10px;font-weight:bold;">${tBal>0?"OUTSTANDING":"CLEAR"}</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:16px;">
+        ${["Bursar","Parent/Guardian","Date"].map(l=>`<div style="text-align:center;"><div style="border-top:1px solid #374151;padding-top:4px;font-size:10px;color:#64748b;">${l}</div><div style="font-size:9px;color:#94a3b8;margin-top:12px;">Signature</div></div>`).join("")}
+      </div>
+    </div>`;
   }
 
-  function downloadSchoolStatement(){
-    const rows=[["Student","Class","Fee Type","Term","Year","Due (KES)","Paid (KES)","Balance (KES)","Status"]];
-    (fees||[]).forEach(f=>{const s=students.find(x=>x.id===f.studentId);const bal=getBalance(f);rows.push([s?.name||"—",s?.class||"—",f.feeType,f.term,f.year,(f.amount||0).toLocaleString(),(f.paid||0).toLocaleString(),bal.toLocaleString(),bal>0?"OUTSTANDING":"CLEAR"]);});
-    const tDue=(fees||[]).reduce((a,b)=>a+(b.amount||0),0);
-    const tPaid=(fees||[]).reduce((a,b)=>a+(b.paid||0),0);
-    rows.push(["TOTALS","","","","",tDue.toLocaleString(),tPaid.toLocaleString(),(tDue-tPaid).toLocaleString(),""]);
-    printStatement("Full School Fee Statement",rows);
+  function printStudentFee(student){
+    printWindow(`Fee Statement — ${student.name}`, buildStudentFeeHTML(student), logo);
+  }
+  function printClassFee(className){
+    const stu=students.filter(s=>s.class===className).sort((a,b)=>a.name.localeCompare(b.name));
+    const body=stu.map(s=>buildStudentFeeHTML(s)).filter(Boolean).join("");
+    if(!body){printWindow(`Fee Statement — ${className}`,"<p style='text-align:center;color:#94a3b8;'>No fee records for this class.</p>",logo);return;}
+    printWindow(`Fee Statement — ${className}`, body, logo);
+  }
+  function printSchoolFee(){
+    const body=ALL_CLASSES.flatMap(c=>
+      students.filter(s=>s.class===c).sort((a,b)=>a.name.localeCompare(b.name)).map(s=>buildStudentFeeHTML(s))
+    ).filter(Boolean).join("");
+    if(!body){printWindow("Full School Fee Statement","<p style='text-align:center;color:#94a3b8;'>No fee records.</p>",logo);return;}
+    printWindow("Full School Fee Statement", body, logo);
   }
 
   function doAdd(){
@@ -1122,13 +1163,13 @@ function FeesPage({students,fees,setFees,user,logo}) {
           <Btn onClick={()=>setTab("summary")} v={tab==="summary"?"primary":"ghost"} style={{fontSize:12}}>👥 By Student</Btn>
           <Btn onClick={()=>setTab("defaulters")} v={tab==="defaulters"?"red":"ghost"} style={{fontSize:12}}>⚠️ Defaulters</Btn>
           {user.role==="admin"&&<div style={{position:"relative"}}>
-            <Btn onClick={()=>setShowDlMenu(s=>!s)} v="teal" style={{fontSize:12}}>⬇️ Download</Btn>
-            {showDlMenu&&<div style={{position:"absolute",top:"100%",right:0,zIndex:200,background:"white",border:"1px solid #e2e8f0",borderRadius:12,boxShadow:"0 8px 24px rgba(0,0,0,.12)",padding:8,minWidth:220,marginTop:4}}>
-              <div style={{fontSize:11,color:"#94a3b8",padding:"4px 10px",fontWeight:"bold"}}>BY GRADE</div>
-              {ALL_CLASSES.map(cls=><button key={cls} onClick={()=>{downloadGradeStatement(cls);setShowDlMenu(false);}} style={{width:"100%",display:"block",padding:"7px 14px",background:"none",border:"none",cursor:"pointer",textAlign:"left",fontSize:12,fontFamily:F,color:"#374151",borderRadius:8,transition:"background .1s"}} onMouseEnter={e=>e.target.style.background="#f1f5f9"} onMouseLeave={e=>e.target.style.background="none"}>{cls} Statement</button>)}
-              <div style={{borderTop:"1px solid #f1f5f9",marginTop:4,paddingTop:4}}>
-                <button onClick={()=>{downloadSchoolStatement();setShowDlMenu(false);}} style={{width:"100%",display:"block",padding:"8px 14px",background:"#1e3a5f",border:"none",cursor:"pointer",textAlign:"left",fontSize:12,fontFamily:F,color:"white",borderRadius:8,fontWeight:"bold"}}>🏫 Full School Statement</button>
-              </div>
+            <Btn onClick={()=>setShowDlMenu(s=>!s)} v="teal" style={{fontSize:12}}>🖨️ Print Statements ▾</Btn>
+            {showDlMenu&&<div style={{position:"absolute",top:"100%",right:0,zIndex:200,background:"white",border:"1px solid #e2e8f0",borderRadius:12,boxShadow:"0 8px 24px rgba(0,0,0,.12)",padding:8,minWidth:260,marginTop:4,maxHeight:400,overflowY:"auto"}}>
+              <div style={{fontSize:10,color:"#94a3b8",padding:"4px 10px",fontWeight:"bold",letterSpacing:.5}}>PER CLASS (each learner = 1 page)</div>
+              {ALL_CLASSES.map(c=><button key={c} onClick={()=>{printClassFee(c);setShowDlMenu(false);}} style={{width:"100%",display:"block",padding:"7px 14px",background:"none",border:"none",cursor:"pointer",textAlign:"left",fontSize:12,fontFamily:F,color:"#374151",borderRadius:8}} onMouseEnter={e=>e.target.style.background="#f1f5f9"} onMouseLeave={e=>e.target.style.background="none"}>📄 {c}</button>)}
+              <div style={{borderTop:"1px solid #f1f5f9",margin:"6px 0"}}/>
+              <div style={{fontSize:10,color:"#94a3b8",padding:"4px 10px",fontWeight:"bold",letterSpacing:.5}}>WHOLE SCHOOL</div>
+              <button onClick={()=>{printSchoolFee();setShowDlMenu(false);}} style={{width:"100%",display:"block",padding:"8px 14px",background:"#1e3a5f",border:"none",cursor:"pointer",textAlign:"left",fontSize:12,fontFamily:F,color:"white",borderRadius:8,fontWeight:"bold",marginBottom:4}}>🏫 All Learners — Full School</button>
             </div>}
           </div>}
         </div>
@@ -1260,7 +1301,7 @@ function FeesPage({students,fees,setFees,user,logo}) {
                       {x.bal>0?"Owes":"Cleared"}
                     </span>
                   </td>
-                  <td style={td}><button onClick={()=>setStuModal(x.student)} style={{color:"#1d4ed8",background:"none",border:"none",cursor:"pointer",fontSize:11}}>View Statement</button></td>
+                  <td style={td}><div style={{display:"flex",gap:4}}><button onClick={()=>setStuModal(x.student)} style={{color:"#1d4ed8",background:"none",border:"none",cursor:"pointer",fontSize:11}}>View</button><button onClick={()=>printStudentFee(x.student)} style={{color:"#15803d",background:"none",border:"none",cursor:"pointer",fontSize:11}}>🖨️ Print</button></div></td>
                 </tr>
               )):<tr><td colSpan={8} style={{padding:30,textAlign:"center",color:"#94a3b8"}}>No records for this filter.</td></tr>}
               {stuSummary.length>0&&<tr style={{background:"#f0fdf4",fontWeight:"bold"}}>
@@ -3548,19 +3589,51 @@ function LearnerMonitoringPage({students,user,monitoring,setMonitoring}) {
 // ══════════════════════════════════════════════════════════
 // FEE STRUCTURE
 // ══════════════════════════════════════════════════════════
-function FeeStructurePage({user}) {
+function FeeStructurePage({user,logo}) {
   const [structure,setStructure]=useState(DEFAULT_FEE_STRUCTURE);
   const [saved,setSaved]=useState(false);
   const [editMode,setEditMode]=useState(false);
   const [draft,setDraft]=useState(JSON.parse(JSON.stringify(DEFAULT_FEE_STRUCTURE)));
   function handleSave(){setStructure(JSON.parse(JSON.stringify(draft)));setSaved(true);setEditMode(false);setTimeout(()=>setSaved(false),2000);}
+  function printFeeStructure(){
+    const rows=STUDENT_TYPES.map(type=>`
+      <tr style="border-bottom:1px solid #e2e8f0;">
+        <td style="padding:10px 12px;font-weight:bold;font-size:13px;">${type}</td>
+        ${["term1","term2","term3"].map(t=>`<td style="padding:10px 12px;text-align:right;font-weight:bold;color:#1e3a5f;">KES ${(structure[type]?.[t]||0).toLocaleString()}</td>`).join("")}
+        <td style="padding:10px 12px;text-align:right;font-weight:bold;color:#15803d;">KES ${["term1","term2","term3"].reduce((a,t)=>a+(structure[type]?.[t]||0),0).toLocaleString()}</td>
+      </tr>`).join("");
+    const html=`
+      <h3 style="margin:0 0 16px;color:#1e3a5f;font-size:16px;">Fee Structure — Academic Year ${new Date().getFullYear()}</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead><tr style="background:#1e3a5f;color:white;">
+          <th style="padding:10px 12px;text-align:left;">Student Type</th>
+          <th style="padding:10px 12px;text-align:right;">Term 1</th>
+          <th style="padding:10px 12px;text-align:right;">Term 2</th>
+          <th style="padding:10px 12px;text-align:right;">Term 3</th>
+          <th style="padding:10px 12px;text-align:right;">Annual Total</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div style="margin-top:20px;padding:12px 16px;background:#f0fdf4;border-radius:8px;font-size:11px;color:#15803d;font-weight:bold;">
+        ✅ These fees are set by the school administration and are subject to change. Contact the school for more information.
+      </div>
+      <div style="margin-top:24px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;">
+        ${["Principal","Bursar","Date"].map(l=>`<div style="text-align:center;"><div style="border-top:1px solid #374151;padding-top:4px;font-size:10px;color:#64748b;">${l}</div></div>`).join("")}
+      </div>`;
+    printWindow("Fee Structure", html, logo||null);
+  }
   const terms=["term1","term2","term3"];
   const termLabels={"term1":"Term 1","term2":"Term 2","term3":"Term 3"};
   return (
     <div style={{padding:24}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,flexWrap:"wrap",gap:10}}>
         <div><h2 style={{margin:0,color:"#1e3a5f",fontSize:22,fontFamily:F}}>📑 Fee Structure</h2><div style={{fontSize:13,color:"#64748b",marginTop:2}}>Fees payable per term by student type</div></div>
-        {user.role==="admin"&&<div style={{display:"flex",gap:8}}><Btn onClick={()=>{setDraft(JSON.parse(JSON.stringify(structure)));setEditMode(e=>!e);}} v={editMode?"ghost":"primary"} style={{fontSize:12}}>{editMode?"✕ Cancel":"✏️ Edit Structure"}</Btn>{editMode&&<Btn onClick={handleSave} v="green" style={{fontSize:12}}>💾 Save</Btn>}</div>}
+        <div style={{display:"flex",gap:8}}>
+          <Btn onClick={printFeeStructure} v="teal" style={{fontSize:12}}>🖨️ Print / Download</Btn>
+          {user.role==="admin"&&<Btn onClick={()=>{setDraft(JSON.parse(JSON.stringify(structure)));setEditMode(e=>!e);}} v={editMode?"ghost":"primary"} style={{fontSize:12}}>{editMode?"✕ Cancel":"✏️ Edit"}</Btn>}
+          {editMode&&<Btn onClick={handleSave} v="green" style={{fontSize:12}}>💾 Save</Btn>}
+        </div>
+      </div>
       </div>
       {saved&&<div style={{background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:8,padding:"10px 16px",marginBottom:14,color:"#15803d",fontWeight:"bold",fontSize:13}}>✅ Fee structure saved!</div>}
       <div style={{display:"grid",gap:16}}>
@@ -3847,7 +3920,7 @@ export default function App() {
         {view==="analytics"&&<AnalyticsPage {...ctx}/>}
         {view==="reports"&&<ReportsPage {...ctx}/>}
         {view==="fees"&&<FeesPage students={students} fees={fees} setFees={setFees} user={user} logo={logo}/>}
-        {view==="feestructure"&&<FeeStructurePage user={user}/>}
+        {view==="feestructure"&&<FeeStructurePage user={user} logo={logo}/>}
         {view==="timetable"&&<TimetablePage students={students} staff={staff} user={user} timetable={timetable} setTimetable={setTimetable} ttSetup={ttSetup} setTtSetup={setTtSetup}/>}
         {view==="monitoring"&&<LearnerMonitoringPage students={students} user={user} monitoring={monitoring} setMonitoring={setMonitoring}/>}
         {view==="attendance"&&<AttendancePage {...ctx}/>}
