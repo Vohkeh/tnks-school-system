@@ -3634,7 +3634,6 @@ function FeeStructurePage({user,logo}) {
           {editMode&&<Btn onClick={handleSave} v="green" style={{fontSize:12}}>💾 Save</Btn>}
         </div>
       </div>
-      </div>
       {saved&&<div style={{background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:8,padding:"10px 16px",marginBottom:14,color:"#15803d",fontWeight:"bold",fontSize:13}}>✅ Fee structure saved!</div>}
       <div style={{display:"grid",gap:16}}>
         {STUDENT_TYPES.map(type=>(
