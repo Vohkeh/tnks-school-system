@@ -11,8 +11,8 @@ const supabase = createClient(
 // CONSTANTS
 // ══════════════════════════════════════════════════════════
 const SCHOOL = {
-  name: "The Nyaga Kindiki Schools", location: "North Tharaka District, Tharaka Nithi County",
-  address: "Gaciongo-Mukothima Road, Meru-Mukothima Road", poBox: "P.O Box 2511-60200, Meru – Kenya",
+  name: "The Nyaga Kindiki Schools- Tharaka", location: "Tharaka North District, Tharaka Nithi County",
+  address: "Gaciongo-Mukothima Road, Meru-Mukothima-Gatunga Road", poBox: "P.O Box 2511-60200, Meru – Kenya",
   phone: "+254 722 679747 / +254 720 537265", email: "thenyagakindikischools@gmail.com",
   motto: "Education Liberates", vision: "A model school with the best practices in the region and beyond",
   website: "nyagakindikischools.sc.ke", founded: "7th January 2015",
@@ -719,42 +719,68 @@ function buildHTMLDoc(title, bodyHTML, logo) {
   </body></html>`;
 }
 
+// ── Median PDF print page helper ──────────────────────────
+// Opens content in a hidden iframe, then triggers Median's
+// native PDF export which saves a real .pdf to phone storage
+function printViaMedianPDF(title, html) {
+  const safeTitle = title.replace(/[^a-z0-9\s]/gi,"").replace(/\s+/g,"-").slice(0,50);
+  const filename = `${safeTitle}.pdf`;
+
+  // Write content into a temporary full-screen overlay
+  const overlay = document.createElement("div");
+  overlay.id = "__tnks_print_overlay__";
+  overlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:white;z-index:99999;overflow:auto;";
+
+  const iframe = document.createElement("iframe");
+  iframe.style.cssText = "width:100%;height:100%;border:none;";
+  overlay.appendChild(iframe);
+
+  // Close button
+  const closeBtn = document.createElement("button");
+  closeBtn.innerText = "✕ Close";
+  closeBtn.style.cssText = "position:fixed;top:12px;right:12px;z-index:100000;background:#1e3a5f;color:white;border:none;border-radius:8px;padding:8px 16px;font-size:14px;cursor:pointer;";
+  closeBtn.onclick = () => document.body.removeChild(overlay);
+  overlay.appendChild(closeBtn);
+
+  // Download as PDF button using Median bridge
+  const dlBtn = document.createElement("button");
+  dlBtn.innerText = "📥 Save as PDF";
+  dlBtn.style.cssText = "position:fixed;top:12px;left:12px;z-index:100000;background:#15803d;color:white;border:none;border-radius:8px;padding:8px 16px;font-size:14px;cursor:pointer;";
+  dlBtn.onclick = () => {
+    if (window.median && window.median.screen && window.median.screen.pdf) {
+      window.median.screen.pdf({filename, callback: ()=>{}});
+    } else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.print) {
+      window.webkit.messageHandlers.print.postMessage(filename);
+    } else {
+      // Fallback: share/print via native share sheet
+      if (navigator.share) {
+        const blob = new Blob([html], {type:"text/html"});
+        const file = new File([blob], filename.replace(".pdf",".html"), {type:"text/html"});
+        navigator.share({files:[file], title});
+      } else {
+        iframe.contentWindow.print();
+      }
+    }
+  };
+  overlay.appendChild(dlBtn);
+
+  document.body.appendChild(overlay);
+
+  // Write HTML into iframe
+  iframe.contentDocument.open();
+  iframe.contentDocument.write(html);
+  iframe.contentDocument.close();
+}
+
 // ── Main print/download function ───────────────────────────
 function printWindow(title, bodyHTML, logo) {
   const html = buildHTMLDoc(title, bodyHTML, logo);
-  const safeTitle = title.replace(/[^a-z0-9\-_\s]/gi,"").replace(/\s+/g,"-").slice(0,60);
-  const filename = `${safeTitle}-${new Date().toLocaleDateString("en-KE").replace(/\//g,"-")}.html`;
 
   if (isMedian()) {
-    // ── Median / WebView: download file to phone storage ──
-    try {
-      const blob = new Blob([html], {type:"text/html"});
-      const url = URL.createObjectURL(blob);
-      // Try Median's native download bridge first
-      if (typeof window.median !== "undefined" && window.median.share) {
-        window.median.share.sharePage({url, filename});
-      } else {
-        // Fallback: create a download link and click it
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(()=>URL.revokeObjectURL(url), 3000);
-      }
-    } catch(e) {
-      // Last resort: data URI
-      const dataUri = "data:text/html;charset=utf-8," + encodeURIComponent(html);
-      const a = document.createElement("a");
-      a.href = dataUri;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    }
+    // In Median app: show in overlay + save as PDF
+    printViaMedianPDF(title, html);
   } else {
-    // ── Browser: open new tab and auto-print ──────────────
+    // In browser: open new tab and auto-print
     const w = window.open("", "_blank", "width=900,height=700");
     if (!w) { alert("Please allow pop-ups for this site to print documents."); return; }
     w.document.write(html.replace("</body>", `<script>
