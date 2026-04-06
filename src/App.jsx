@@ -3988,3 +3988,1386 @@ export default function App() {
     </div>
   );
 }
+// ══════════════════════════════════════════════════════════
+// TNKS NEW MODULES — 10 additions
+// Paste each component into the main App file in the
+// appropriate location. The App() nav additions are at
+// the bottom of this file.
+// ══════════════════════════════════════════════════════════
+
+// ── Dependencies (already in main file) ──────────────────
+// useState, useEffect, useRef, useCallback — from React
+// Card, Btn, Inp, Sel, Textarea, Modal, PageH, Empty,
+// Avatar, Stat, F, CC, printWindow, ALL_CLASSES, DAYS,
+// TERMS, YEARS, EXAM_TYPES, getSubs, getGrade — from main
+
+// ══════════════════════════════════════════════════════════
+// 1. EXAM MANAGEMENT
+// ══════════════════════════════════════════════════════════
+function ExamManagementPage({ students, staff, user, examSchedules, setExamSchedules, logo }) {
+  const teachingStaff = (staff || []).filter(s => s.staffType === "teaching");
+  const blankExam = {
+    name: "", date: "", startTime: "08:00", endTime: "10:00",
+    class: "Grade 7", subject: "", examType: "End Term Exam",
+    term: "Term 1", year: String(new Date().getFullYear()),
+    venue: "", invigilators: [], duration: 120, totalMarks: 100, instructions: ""
+  };
+  const [form, setForm] = useState(blankExam);
+  const [tab, setTab] = useState("schedule");
+  const [msg, setMsg] = useState({ t: "", ok: true });
+  const [selInv, setSelInv] = useState("");
+  const flash = (t, ok = true) => { setMsg({ t, ok }); setTimeout(() => setMsg({ t: "", ok: true }), 3000); };
+
+  function addExam() {
+    if (!form.name || !form.date || !form.subject) return flash("Name, date and subject required.", false);
+    setExamSchedules(p => [...(p || []), { ...form, id: Date.now().toString(), createdBy: user.name }]);
+    flash("✅ Exam scheduled!"); setForm(blankExam);
+  }
+  function addInv() {
+    if (!selInv || form.invigilators.includes(selInv)) return;
+    setForm(f => ({ ...f, invigilators: [...f.invigilators, selInv] }));
+    setSelInv("");
+  }
+  function removeInv(name) { setForm(f => ({ ...f, invigilators: f.invigilators.filter(x => x !== name) })); }
+  function delExam(id) { setExamSchedules(p => p.filter(e => e.id !== id)); }
+
+  function printExamTimetable() {
+    const rows = (examSchedules || []).sort((a, b) => new Date(a.date) - new Date(b.date)).map((e, i) => `
+      <tr style="background:${i % 2 === 0 ? "white" : "#f8fafc"}">
+        <td style="padding:7px 10px;">${e.date}</td>
+        <td style="padding:7px 10px;">${e.startTime}–${e.endTime}</td>
+        <td style="padding:7px 10px;font-weight:bold;">${e.name}</td>
+        <td style="padding:7px 10px;">${e.class}</td>
+        <td style="padding:7px 10px;">${e.subject}</td>
+        <td style="padding:7px 10px;">${e.venue || "—"}</td>
+        <td style="padding:7px 10px;">${(e.invigilators || []).join(", ") || "—"}</td>
+      </tr>`).join("");
+    const html = `<h3 style="margin:0 0 14px;color:#1e3a5f;">Examination Timetable — ${form.term} ${form.year}</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:11px;">
+        <thead><tr style="background:#1e3a5f;color:white;">
+          ${["Date","Time","Exam","Class","Subject","Venue","Invigilators"].map(h => `<th style="padding:8px 10px;text-align:left;">${h}</th>`).join("")}
+        </tr></thead><tbody>${rows}</tbody></table>`;
+    printWindow("Exam Timetable", html, logo);
+  }
+
+  function printInvigilationSchedule() {
+    const byInv = {};
+    (examSchedules || []).forEach(e => {
+      (e.invigilators || []).forEach(inv => {
+        if (!byInv[inv]) byInv[inv] = [];
+        byInv[inv].push(e);
+      });
+    });
+    const html = Object.entries(byInv).map(([inv, exams]) => `
+      <div style="page-break-after:always;padding:16px;">
+        <h3 style="color:#1e3a5f;margin:0 0 10px;">Invigilation — ${inv}</h3>
+        <table style="width:100%;border-collapse:collapse;font-size:11px;">
+          <thead><tr style="background:#1e3a5f;color:white;">
+            ${["Date","Time","Exam","Class","Subject","Venue"].map(h => `<th style="padding:8px 10px;text-align:left;">${h}</th>`).join("")}
+          </tr></thead><tbody>
+          ${exams.map((e, i) => `<tr style="background:${i % 2 === 0 ? "white" : "#f8fafc"}">
+            <td style="padding:7px 10px;">${e.date}</td>
+            <td style="padding:7px 10px;">${e.startTime}–${e.endTime}</td>
+            <td style="padding:7px 10px;font-weight:bold;">${e.name}</td>
+            <td style="padding:7px 10px;">${e.class}</td>
+            <td style="padding:7px 10px;">${e.subject}</td>
+            <td style="padding:7px 10px;">${e.venue || "—"}</td>
+          </tr>`).join("")}
+          </tbody></table></div>`).join("");
+    printWindow("Invigilation Schedule", html || "<p>No invigilators assigned.</p>", logo);
+  }
+
+  const th = { textAlign: "left", padding: "9px 12px", fontWeight: "bold", fontSize: 11, color: "#1d4ed8", background: "#eff6ff" };
+  const td = { padding: "8px 12px", fontSize: 12, borderTop: "1px solid #f1f5f9" };
+  const upcoming = (examSchedules || []).filter(e => new Date(e.date) >= new Date()).sort((a, b) => new Date(a.date) - new Date(b.date));
+  const past = (examSchedules || []).filter(e => new Date(e.date) < new Date());
+
+  return (
+    <div style={{ padding: 24 }}>
+      <PageH title="📝 Exam Management" sub="Schedule exams, assign invigilators, print timetables">
+        <div style={{ display: "flex", gap: 8 }}>
+          <Btn onClick={printExamTimetable} v="teal" style={{ fontSize: 12 }}>🖨️ Print Timetable</Btn>
+          <Btn onClick={printInvigilationSchedule} v="ghost" style={{ fontSize: 12 }}>👤 Print Invigilation</Btn>
+        </div>
+      </PageH>
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        {[["schedule", "📅 Schedule"], ["add", "➕ Add Exam"], ["invigilation", "👤 Invigilation"], ["past", "📜 Past"]].map(([t, l]) =>
+          <Btn key={t} onClick={() => setTab(t)} v={tab === t ? "primary" : "ghost"} style={{ fontSize: 12 }}>{l}</Btn>
+        )}
+      </div>
+      {msg.t && <div style={{ background: msg.ok ? "#f0fdf4" : "#fef2f2", border: `1px solid ${msg.ok ? "#bbf7d0" : "#fecaca"}`, borderRadius: 8, padding: "10px 16px", marginBottom: 14, color: msg.ok ? "#15803d" : "#b91c1c", fontWeight: "bold", fontSize: 13 }}>{msg.t}</div>}
+
+      {tab === "add" && <Card style={{ marginBottom: 18 }}>
+        <div style={{ fontWeight: "bold", color: "#1e3a5f", marginBottom: 14, fontSize: 14 }}>Schedule New Exam / Assessment</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
+          <Inp label="EXAM NAME *" value={form.name} onChange={v => setForm({ ...form, name: v })} placeholder="e.g. Grade 7 Maths End Term" />
+          <Inp label="DATE *" value={form.date} onChange={v => setForm({ ...form, date: v })} type="date" />
+          <Inp label="START TIME" value={form.startTime} onChange={v => setForm({ ...form, startTime: v })} type="time" />
+          <Inp label="END TIME" value={form.endTime} onChange={v => setForm({ ...form, endTime: v })} type="time" />
+          <Sel label="CLASS" value={form.class} onChange={v => setForm({ ...form, class: v })} options={ALL_CLASSES} />
+          <Sel label="SUBJECT" value={form.subject || getSubs(form.class)[0] || ""} onChange={v => setForm({ ...form, subject: v })} options={getSubs(form.class)} />
+          <Sel label="EXAM TYPE" value={form.examType} onChange={v => setForm({ ...form, examType: v })} options={EXAM_TYPES} />
+          <Sel label="TERM" value={form.term} onChange={v => setForm({ ...form, term: v })} options={TERMS} />
+          <Sel label="YEAR" value={form.year} onChange={v => setForm({ ...form, year: v })} options={YEARS} />
+          <Inp label="VENUE" value={form.venue} onChange={v => setForm({ ...form, venue: v })} placeholder="e.g. Room 3A" />
+          <Inp label="TOTAL MARKS" value={form.totalMarks} onChange={v => setForm({ ...form, totalMarks: v })} placeholder="100" type="number" />
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <Textarea label="INSTRUCTIONS (optional)" value={form.instructions} onChange={v => setForm({ ...form, instructions: v })} placeholder="Special instructions for this exam..." rows={2} />
+        </div>
+        <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px dashed #e2e8f0" }}>
+          <div style={{ fontSize: 12, fontWeight: "bold", color: "#1e3a5f", marginBottom: 10 }}>👤 Assign Invigilators</div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <select value={selInv} onChange={e => setSelInv(e.target.value)} style={{ border: "1.5px solid #e2e8f0", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "Georgia,serif", minWidth: 200 }}>
+              <option value="">-- Select invigilator --</option>
+              {teachingStaff.filter(s => !form.invigilators.includes(s.name)).map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+            </select>
+            <Btn onClick={addInv} v="ghost" style={{ fontSize: 12 }}>Add</Btn>
+          </div>
+          <div style={{ marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {form.invigilators.map(inv => <span key={inv} style={{ background: "#eff6ff", color: "#1d4ed8", fontSize: 11, padding: "3px 10px", borderRadius: 20, fontWeight: "bold", display: "flex", alignItems: "center", gap: 6 }}>{inv}<button onClick={() => removeInv(inv)} style={{ background: "none", border: "none", cursor: "pointer", color: "#b91c1c", fontSize: 14, padding: 0, lineHeight: 1 }}>✕</button></span>)}
+          </div>
+        </div>
+        {msg.t && <div style={{ marginTop: 10, fontSize: 13, color: msg.ok ? "#15803d" : "#b91c1c", fontWeight: "bold" }}>{msg.t}</div>}
+        <div style={{ marginTop: 14 }}><Btn onClick={addExam} v="primary">📅 Schedule Exam</Btn></div>
+      </Card>}
+
+      {(tab === "schedule" || tab === "past") && <Card style={{ padding: 0, overflow: "hidden" }}>
+        <div style={{ padding: "12px 16px", background: "#eff6ff", fontWeight: "bold", color: "#1e3a5f", fontSize: 13, borderBottom: "1px solid #dbeafe" }}>
+          {tab === "schedule" ? `Upcoming Exams (${upcoming.length})` : `Past Exams (${past.length})`}
+        </div>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
+            <thead><tr>{["Date", "Time", "Name", "Class", "Subject", "Venue", "Invigilators", user.role === "admin" ? "Action" : ""].filter(Boolean).map(h => <th key={h} style={th}>{h}</th>)}</tr></thead>
+            <tbody>
+              {(tab === "schedule" ? upcoming : past).length ? (tab === "schedule" ? upcoming : past).map((e, i) => <tr key={e.id} style={{ background: i % 2 === 0 ? "white" : "#fafafa" }}>
+                <td style={{ ...td, fontFamily: "monospace", fontSize: 11 }}>{e.date}</td>
+                <td style={{ ...td, fontFamily: "monospace", fontSize: 11 }}>{e.startTime}–{e.endTime}</td>
+                <td style={{ ...td, fontWeight: "bold" }}>{e.name}</td>
+                <td style={td}><span style={{ background: "#eff6ff", color: "#1d4ed8", fontSize: 10, padding: "2px 8px", borderRadius: 20, fontWeight: "bold" }}>{e.class}</span></td>
+                <td style={td}>{e.subject}</td>
+                <td style={td}>{e.venue || "—"}</td>
+                <td style={{ ...td, fontSize: 11 }}>{(e.invigilators || []).join(", ") || <span style={{ color: "#94a3b8" }}>None</span>}</td>
+                {user.role === "admin" && <td style={td}><button onClick={() => delExam(e.id)} style={{ color: "#b91c1c", background: "none", border: "none", cursor: "pointer", fontSize: 12 }}>Del</button></td>}
+              </tr>) : <tr><td colSpan={8} style={{ padding: 30, textAlign: "center", color: "#94a3b8" }}>No exams found.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </Card>}
+
+      {tab === "invigilation" && (() => {
+        const byInv = {};
+        (examSchedules || []).forEach(e => {
+          (e.invigilators || []).forEach(inv => { if (!byInv[inv]) byInv[inv] = []; byInv[inv].push(e); });
+        });
+        return <div style={{ display: "grid", gap: 14 }}>
+          {Object.keys(byInv).length ? Object.entries(byInv).map(([inv, exams]) => <Card key={inv}>
+            <div style={{ fontWeight: "bold", color: "#1e3a5f", fontSize: 14, marginBottom: 10 }}>👤 {inv} — {exams.length} exam(s)</div>
+            <div style={{ display: "grid", gap: 8 }}>
+              {exams.sort((a, b) => new Date(a.date) - new Date(b.date)).map(e => <div key={e.id} style={{ display: "flex", gap: 12, alignItems: "center", padding: "8px 12px", background: "#f8fafc", borderRadius: 8 }}>
+                <div style={{ fontFamily: "monospace", fontSize: 11, color: "#64748b", minWidth: 80 }}>{e.date}</div>
+                <div style={{ fontFamily: "monospace", fontSize: 11, color: "#64748b", minWidth: 100 }}>{e.startTime}–{e.endTime}</div>
+                <div style={{ fontWeight: "bold", flex: 1 }}>{e.name}</div>
+                <span style={{ background: "#eff6ff", color: "#1d4ed8", fontSize: 10, padding: "2px 8px", borderRadius: 20, fontWeight: "bold" }}>{e.class}</span>
+                <span style={{ fontSize: 11, color: "#64748b" }}>{e.venue || "—"}</span>
+              </div>)}
+            </div>
+          </Card>) : <Empty icon="👤" text="No invigilators assigned yet. Add exams and assign invigilators first." />}
+        </div>;
+      })()}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// 2. BULK OPERATIONS (CSV Import + Bulk Results + Bulk Fees)
+// ══════════════════════════════════════════════════════════
+function BulkOperationsPage({ students, setStudents, results, setResults, fees, setFees, user }) {
+  const [tab, setTab] = useState("students");
+  const [csvText, setCsvText] = useState("");
+  const [preview, setPreview] = useState([]);
+  const [parseMsg, setParseMsg] = useState("");
+  const [importMsg, setImportMsg] = useState({ t: "", ok: true });
+  const [bulkCls, setBulkCls] = useState("Grade 7");
+  const [bulkTerm, setBulkTerm] = useState("Term 1");
+  const [bulkYear, setBulkYear] = useState(String(new Date().getFullYear()));
+  const [bulkExam, setBulkExam] = useState("End Term Exam");
+  const [bulkMarksText, setBulkMarksText] = useState("");
+  const [bulkMarksMsg, setBulkMarksMsg] = useState({ t: "", ok: true });
+  const fileRef = useRef();
+
+  function parseCSV(text) {
+    const lines = text.trim().split("\n").map(l => l.trim()).filter(Boolean);
+    if (lines.length < 2) { setParseMsg("CSV must have a header row and at least one data row."); setPreview([]); return; }
+    const headers = lines[0].split(",").map(h => h.trim().toLowerCase().replace(/['"]/g, ""));
+    const required = ["name", "admno"];
+    const missing = required.filter(r => !headers.some(h => h.includes(r.replace("no", "").trim()) || h === r));
+    if (missing.length) { setParseMsg(`Missing required columns: ${missing.join(", ")}. Required: name, admno`); setPreview([]); return; }
+    const rows = lines.slice(1).map(line => {
+      const vals = line.split(",").map(v => v.trim().replace(/^["']|["']$/g, ""));
+      const obj = {};
+      headers.forEach((h, i) => { obj[h] = vals[i] || ""; });
+      return obj;
+    });
+    setPreview(rows);
+    setParseMsg(`✅ ${rows.length} learner(s) ready to import. Review below then click Import.`);
+  }
+
+  function handleFile(e) {
+    const f = e.target.files[0]; if (!f) return;
+    const r = new FileReader(); r.onload = ev => { setCsvText(ev.target.result); parseCSV(ev.target.result); }; r.readAsText(f);
+  }
+
+  function doImport() {
+    let added = 0, skipped = 0;
+    const newStudents = [...students];
+    preview.forEach(row => {
+      const admno = row["admno"] || row["adm no"] || row["admission no"] || row["admno"];
+      const name = row["name"] || row["full name"] || row["student name"];
+      if (!name || !admno) { skipped++; return; }
+      if (newStudents.find(s => s.admNo === admno)) { skipped++; return; }
+      newStudents.push({
+        id: Date.now().toString() + Math.random(),
+        name, admNo: admno,
+        class: row["class"] || "Grade 7",
+        gender: row["gender"] || "Male",
+        parentName: row["parent"] || row["parentname"] || "",
+        parentPhone: row["phone"] || row["parentphone"] || "",
+        address: row["address"] || "",
+        dob: row["dob"] || row["dateofbirth"] || "",
+        status: "active",
+        enrollDate: new Date().toLocaleDateString("en-KE")
+      });
+      added++;
+    });
+    setStudents(newStudents);
+    setImportMsg({ t: `✅ Imported ${added} learner(s). ${skipped} skipped (duplicates/incomplete).`, ok: true });
+    setPreview([]); setCsvText("");
+  }
+
+  function parseBulkMarks() {
+    const lines = bulkMarksText.trim().split("\n").filter(Boolean);
+    const clsStudents = students.filter(s => s.class === bulkCls).sort((a, b) => a.name.localeCompare(b.name));
+    const subs = getSubs(bulkCls);
+    const parsed = [];
+    let errors = [];
+    lines.forEach((line, li) => {
+      const parts = line.split(",").map(p => p.trim());
+      const admNo = parts[0];
+      const s = students.find(x => x.admNo === admNo && x.class === bulkCls) || clsStudents[li];
+      if (!s) { errors.push(`Row ${li + 1}: student not found`); return; }
+      subs.forEach((sub, si) => {
+        const mark = parseFloat(parts[si + 1]);
+        if (!isNaN(mark)) parsed.push({ studentId: s.id, class: bulkCls, subject: sub, term: bulkTerm, year: bulkYear, examType: bulkExam, marks: Math.min(100, Math.max(0, mark)) });
+      });
+    });
+    if (errors.length) { setBulkMarksMsg({ t: `⚠️ ${errors.join("; ")}`, ok: false }); return; }
+    const next = results.filter(r => !parsed.some(p => p.studentId === r.studentId && p.subject === r.subject && p.term === r.term && p.year === r.year && p.examType === r.examType));
+    setResults([...next, ...parsed.map((p, i) => ({ ...p, id: `bulk-${Date.now()}-${i}` }))]);
+    setBulkMarksMsg({ t: `✅ Saved ${parsed.length} result(s) for ${bulkCls}!`, ok: true });
+    setBulkMarksText("");
+  }
+
+  const sampleCSV = `name,admno,class,gender,parentname,phone
+John Kamau,NKS/2025/001,Grade 7,Male,James Kamau,+254 712 000001
+Mary Wanjiku,NKS/2025/002,Grade 7,Female,Jane Wanjiku,+254 712 000002`;
+
+  const subs = getSubs(bulkCls);
+
+  return (
+    <div style={{ padding: 24 }}>
+      <PageH title="📦 Bulk Operations" sub="Import students via CSV · Bulk results entry · Bulk fee recording" />
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        {[["students", "👥 Student Import"], ["results", "📝 Bulk Results"], ["fees", "💰 Bulk Fees"]].map(([t, l]) =>
+          <Btn key={t} onClick={() => setTab(t)} v={tab === t ? "primary" : "ghost"} style={{ fontSize: 12 }}>{l}</Btn>
+        )}
+      </div>
+
+      {tab === "students" && <>
+        <Card style={{ marginBottom: 14, background: "#fffbeb", border: "1px solid #fde68a" }}>
+          <div style={{ fontWeight: "bold", color: "#92400e", marginBottom: 8, fontSize: 13 }}>📋 CSV Format Guide</div>
+          <div style={{ fontSize: 12, color: "#78350f", marginBottom: 8 }}>Required columns: <b>name, admno</b>. Optional: class, gender, parentname, phone, address, dob</div>
+          <div style={{ fontFamily: "monospace", fontSize: 11, background: "#fef3c7", padding: "8px 12px", borderRadius: 6, whiteSpace: "pre" }}>{sampleCSV}</div>
+          <button onClick={() => { const a = document.createElement("a"); a.href = "data:text/csv," + encodeURIComponent(sampleCSV); a.download = "tnks_students_template.csv"; a.click(); }} style={{ marginTop: 8, background: "#b45309", color: "white", border: "none", borderRadius: 7, padding: "6px 14px", cursor: "pointer", fontSize: 12, fontFamily: "Georgia,serif", fontWeight: "bold" }}>⬇️ Download Template</button>
+        </Card>
+        <Card style={{ marginBottom: 14 }}>
+          <div style={{ fontWeight: "bold", color: "#1e3a5f", marginBottom: 12, fontSize: 14 }}>📁 Upload CSV File</div>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <Btn onClick={() => fileRef.current?.click()} v="primary" style={{ fontSize: 12 }}>📁 Choose CSV File</Btn>
+            <span style={{ fontSize: 12, color: "#64748b" }}>or paste CSV below</span>
+          </div>
+          <input ref={fileRef} type="file" accept=".csv,.txt" style={{ display: "none" }} onChange={handleFile} />
+          <div style={{ marginTop: 12 }}>
+            <Textarea label="OR PASTE CSV DATA" value={csvText} onChange={v => { setCsvText(v); if (v.trim()) parseCSV(v); }} placeholder="Paste CSV data here..." rows={5} />
+          </div>
+          <div style={{ marginTop: 8, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            <Btn onClick={() => parseCSV(csvText)} v="ghost" style={{ fontSize: 12 }}>🔍 Preview</Btn>
+            {preview.length > 0 && <Btn onClick={doImport} v="green" style={{ fontSize: 12 }}>✅ Import {preview.length} Learners</Btn>}
+          </div>
+          {parseMsg && <div style={{ marginTop: 10, fontSize: 13, color: parseMsg.startsWith("✅") ? "#15803d" : "#b91c1c", fontWeight: "bold" }}>{parseMsg}</div>}
+          {importMsg.t && <div style={{ marginTop: 6, fontSize: 13, color: importMsg.ok ? "#15803d" : "#b91c1c", fontWeight: "bold" }}>{importMsg.t}</div>}
+        </Card>
+        {preview.length > 0 && <Card style={{ padding: 0, overflow: "hidden" }}>
+          <div style={{ padding: "12px 16px", background: "#eff6ff", fontWeight: "bold", color: "#1e3a5f", fontSize: 13, borderBottom: "1px solid #dbeafe" }}>Preview — {preview.length} rows</div>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+              <thead><tr>{Object.keys(preview[0] || {}).map(k => <th key={k} style={{ padding: "8px 12px", background: "#eff6ff", textAlign: "left", fontSize: 11, fontWeight: "bold", color: "#1d4ed8" }}>{k}</th>)}</tr></thead>
+              <tbody>{preview.slice(0, 10).map((row, i) => <tr key={i} style={{ background: i % 2 === 0 ? "white" : "#fafafa" }}>{Object.values(row).map((v, j) => <td key={j} style={{ padding: "7px 12px", borderTop: "1px solid #f1f5f9" }}>{v}</td>)}</tr>)}</tbody>
+            </table>
+            {preview.length > 10 && <div style={{ padding: "8px 16px", fontSize: 11, color: "#94a3b8" }}>... and {preview.length - 10} more rows</div>}
+          </div>
+        </Card>}
+      </>}
+
+      {tab === "results" && <Card>
+        <div style={{ fontWeight: "bold", color: "#1e3a5f", marginBottom: 14, fontSize: 14 }}>📝 Bulk Results Entry</div>
+        <div style={{ fontSize: 12, color: "#64748b", marginBottom: 14, background: "#eff6ff", padding: "10px 14px", borderRadius: 8 }}>
+          Format: <b>admno, mark1, mark2, ...</b> (one student per line, marks in subject order for selected class)<br />
+          Subject order for <b>{bulkCls}</b>: {subs.join(", ")}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12, marginBottom: 14 }}>
+          <Sel label="CLASS" value={bulkCls} onChange={setBulkCls} options={ALL_CLASSES} />
+          <Sel label="TERM" value={bulkTerm} onChange={setBulkTerm} options={TERMS} />
+          <Sel label="EXAM TYPE" value={bulkExam} onChange={setBulkExam} options={EXAM_TYPES} />
+          <Sel label="YEAR" value={bulkYear} onChange={setBulkYear} options={YEARS} />
+        </div>
+        <div style={{ marginBottom: 8, fontSize: 11, color: "#94a3b8", fontFamily: "monospace", background: "#f8fafc", padding: "8px 12px", borderRadius: 6 }}>
+          Example row: NKS/2025/001,85,72,90,88,75,80,65<br />
+          (admno then one mark per subject in order above)
+        </div>
+        <Textarea label="PASTE MARKS DATA" value={bulkMarksText} onChange={setBulkMarksText} placeholder={"NKS/2025/001,85,72,90,88,75,80,65\nNKS/2025/002,70,68,55,..."} rows={8} />
+        {bulkMarksMsg.t && <div style={{ marginTop: 10, fontSize: 13, color: bulkMarksMsg.ok ? "#15803d" : "#b91c1c", fontWeight: "bold" }}>{bulkMarksMsg.t}</div>}
+        <div style={{ marginTop: 14 }}><Btn onClick={parseBulkMarks} v="green">💾 Save All Marks</Btn></div>
+      </Card>}
+
+      {tab === "fees" && <BulkFeesTab students={students} fees={fees} setFees={setFees} />}
+    </div>
+  );
+}
+
+function BulkFeesTab({ students, fees, setFees }) {
+  const [cls, setCls] = useState("Grade 7");
+  const [feeType, setFeeType] = useState("School Fees");
+  const [term, setTerm] = useState("Term 1");
+  const [year, setYear] = useState(String(new Date().getFullYear()));
+  const [amount, setAmount] = useState("");
+  const [msg, setMsg] = useState({ t: "", ok: true });
+
+  function applyToClass() {
+    if (!amount) { setMsg({ t: "Enter amount.", ok: false }); return; }
+    const clsStudents = students.filter(s => s.class === cls && s.status !== "transferred");
+    let added = 0;
+    const newFees = [...fees];
+    clsStudents.forEach(s => {
+      const exists = newFees.find(f => f.studentId === s.id && f.feeType === feeType && f.term === term && f.year === year);
+      if (!exists) {
+        newFees.push({ id: `bf-${Date.now()}-${s.id}`, studentId: s.id, feeType, term, year, amount: parseFloat(amount) || 0, paid: 0, payMethod: "Cash", payDate: "", receipt: "" });
+        added++;
+      }
+    });
+    setFees(newFees);
+    setMsg({ t: `✅ Added fee records for ${added} learner(s) in ${cls}. ${clsStudents.length - added} already existed.`, ok: true });
+  }
+
+  function applyToAll() {
+    if (!amount) { setMsg({ t: "Enter amount.", ok: false }); return; }
+    let added = 0;
+    const newFees = [...fees];
+    students.filter(s => s.status !== "transferred").forEach(s => {
+      const exists = newFees.find(f => f.studentId === s.id && f.feeType === feeType && f.term === term && f.year === year);
+      if (!exists) {
+        newFees.push({ id: `bf-${Date.now()}-${s.id}`, studentId: s.id, feeType, term, year, amount: parseFloat(amount) || 0, paid: 0, payMethod: "Cash", payDate: "", receipt: "" });
+        added++;
+      }
+    });
+    setFees(newFees);
+    setMsg({ t: `✅ Added ${added} fee records across all classes!`, ok: true });
+  }
+
+  return <Card>
+    <div style={{ fontWeight: "bold", color: "#1e3a5f", marginBottom: 14, fontSize: 14 }}>💰 Bulk Fee Recording</div>
+    <div style={{ fontSize: 12, color: "#64748b", marginBottom: 14 }}>Apply the same fee charge to an entire class or all students at once. Only adds records that don't already exist.</div>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
+      <Sel label="CLASS" value={cls} onChange={setCls} options={ALL_CLASSES} />
+      <Sel label="FEE TYPE" value={feeType} onChange={setFeeType} options={["School Fees", "Activity Fees", "Transport", "Lunch", "Uniform", "Books", "Exam Fee", "Other"]} />
+      <Sel label="TERM" value={term} onChange={setTerm} options={TERMS} />
+      <Sel label="YEAR" value={year} onChange={setYear} options={YEARS} />
+      <Inp label="AMOUNT DUE (KES) *" value={amount} onChange={setAmount} placeholder="0" type="number" />
+    </div>
+    {msg.t && <div style={{ marginTop: 10, fontSize: 13, color: msg.ok ? "#15803d" : "#b91c1c", fontWeight: "bold" }}>{msg.t}</div>}
+    <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
+      <Btn onClick={applyToClass} v="green">Apply to {cls} ({students.filter(s => s.class === cls && s.status !== "transferred").length} students)</Btn>
+      <Btn onClick={applyToAll} v="amber">Apply to All Students ({students.filter(s => s.status !== "transferred").length})</Btn>
+    </div>
+  </Card>;
+}
+
+// ══════════════════════════════════════════════════════════
+// 3. SMS / EMAIL NOTIFICATIONS
+// ══════════════════════════════════════════════════════════
+function NotificationsPage({ students, fees, results, user, monitoring }) {
+  const [tab, setTab] = useState("compose");
+  const [recipient, setRecipient] = useState("all");
+  const [filterCls, setFilterCls] = useState("All");
+  const [channel, setChannel] = useState("SMS");
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+  const [template, setTemplate] = useState("");
+  const [log, setLog] = useState([]);
+  const [msg, setMsg] = useState({ t: "", ok: true });
+
+  const TEMPLATES = {
+    "fee_reminder": {
+      subject: "Fee Reminder — {school}",
+      body: "Dear Parent/Guardian,\n\nThis is a reminder that fees for {term} are due. Your child {name}'s outstanding balance is KES {balance}. Please settle by the due date.\n\nThank you.\n{school}"
+    },
+    "absent_alert": {
+      subject: "Attendance Alert — {name}",
+      body: "Dear Parent/Guardian,\n\nThis is to inform you that your child {name} ({class}) was absent from school today, {date}. Please contact us if there is an issue.\n\nKind regards,\n{school}"
+    },
+    "results_ready": {
+      subject: "Results Available — {term} {year}",
+      body: "Dear Parent/Guardian,\n\nThe {term} {year} results for {name} are now available. Please visit the school or login to the parent portal to view the report.\n\nThank you,\n{school}"
+    },
+    "general": { subject: "", body: "" }
+  };
+
+  function applyTemplate(key) {
+    setTemplate(key);
+    const t = TEMPLATES[key];
+    if (t) { setSubject(t.subject); setBody(t.body); }
+  }
+
+  function getRecipients() {
+    let list = students.filter(s => s.status !== "transferred");
+    if (filterCls !== "All") list = list.filter(s => s.class === filterCls);
+    if (recipient === "defaulters") {
+      list = list.filter(s => {
+        const sf = (fees || []).filter(f => f.studentId === s.id);
+        return sf.reduce((a, b) => a + (b.amount || 0) - (b.paid || 0), 0) > 0;
+      });
+    }
+    if (recipient === "absent") {
+      const today = new Date().toISOString().split("T")[0];
+      const absentIds = (monitoring || []).filter(m => m.date === today && m.type.startsWith("Absent")).map(m => m.studentId);
+      list = list.filter(s => absentIds.includes(s.id));
+    }
+    return list;
+  }
+
+  const recipients = getRecipients();
+
+  function sendNotification() {
+    if (!body.trim()) { setMsg({ t: "Message body is required.", ok: false }); return; }
+    const entry = {
+      id: Date.now().toString(),
+      channel, subject, body,
+      recipientCount: recipients.length,
+      recipientType: recipient,
+      filterCls,
+      sentBy: user.name,
+      sentAt: new Date().toLocaleString("en-KE"),
+      status: "Simulated"
+    };
+    setLog(l => [entry, ...l]);
+    setMsg({ t: `✅ Message composed for ${recipients.length} recipient(s) via ${channel}. (Simulation — integrate with your SMS/email provider API to send live.)`, ok: true });
+  }
+
+  const feeDefaulters = students.filter(s => {
+    const sf = (fees || []).filter(f => f.studentId === s.id);
+    return sf.reduce((a, b) => a + (b.amount || 0) - (b.paid || 0), 0) > 0;
+  }).length;
+  const today = new Date().toISOString().split("T")[0];
+  const absentToday = [...new Set((monitoring || []).filter(m => m.date === today && m.type.startsWith("Absent")).map(m => m.studentId))].length;
+
+  return (
+    <div style={{ padding: 24 }}>
+      <PageH title="💬 Notifications" sub="Compose and send SMS/email alerts to parents" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 12, marginBottom: 18 }}>
+        <Stat icon="⚠️" label="Fee Defaulters" value={feeDefaulters} color="#b91c1c" sub="parents to notify" />
+        <Stat icon="🏠" label="Absent Today" value={absentToday} color="#b45309" sub="absent alerts" />
+        <Stat icon="📨" label="Sent (Session)" value={log.length} color="#1d4ed8" sub="messages composed" />
+        <Stat icon="👨‍👩‍👧" label="Total Parents" value={students.filter(s => s.parentPhone || s.email).length} color="#15803d" sub="with contact info" />
+      </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        {[["compose", "✉️ Compose"], ["log", "📋 Log"]].map(([t, l]) =>
+          <Btn key={t} onClick={() => setTab(t)} v={tab === t ? "primary" : "ghost"} style={{ fontSize: 12 }}>{l}</Btn>
+        )}
+      </div>
+
+      {tab === "compose" && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, alignItems: "start" }}>
+        <div style={{ display: "grid", gap: 14 }}>
+          <Card>
+            <div style={{ fontWeight: "bold", color: "#1e3a5f", marginBottom: 14, fontSize: 14 }}>🎯 Recipients</div>
+            <div style={{ display: "grid", gap: 10 }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: "bold", color: "#374151", display: "block", marginBottom: 3 }}>SEND TO</label>
+                <select value={recipient} onChange={e => setRecipient(e.target.value)} style={{ width: "100%", border: "1.5px solid #e2e8f0", borderRadius: 8, padding: "8px 10px", fontSize: 13, fontFamily: "Georgia,serif" }}>
+                  <option value="all">All Students / Parents</option>
+                  <option value="class">Specific Class</option>
+                  <option value="defaulters">Fee Defaulters Only ({feeDefaulters})</option>
+                  <option value="absent">Absent Today ({absentToday})</option>
+                </select>
+              </div>
+              {(recipient === "all" || recipient === "class") && <Sel label="FILTER BY CLASS" value={filterCls} onChange={setFilterCls} options={["All", ...ALL_CLASSES]} />}
+              <Sel label="CHANNEL" value={channel} onChange={setChannel} options={["SMS", "Email", "WhatsApp", "All Channels"]} />
+            </div>
+            <div style={{ marginTop: 12, background: "#f0fdf4", borderRadius: 8, padding: "10px 14px", fontSize: 12, color: "#15803d", fontWeight: "bold" }}>
+              {recipients.length} recipient(s) selected
+              {recipients.filter(s => !s.parentPhone && !s.email).length > 0 && <div style={{ color: "#b45309", fontWeight: "normal", marginTop: 4 }}>⚠️ {recipients.filter(s => !s.parentPhone && !s.email).length} have no contact info</div>}
+            </div>
+          </Card>
+          <Card>
+            <div style={{ fontWeight: "bold", color: "#1e3a5f", marginBottom: 10, fontSize: 14 }}>📋 Quick Templates</div>
+            <div style={{ display: "grid", gap: 6 }}>
+              {[["fee_reminder", "💰 Fee Reminder"], ["absent_alert", "🏠 Absence Alert"], ["results_ready", "📝 Results Ready"], ["general", "✍️ Custom Message"]].map(([k, l]) =>
+                <button key={k} onClick={() => applyTemplate(k)} style={{ background: template === k ? "#1e3a5f" : "#f8fafc", color: template === k ? "white" : "#374151", border: "1px solid #e2e8f0", borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 12, fontFamily: "Georgia,serif", textAlign: "left", fontWeight: template === k ? "bold" : "normal" }}>{l}</button>
+              )}
+            </div>
+          </Card>
+        </div>
+        <Card>
+          <div style={{ fontWeight: "bold", color: "#1e3a5f", marginBottom: 14, fontSize: 14 }}>✉️ Message</div>
+          <div style={{ display: "grid", gap: 12 }}>
+            {channel !== "SMS" && <Inp label="SUBJECT" value={subject} onChange={setSubject} placeholder="Message subject..." />}
+            <Textarea label="MESSAGE BODY" value={body} onChange={setBody} placeholder="Type your message here...\n\nAvailable placeholders:\n{name} {class} {balance} {term} {year} {date} {school}" rows={8} />
+            <div style={{ fontSize: 11, color: "#94a3b8" }}>
+              💡 Placeholders: {"{name}"} {"{class}"} {"{balance}"} {"{term}"} {"{year}"} {"{date}"} {"{school}"}
+            </div>
+            {channel === "SMS" && <div style={{ fontSize: 11, color: body.length > 160 ? "#b91c1c" : "#64748b", fontWeight: "bold" }}>
+              Characters: {body.length} / 160 {body.length > 160 ? `(${Math.ceil(body.length / 160)} SMS parts)` : ""}
+            </div>}
+          </div>
+          {msg.t && <div style={{ marginTop: 10, fontSize: 12, color: msg.ok ? "#15803d" : "#b91c1c", fontWeight: "bold", lineHeight: 1.5 }}>{msg.t}</div>}
+          <div style={{ marginTop: 14, display: "flex", gap: 8 }}>
+            <Btn onClick={sendNotification} v="primary">📨 Compose & Log ({recipients.length})</Btn>
+          </div>
+          <div style={{ marginTop: 10, background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "10px 14px", fontSize: 11, color: "#b45309" }}>
+            ⚠️ Integration note: Connect to Africa's Talking, Twilio, SendGrid or your SMS gateway API to send live messages. Currently in simulation mode.
+          </div>
+        </Card>
+      </div>}
+
+      {tab === "log" && <Card style={{ padding: 0, overflow: "hidden" }}>
+        <div style={{ padding: "12px 16px", background: "#eff6ff", fontWeight: "bold", color: "#1e3a5f", fontSize: 13, borderBottom: "1px solid #dbeafe" }}>Notification Log ({log.length})</div>
+        {log.length ? <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead><tr>{["Time", "Channel", "Recipients", "Subject/Type", "Sent By", "Status"].map(h => <th key={h} style={{ textAlign: "left", padding: "9px 12px", fontWeight: "bold", fontSize: 11, color: "#1d4ed8", background: "#eff6ff" }}>{h}</th>)}</tr></thead>
+          <tbody>{log.map((l, i) => <tr key={l.id} style={{ background: i % 2 === 0 ? "white" : "#fafafa", borderTop: "1px solid #f1f5f9" }}>
+            <td style={{ padding: "8px 12px", fontSize: 11, fontFamily: "monospace" }}>{l.sentAt}</td>
+            <td style={{ padding: "8px 12px", fontSize: 12 }}><span style={{ background: "#eff6ff", color: "#1d4ed8", fontSize: 10, padding: "2px 8px", borderRadius: 20, fontWeight: "bold" }}>{l.channel}</span></td>
+            <td style={{ padding: "8px 12px", fontSize: 12, fontWeight: "bold" }}>{l.recipientCount}</td>
+            <td style={{ padding: "8px 12px", fontSize: 12 }}>{l.subject || l.recipientType}</td>
+            <td style={{ padding: "8px 12px", fontSize: 11, color: "#64748b" }}>{l.sentBy}</td>
+            <td style={{ padding: "8px 12px" }}><span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 20, fontWeight: "bold", background: "#fef3c7", color: "#b45309" }}>{l.status}</span></td>
+          </tr>)}</tbody>
+        </table> : <Empty icon="📨" text="No notifications composed yet." />}
+      </Card>}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// 4. AI COMMENT ASSISTANT (for teacher comments)
+// ══════════════════════════════════════════════════════════
+function AICommentAssistant({ students, results, comments, setComments, term, year, examType }) {
+  const [cls, setCls] = useState("Grade 7");
+  const [selStudent, setSelStudent] = useState("");
+  const [tone, setTone] = useState("Encouraging");
+  const [focus, setFocus] = useState("Overall");
+  const [draft, setDraft] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const clsStudents = students.filter(s => s.class === cls);
+  const student = students.find(s => s.id === selStudent);
+
+  async function generateComment() {
+    if (!selStudent) return;
+    setLoading(true); setSaved(false);
+    const sr = results.filter(r => r.studentId === selStudent && r.term === term && r.year === year && r.examType === examType);
+    const subMap = {}; sr.forEach(r => { subMap[r.subject] = r; });
+    const deduped = Object.values(subMap);
+    const avg = deduped.length ? deduped.reduce((a, b) => a + b.marks, 0) / deduped.length : 0;
+    const subs = deduped.map(r => `${r.subject}: ${r.marks}%`).join(", ");
+    const prompt = `You are a CBC teacher writing a ${tone.toLowerCase()} report card comment for ${student?.name}, a ${cls} student. ${term} ${year} ${examType}. Average: ${avg.toFixed(1)}%. Subjects: ${subs || "no results entered"}. Focus: ${focus}. Write a concise 2-3 sentence comment (max 60 words) that is professional, personal, and actionable. Do not start with the student's name. Do not use generic filler.`;
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 150, messages: [{ role: "user", content: prompt }] })
+      });
+      const data = await res.json();
+      setDraft(data.content?.map(c => c.text || "").join("") || "Unable to generate comment.");
+    } catch { setDraft("Could not connect to AI. Please try again."); }
+    setLoading(false);
+  }
+
+  function saveComment() {
+    if (!selStudent || !draft.trim()) return;
+    const nc = { id: `${selStudent}-${term}-${year}-${examType}`, studentId: selStudent, term, year, examType, text: draft.trim(), teacher: "Class Teacher (AI-assisted)", date: new Date().toLocaleDateString("en-KE") };
+    setComments(p => [...(p || []).filter(c => c.id !== nc.id), nc]);
+    setSaved(true);
+  }
+
+  const existing = (comments || []).find(c => c.studentId === selStudent && c.term === term && c.year === year && c.examType === examType);
+
+  return (
+    <div style={{ padding: 24 }}>
+      <PageH title="🤖 AI Comment Assistant" sub="Generate nuanced teacher comments with Claude AI" />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr", gap: 18, alignItems: "start" }}>
+        <div style={{ display: "grid", gap: 14 }}>
+          <Card>
+            <div style={{ fontWeight: "bold", color: "#1e3a5f", marginBottom: 14, fontSize: 14 }}>Select Student</div>
+            <div style={{ display: "grid", gap: 10 }}>
+              <Sel label="CLASS" value={cls} onChange={v => { setCls(v); setSelStudent(""); setDraft(""); setSaved(false); }} options={ALL_CLASSES} />
+              <div>
+                <label style={{ fontSize: 11, fontWeight: "bold", color: "#374151", display: "block", marginBottom: 3 }}>STUDENT</label>
+                <select value={selStudent} onChange={e => { setSelStudent(e.target.value); setDraft(""); setSaved(false); }} style={{ width: "100%", border: "1.5px solid #e2e8f0", borderRadius: 8, padding: "8px 10px", fontSize: 13, fontFamily: "Georgia,serif" }}>
+                  <option value="">-- Select --</option>
+                  {clsStudents.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+              <Sel label="TONE" value={tone} onChange={setTone} options={["Encouraging", "Firm but Kind", "Celebratory", "Concerned", "Neutral Professional", "Motivational"]} />
+              <Sel label="FOCUS" value={focus} onChange={setFocus} options={["Overall", "Academic Strengths", "Areas for Improvement", "Effort & Attitude", "Leadership", "Social Skills"]} />
+            </div>
+          </Card>
+          {student && (() => {
+            const sr = results.filter(r => r.studentId === selStudent && r.term === term && r.year === year && r.examType === examType);
+            const subMap = {}; sr.forEach(r => { subMap[r.subject] = r; }); const deduped = Object.values(subMap);
+            const avg = deduped.length ? deduped.reduce((a, b) => a + b.marks, 0) / deduped.length : 0;
+            const g = avg > 0 ? getGrade(avg) : null;
+            return <Card style={{ background: "#f8fafc" }}>
+              <div style={{ fontWeight: "bold", color: "#1e3a5f", marginBottom: 10, fontSize: 13 }}>Performance Summary</div>
+              <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
+                <Avatar name={student.name} photo={student.photo} size={44} />
+                <div><div style={{ fontWeight: "bold" }}>{student.name}</div><div style={{ fontSize: 11, color: "#64748b" }}>{student.class}</div></div>
+              </div>
+              <div style={{ fontSize: 12 }}>
+                <div>Average: <b style={{ color: g?.col || "#94a3b8" }}>{avg > 0 ? avg.toFixed(1) + "%" : "No results"}</b></div>
+                <div>Grade: <b>{g?.g || "—"}</b></div>
+                <div style={{ marginTop: 6 }}>{deduped.map(r => { const mg = getGrade(r.marks); return <span key={r.subject} style={{ display: "inline-block", fontSize: 9, background: mg.bg, color: mg.col, padding: "1px 6px", borderRadius: 10, margin: "2px 2px", fontWeight: "bold" }}>{r.subject.split(" ")[0]}: {r.marks}</span>; })}</div>
+              </div>
+            </Card>;
+          })()}
+        </div>
+        <div style={{ display: "grid", gap: 14 }}>
+          <Card>
+            <div style={{ fontWeight: "bold", color: "#1e3a5f", marginBottom: 14, fontSize: 14 }}>AI-Generated Comment</div>
+            {existing && !draft && <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "10px 14px", marginBottom: 12, fontSize: 12 }}>
+              <div style={{ fontWeight: "bold", color: "#b45309", marginBottom: 4 }}>Existing comment:</div>
+              <div style={{ color: "#78350f" }}>{existing.text}</div>
+            </div>}
+            <Textarea label={draft ? "GENERATED COMMENT (edit as needed)" : "COMMENT WILL APPEAR HERE"} value={draft} onChange={setDraft} placeholder="Select a student and click Generate to create an AI-powered comment..." rows={5} />
+            {saved && <div style={{ marginTop: 8, fontSize: 13, color: "#15803d", fontWeight: "bold" }}>✅ Comment saved to student record!</div>}
+            <div style={{ marginTop: 14, display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button onClick={generateComment} disabled={!selStudent || loading} style={{ background: loading ? "#94a3b8" : "linear-gradient(135deg,#7c3aed,#4c1d95)", color: "white", border: "none", borderRadius: 9, padding: "10px 20px", cursor: loading ? "not-allowed" : "pointer", fontFamily: "Georgia,serif", fontSize: 13, fontWeight: "bold", display: "flex", alignItems: "center", gap: 8 }}>
+                {loading ? "🤖 Generating..." : "🤖 Generate with AI"}
+              </button>
+              {draft && <Btn onClick={saveComment} v="green">💾 Save Comment</Btn>}
+              {draft && <Btn onClick={() => { setDraft(""); setSaved(false); }} v="ghost" style={{ fontSize: 12 }}>Clear</Btn>}
+            </div>
+          </Card>
+          <Card style={{ background: "#f3e8ff", border: "1px solid #c4b5fd" }}>
+            <div style={{ fontWeight: "bold", color: "#4c1d95", marginBottom: 8, fontSize: 13 }}>💡 How AI Comments Work</div>
+            <div style={{ fontSize: 12, color: "#5b21b6", lineHeight: 1.7 }}>
+              Claude AI analyses the student's actual marks, calculates their performance level, and generates a contextually appropriate comment. You can then edit it before saving. The tone and focus controls let you tailor the style.
+              <br /><br />
+              All comments are stored in the student record and appear on printed report cards.
+            </div>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// 5. ALUMNI / LEAVERS REGISTRY
+// ══════════════════════════════════════════════════════════
+function AlumniPage({ students, setStudents, user }) {
+  const [tab, setTab] = useState("registry");
+  const [search, setSearch] = useState("");
+  const [filterYear, setFilterYear] = useState("All");
+  const [editId, setEditId] = useState(null);
+  const [editData, setEditData] = useState({});
+  const [msg, setMsg] = useState({ t: "", ok: true });
+  const flash = (t, ok = true) => { setMsg({ t, ok }); setTimeout(() => setMsg({ t: "", ok: true }), 2500); };
+
+  const alumni = students.filter(s => s.status === "transferred" || s.status === "alumni" || s.status === "completed");
+  const exitYears = [...new Set(alumni.map(s => s.exitYear || s.transferDate?.split("/")[2] || "Unknown"))].sort().reverse();
+
+  function markCompleted(id) {
+    setStudents(p => p.map(s => s.id === id ? { ...s, status: "completed", exitYear: String(new Date().getFullYear()), completedDate: new Date().toLocaleDateString("en-KE") } : s));
+    flash("✅ Marked as completed/graduate!");
+  }
+  function updateAlumni(id, data) {
+    setStudents(p => p.map(s => s.id === id ? { ...s, ...data } : s));
+    setEditId(null); flash("✅ Record updated!");
+  }
+
+  const filtered = alumni.filter(s => {
+    const q = search.toLowerCase();
+    const yr = s.exitYear || s.transferDate?.split("/")[2] || "Unknown";
+    return (!search || s.name.toLowerCase().includes(q) || s.admNo?.toLowerCase().includes(q)) && (filterYear === "All" || yr === filterYear);
+  });
+
+  const th = { textAlign: "left", padding: "9px 12px", fontWeight: "bold", fontSize: 11, color: "#1d4ed8", background: "#eff6ff" };
+  const td = { padding: "8px 12px", fontSize: 12, borderTop: "1px solid #f1f5f9" };
+
+  return (
+    <div style={{ padding: 24 }}>
+      <PageH title="🎓 Alumni & Leavers Registry" sub="Track graduates, transfers and school completions">
+        {user.role === "admin" && <Btn onClick={() => setTab(tab === "mark" ? "registry" : "mark")} v={tab === "mark" ? "ghost" : "green"} style={{ fontSize: 12 }}>🎓 Mark as Graduate</Btn>}
+      </PageH>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 12, marginBottom: 18 }}>
+        <Stat icon="🎓" label="Graduates" value={students.filter(s => s.status === "completed").length} color="#15803d" />
+        <Stat icon="🔄" label="Transfers Out" value={students.filter(s => s.status === "transferred").length} color="#b45309" />
+        <Stat icon="📋" label="Total Alumni" value={alumni.length} color="#1d4ed8" />
+      </div>
+      {msg.t && <div style={{ background: msg.ok ? "#f0fdf4" : "#fef2f2", border: `1px solid ${msg.ok ? "#bbf7d0" : "#fecaca"}`, borderRadius: 8, padding: "10px 16px", marginBottom: 14, color: msg.ok ? "#15803d" : "#b91c1c", fontWeight: "bold", fontSize: 13 }}>{msg.t}</div>}
+
+      {tab === "mark" && user.role === "admin" && <Card style={{ marginBottom: 16 }}>
+        <div style={{ fontWeight: "bold", color: "#1e3a5f", marginBottom: 14, fontSize: 14 }}>🎓 Mark Current Students as Alumni/Graduates</div>
+        <div style={{ display: "grid", gap: 8 }}>
+          {students.filter(s => s.status === "active" || !s.status).slice(0, 20).map(s => <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", background: "#f8fafc", borderRadius: 8 }}>
+            <Avatar name={s.name} photo={s.photo} size={32} />
+            <div style={{ flex: 1 }}><div style={{ fontWeight: "bold", fontSize: 12 }}>{s.name}</div><div style={{ fontSize: 11, color: "#64748b" }}>{s.class} · {s.admNo}</div></div>
+            <Btn onClick={() => markCompleted(s.id)} v="green" style={{ fontSize: 11 }}>🎓 Graduate</Btn>
+          </div>)}
+        </div>
+      </Card>}
+
+      <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search alumni..." style={{ flex: 1, minWidth: 200, border: "1.5px solid #e2e8f0", borderRadius: 9, padding: "8px 12px", fontSize: 13, fontFamily: "Georgia,serif", outline: "none" }} />
+        <Sel value={filterYear} onChange={setFilterYear} options={["All", ...exitYears]} />
+        <span style={{ fontSize: 12, color: "#64748b" }}>{filtered.length} record(s)</span>
+      </div>
+      <Card style={{ padding: 0, overflow: "hidden" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead><tr>{["", "Adm No", "Name", "Last Class", "Exit Year", "Status", "Destination", "Current Career", user.role === "admin" ? "Action" : ""].filter(Boolean).map(h => <th key={h} style={th}>{h}</th>)}</tr></thead>
+          <tbody>
+            {filtered.length ? filtered.map((s, i) => <tr key={s.id} style={{ background: i % 2 === 0 ? "white" : "#fafafa" }}>
+              <td style={{ ...td, width: 40 }}><Avatar name={s.name} photo={s.photo} size={32} /></td>
+              <td style={{ ...td, fontFamily: "monospace", fontSize: 11 }}>{s.admNo || "—"}</td>
+              <td style={{ ...td, fontWeight: "bold" }}>{s.name}</td>
+              <td style={td}>{s.class}</td>
+              <td style={td}>{s.exitYear || s.transferDate?.split("/")[2] || "—"}</td>
+              <td style={td}><span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 20, fontWeight: "bold", background: s.status === "completed" ? "#dcfce7" : "#fef3c7", color: s.status === "completed" ? "#15803d" : "#b45309" }}>{s.status === "completed" ? "Graduate" : "Transferred"}</span></td>
+              <td style={td}>{editId === s.id ? <input value={editData.transferDest || ""} onChange={e => setEditData(d => ({ ...d, transferDest: e.target.value }))} style={{ border: "1.5px solid #93c5fd", borderRadius: 6, padding: "4px 8px", fontSize: 12, fontFamily: "Georgia,serif", width: 140 }} /> : (s.transferDest || "—")}</td>
+              <td style={td}>{editId === s.id ? <input value={editData.currentCareer || ""} onChange={e => setEditData(d => ({ ...d, currentCareer: e.target.value }))} placeholder="e.g. University" style={{ border: "1.5px solid #93c5fd", borderRadius: 6, padding: "4px 8px", fontSize: 12, fontFamily: "Georgia,serif", width: 140 }} /> : (s.currentCareer || <span style={{ color: "#94a3b8" }}>Unknown</span>)}</td>
+              {user.role === "admin" && <td style={td}>{editId === s.id ? <><button onClick={() => updateAlumni(s.id, editData)} style={{ background: "#15803d", color: "white", border: "none", borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontSize: 11, fontFamily: "Georgia,serif", marginRight: 4 }}>✓</button><button onClick={() => setEditId(null)} style={{ background: "#f1f5f9", border: "none", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontSize: 11, fontFamily: "Georgia,serif" }}>✕</button></> : <button onClick={() => { setEditId(s.id); setEditData({ transferDest: s.transferDest || "", currentCareer: s.currentCareer || "" }); }} style={{ color: "#1d4ed8", background: "none", border: "none", cursor: "pointer", fontSize: 12 }}>Edit</button>}</td>}
+            </tr>) : <tr><td colSpan={9} style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>No alumni records yet.</td></tr>}
+          </tbody>
+        </table>
+      </Card>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// 6. SCHOOL CALENDAR (monthly grid view)
+// ══════════════════════════════════════════════════════════
+function SchoolCalendarPage({ events, setEvents, user }) {
+  const now = new Date();
+  const [calYear, setCalYear] = useState(now.getFullYear());
+  const [calMonth, setCalMonth] = useState(now.getMonth());
+  const [selected, setSelected] = useState(null);
+  const [addModal, setAddModal] = useState(null);
+  const [form, setForm] = useState({ title: "", type: "Academic", description: "" });
+
+  const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const TYPE_COLORS = { Academic: "#1d4ed8", Sports: "#15803d", Cultural: "#b45309", Meeting: "#7c3aed", Holiday: "#0e7490", Exam: "#b91c1c", Other: "#64748b" };
+
+  function getDays() {
+    const first = new Date(calYear, calMonth, 1);
+    const last = new Date(calYear, calMonth + 1, 0);
+    const startDay = first.getDay();
+    const days = [];
+    for (let i = 0; i < startDay; i++) days.push(null);
+    for (let d = 1; d <= last.getDate(); d++) days.push(d);
+    return days;
+  }
+
+  function eventsOnDay(day) {
+    if (!day) return [];
+    const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    return (events || []).filter(e => e.date === dateStr);
+  }
+
+  function addEvent() {
+    if (!form.title || !addModal) return;
+    const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, "0")}-${String(addModal).padStart(2, "0")}`;
+    setEvents(p => [...(p || []), { ...form, id: Date.now().toString(), date: dateStr, audience: "All", addedBy: user.name }]);
+    setAddModal(null); setForm({ title: "", type: "Academic", description: "" });
+  }
+
+  const today = now.getDate();
+  const isCurrentMonth = calYear === now.getFullYear() && calMonth === now.getMonth();
+  const days = getDays();
+
+  return (
+    <div style={{ padding: 24 }}>
+      <PageH title="📅 School Calendar" sub="Visual monthly calendar with events and activities">
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <Btn onClick={() => { if (calMonth === 0) { setCalMonth(11); setCalYear(y => y - 1); } else setCalMonth(m => m - 1); }} v="ghost" style={{ fontSize: 16, padding: "6px 12px" }}>‹</Btn>
+          <span style={{ fontWeight: "bold", color: "#1e3a5f", fontSize: 15, minWidth: 160, textAlign: "center" }}>{MONTHS[calMonth]} {calYear}</span>
+          <Btn onClick={() => { if (calMonth === 11) { setCalMonth(0); setCalYear(y => y + 1); } else setCalMonth(m => m + 1); }} v="ghost" style={{ fontSize: 16, padding: "6px 12px" }}>›</Btn>
+          <Btn onClick={() => { setCalMonth(now.getMonth()); setCalYear(now.getFullYear()); }} v="ghost" style={{ fontSize: 12 }}>Today</Btn>
+        </div>
+      </PageH>
+
+      {addModal && <Modal title={`➕ Add Event — ${addModal} ${MONTHS[calMonth]}`} onClose={() => setAddModal(null)}>
+        <div style={{ display: "grid", gap: 12 }}>
+          <Inp label="EVENT TITLE *" value={form.title} onChange={v => setForm({ ...form, title: v })} placeholder="Event name" />
+          <Sel label="TYPE" value={form.type} onChange={v => setForm({ ...form, type: v })} options={Object.keys(TYPE_COLORS)} />
+          <Textarea label="DESCRIPTION" value={form.description} onChange={v => setForm({ ...form, description: v })} placeholder="Optional details..." rows={3} />
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+          <Btn onClick={addEvent} v="primary">Add Event</Btn>
+          <Btn onClick={() => setAddModal(null)} v="ghost">Cancel</Btn>
+        </div>
+      </Modal>}
+
+      {selected && (() => {
+        const dayEvs = eventsOnDay(selected);
+        return <Modal title={`Events — ${selected} ${MONTHS[calMonth]} ${calYear}`} onClose={() => setSelected(null)}>
+          {dayEvs.length ? dayEvs.map(e => <div key={e.id} style={{ background: "#f8fafc", borderRadius: 8, padding: "10px 14px", marginBottom: 10, borderLeft: `4px solid ${TYPE_COLORS[e.type] || "#64748b"}` }}>
+            <div style={{ fontWeight: "bold", color: "#1e3a5f" }}>{e.title}</div>
+            <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>{e.type} {e.time && `· ${e.time}`} {e.venue && `· ${e.venue}`}</div>
+            {e.description && <div style={{ fontSize: 12, color: "#374151", marginTop: 4 }}>{e.description}</div>}
+            {user.role === "admin" && <button onClick={() => { setEvents(p => p.filter(x => x.id !== e.id)); }} style={{ marginTop: 6, background: "none", border: "none", color: "#b91c1c", cursor: "pointer", fontSize: 12, padding: 0 }}>🗑️ Remove</button>}
+          </div>) : <div style={{ color: "#94a3b8", fontSize: 13, padding: "10px 0" }}>No events on this day.</div>}
+          {user.role === "admin" && <Btn onClick={() => { setSelected(null); setAddModal(selected); }} v="primary" style={{ marginTop: 8, fontSize: 12 }}>➕ Add Event</Btn>}
+        </Modal>;
+      })()}
+
+      <Card style={{ padding: 0, overflow: "hidden" }}>
+        {/* Day headers */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", background: "#1e3a5f" }}>
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(d => <div key={d} style={{ padding: "10px 0", textAlign: "center", fontSize: 11, fontWeight: "bold", color: "white" }}>{d}</div>)}
+        </div>
+        {/* Calendar grid */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)" }}>
+          {days.map((day, idx) => {
+            const dayEvs = eventsOnDay(day);
+            const isToday = isCurrentMonth && day === today;
+            return <div key={idx} onClick={() => { if (day) setSelected(day); }} style={{ minHeight: 90, padding: "6px 8px", borderRight: "1px solid #f1f5f9", borderBottom: "1px solid #f1f5f9", background: isToday ? "#eff6ff" : day ? "white" : "#fafafa", cursor: day ? "pointer" : "default", transition: "background .1s" }} onMouseEnter={e => { if (day) e.currentTarget.style.background = "#f8fafc"; }} onMouseLeave={e => { e.currentTarget.style.background = isToday ? "#eff6ff" : day ? "white" : "#fafafa"; }}>
+              {day && <>
+                <div style={{ fontSize: 13, fontWeight: isToday ? "bold" : "normal", color: isToday ? "#1d4ed8" : "#374151", width: 24, height: 24, borderRadius: "50%", background: isToday ? "#dbeafe" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 4 }}>{day}</div>
+                {dayEvs.slice(0, 3).map(e => <div key={e.id} style={{ fontSize: 9, background: TYPE_COLORS[e.type] || "#64748b", color: "white", borderRadius: 3, padding: "1px 4px", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: "bold" }}>{e.title}</div>)}
+                {dayEvs.length > 3 && <div style={{ fontSize: 9, color: "#94a3b8" }}>+{dayEvs.length - 3} more</div>}
+              </>}
+            </div>;
+          })}
+        </div>
+      </Card>
+
+      {/* Legend */}
+      <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <span style={{ fontSize: 11, fontWeight: "bold", color: "#64748b" }}>Legend:</span>
+        {Object.entries(TYPE_COLORS).map(([t, c]) => <span key={t} style={{ fontSize: 11, background: c, color: "white", padding: "2px 8px", borderRadius: 12, fontWeight: "bold" }}>{t}</span>)}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// 7. CLUBS & ACTIVITIES
+// ══════════════════════════════════════════════════════════
+function ClubsPage({ students, staff, user, clubs, setClubs }) {
+  const blank = { name: "", category: "Academic", description: "", patron: "", meetingDay: "Tuesday", meetingTime: "16:30", venue: "", maxMembers: 30 };
+  const [form, setForm] = useState(blank);
+  const [tab, setTab] = useState("clubs");
+  const [selClub, setSelClub] = useState(null);
+  const [joinStudentId, setJoinStudentId] = useState("");
+  const [msg, setMsg] = useState({ t: "", ok: true });
+  const flash = (t, ok = true) => { setMsg({ t, ok }); setTimeout(() => setMsg({ t: "", ok: true }), 2500); };
+
+  const teachingStaff = (staff || []).filter(s => s.staffType === "teaching");
+
+  function addClub() {
+    if (!form.name) return flash("Club name required.", false);
+    setClubs(p => [...(p || []), { ...form, id: Date.now().toString(), members: [], createdAt: new Date().toLocaleDateString("en-KE") }]);
+    flash("✅ Club added!"); setForm(blank);
+  }
+  function addMember() {
+    if (!joinStudentId || !selClub) return;
+    const club = clubs.find(c => c.id === selClub);
+    if (!club) return;
+    if (club.members?.includes(joinStudentId)) { flash("Already a member.", false); return; }
+    if (club.members?.length >= (club.maxMembers || 30)) { flash("Club is full.", false); return; }
+    setClubs(p => p.map(c => c.id === selClub ? { ...c, members: [...(c.members || []), joinStudentId] } : c));
+    setJoinStudentId(""); flash("✅ Member added!");
+  }
+  function removeMember(clubId, stuId) {
+    setClubs(p => p.map(c => c.id === clubId ? { ...c, members: c.members.filter(m => m !== stuId) } : c));
+  }
+  function delClub(id) { if (confirm("Delete this club?")) { setClubs(p => p.filter(c => c.id !== id)); if (selClub === id) setSelClub(null); } }
+
+  const CATEGORIES = ["Academic", "Sports", "Arts", "Science", "Community Service", "Technology", "Religious", "Environmental", "Music", "Drama", "Debate", "Leadership"];
+  const sel = clubs?.find(c => c.id === selClub);
+
+  return (
+    <div style={{ padding: 24 }}>
+      <PageH title="🏆 Clubs & Activities" sub="Manage school clubs, activity groups and membership">
+        <div style={{ display: "flex", gap: 8 }}>
+          {user.role === "admin" && <Btn onClick={() => setTab(tab === "add" ? "clubs" : "add")} v={tab === "add" ? "ghost" : "primary"} style={{ fontSize: 12 }}>{tab === "add" ? "📋 View Clubs" : "➕ Add Club"}</Btn>}
+        </div>
+      </PageH>
+      {msg.t && <div style={{ background: msg.ok ? "#f0fdf4" : "#fef2f2", border: `1px solid ${msg.ok ? "#bbf7d0" : "#fecaca"}`, borderRadius: 8, padding: "10px 16px", marginBottom: 14, color: msg.ok ? "#15803d" : "#b91c1c", fontWeight: "bold", fontSize: 13 }}>{msg.t}</div>}
+
+      {tab === "add" && user.role === "admin" && <Card style={{ marginBottom: 18 }}>
+        <div style={{ fontWeight: "bold", color: "#1e3a5f", marginBottom: 14, fontSize: 14 }}>Add New Club / Activity Group</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
+          <Inp label="CLUB NAME *" value={form.name} onChange={v => setForm({ ...form, name: v })} placeholder="e.g. Science Club" />
+          <Sel label="CATEGORY" value={form.category} onChange={v => setForm({ ...form, category: v })} options={CATEGORIES} />
+          <div><label style={{ fontSize: 11, fontWeight: "bold", color: "#374151", display: "block", marginBottom: 3 }}>PATRON TEACHER</label>
+            <select value={form.patron} onChange={e => setForm({ ...form, patron: e.target.value })} style={{ width: "100%", border: "1.5px solid #e2e8f0", borderRadius: 8, padding: "8px 10px", fontSize: 13, fontFamily: "Georgia,serif" }}>
+              <option value="">-- Select --</option>
+              {teachingStaff.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+            </select>
+          </div>
+          <Sel label="MEETING DAY" value={form.meetingDay} onChange={v => setForm({ ...form, meetingDay: v })} options={["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]} />
+          <Inp label="MEETING TIME" value={form.meetingTime} onChange={v => setForm({ ...form, meetingTime: v })} type="time" />
+          <Inp label="VENUE" value={form.venue} onChange={v => setForm({ ...form, venue: v })} placeholder="e.g. Lab 1" />
+          <Inp label="MAX MEMBERS" value={form.maxMembers} onChange={v => setForm({ ...form, maxMembers: v })} placeholder="30" type="number" />
+        </div>
+        <Textarea label="DESCRIPTION" value={form.description} onChange={v => setForm({ ...form, description: v })} placeholder="What does this club do?" rows={2} />
+        <div style={{ marginTop: 14 }}><Btn onClick={addClub} v="primary">🏆 Add Club</Btn></div>
+      </Card>}
+
+      <div style={{ display: "grid", gridTemplateColumns: selClub ? "1fr 1.2fr" : "1fr", gap: 16 }}>
+        <div>
+          <div style={{ display: "grid", gap: 10 }}>
+            {(clubs || []).length ? (clubs || []).map(club => {
+              const catColor = { Academic: "#1d4ed8", Sports: "#15803d", Arts: "#b45309", Science: "#7c3aed", Technology: "#0e7490", Religious: "#be185d" }[club.category] || "#64748b";
+              return <div key={club.id} onClick={() => setSelClub(selClub === club.id ? null : club.id)} style={{ background: selClub === club.id ? "#eff6ff" : "white", borderRadius: 12, padding: "14px 18px", boxShadow: "0 1px 6px rgba(0,0,0,.06)", border: `1px solid ${selClub === club.id ? "#93c5fd" : "#e2e8f0"}`, cursor: "pointer", borderLeft: `4px solid ${catColor}` }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div>
+                    <div style={{ fontWeight: "bold", color: "#1e3a5f", fontSize: 14 }}>{club.name}</div>
+                    <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>
+                      <span style={{ background: catColor + "15", color: catColor, fontSize: 10, padding: "2px 8px", borderRadius: 20, fontWeight: "bold", marginRight: 8 }}>{club.category}</span>
+                      {club.meetingDay} {club.meetingTime} {club.venue && `· ${club.venue}`}
+                    </div>
+                    {club.patron && <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Patron: {club.patron}</div>}
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontWeight: "bold", color: catColor, fontSize: 16 }}>{(club.members || []).length}</div>
+                    <div style={{ fontSize: 10, color: "#94a3b8" }}>/ {club.maxMembers}</div>
+                  </div>
+                </div>
+                {club.description && <div style={{ fontSize: 11, color: "#64748b", marginTop: 6 }}>{club.description}</div>}
+                {user.role === "admin" && <button onClick={e => { e.stopPropagation(); delClub(club.id); }} style={{ marginTop: 6, background: "none", border: "none", color: "#b91c1c", cursor: "pointer", fontSize: 11, padding: 0 }}>🗑️ Delete</button>}
+              </div>;
+            }) : <Empty icon="🏆" text="No clubs yet. Add your first club!" />}
+          </div>
+        </div>
+        {sel && <Card>
+          <div style={{ fontWeight: "bold", color: "#1e3a5f", fontSize: 15, marginBottom: 14 }}>👥 {sel.name} — Members</div>
+          <div style={{ marginBottom: 14, display: "flex", gap: 8 }}>
+            <select value={joinStudentId} onChange={e => setJoinStudentId(e.target.value)} style={{ flex: 1, border: "1.5px solid #e2e8f0", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "Georgia,serif" }}>
+              <option value="">-- Add student --</option>
+              {students.filter(s => !(sel.members || []).includes(s.id)).map(s => <option key={s.id} value={s.id}>{s.name} ({s.class})</option>)}
+            </select>
+            <Btn onClick={addMember} v="green" style={{ fontSize: 12 }}>Add</Btn>
+          </div>
+          <div style={{ display: "grid", gap: 6, maxHeight: 340, overflowY: "auto" }}>
+            {(sel.members || []).length ? (sel.members || []).map(mid => {
+              const s = students.find(x => x.id === mid);
+              if (!s) return null;
+              return <div key={mid} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", background: "#f8fafc", borderRadius: 8 }}>
+                <Avatar name={s.name} photo={s.photo} size={30} />
+                <div style={{ flex: 1 }}><div style={{ fontWeight: "bold", fontSize: 12 }}>{s.name}</div><div style={{ fontSize: 10, color: "#64748b" }}>{s.class}</div></div>
+                <button onClick={() => removeMember(sel.id, mid)} style={{ background: "none", border: "none", color: "#b91c1c", cursor: "pointer", fontSize: 13 }}>✕</button>
+              </div>;
+            }) : <Empty icon="👥" text="No members yet." />}
+          </div>
+          <div style={{ marginTop: 10, fontSize: 12, color: "#64748b" }}>{(sel.members || []).length} / {sel.maxMembers} members</div>
+        </Card>}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// 8. TRANSPORT MANAGEMENT
+// ══════════════════════════════════════════════════════════
+function TransportPage({ students, setStudents, user }) {
+  const ROUTES = ["Route A", "Route B", "Route C"];
+  const ROUTE_COLORS = { "Route A": "#1d4ed8", "Route B": "#15803d", "Route C": "#b45309" };
+  const ROUTE_FARES = { "Route A": 15000, "Route B": 16500, "Route C": 18000 };
+  const [tab, setTab] = useState("routes");
+  const [selRoute, setSelRoute] = useState("Route A");
+  const [assignId, setAssignId] = useState("");
+  const [msg, setMsg] = useState({ t: "", ok: true });
+  const [routes, setRoutes] = useState({
+    "Route A": { driver: "", vehicle: "", capacity: 40, stops: ["Meru Town", "Mukothima Junction", "School Gate"] },
+    "Route B": { driver: "", vehicle: "", capacity: 40, stops: ["Gatunga", "Igamba", "School Gate"] },
+    "Route C": { driver: "", vehicle: "", capacity: 40, stops: ["Tharaka", "Nkondi", "School Gate"] }
+  });
+  const [editRoute, setEditRoute] = useState(null);
+  const flash = (t, ok = true) => { setMsg({ t, ok }); setTimeout(() => setMsg({ t: "", ok: true }), 2500); };
+
+  function assignStudent() {
+    if (!assignId) return flash("Select a student.", false);
+    const stu = students.find(s => s.id === assignId);
+    if (!stu) return;
+    const routeKey = `Bus (${selRoute})`;
+    setStudents(p => p.map(s => s.id === assignId ? { ...s, studentType: routeKey, busRoute: selRoute } : s));
+    setAssignId(""); flash(`✅ ${stu.name} assigned to ${selRoute}!`);
+  }
+  function removeFromBus(id) {
+    setStudents(p => p.map(s => s.id === id ? { ...s, studentType: "Day Scholar", busRoute: "" } : s));
+  }
+
+  const busStudents = (route) => students.filter(s => s.busRoute === route || s.studentType === `Bus (${route})`);
+  const unassigned = students.filter(s => !s.busRoute && s.studentType !== "Boarder");
+
+  const th = { textAlign: "left", padding: "9px 12px", fontWeight: "bold", fontSize: 11, color: "#1d4ed8", background: "#eff6ff" };
+  const td = { padding: "8px 12px", fontSize: 12, borderTop: "1px solid #f1f5f9" };
+
+  return (
+    <div style={{ padding: 24 }}>
+      <PageH title="🚌 Transport Management" sub="Bus routes, student assignments and route tracking" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12, marginBottom: 18 }}>
+        {ROUTES.map(r => {
+          const count = busStudents(r).length;
+          const cap = routes[r]?.capacity || 40;
+          return <Stat key={r} icon="🚌" label={r} value={`${count}/${cap}`} color={ROUTE_COLORS[r]} sub={`KES ${ROUTE_FARES[r].toLocaleString()}/term`} />;
+        })}
+        <Stat icon="👥" label="Unassigned" value={unassigned.length} color="#64748b" sub="day scholars" />
+      </div>
+      {msg.t && <div style={{ background: msg.ok ? "#f0fdf4" : "#fef2f2", border: `1px solid ${msg.ok ? "#bbf7d0" : "#fecaca"}`, borderRadius: 8, padding: "10px 16px", marginBottom: 14, color: msg.ok ? "#15803d" : "#b91c1c", fontWeight: "bold", fontSize: 13 }}>{msg.t}</div>}
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        {[["routes", "🚌 Routes Overview"], ["assign", "➕ Assign Students"], ["roster", "📋 Bus Roster"]].map(([t, l]) =>
+          <Btn key={t} onClick={() => setTab(t)} v={tab === t ? "primary" : "ghost"} style={{ fontSize: 12 }}>{l}</Btn>
+        )}
+      </div>
+
+      {tab === "routes" && <div style={{ display: "grid", gap: 14 }}>
+        {ROUTES.map(route => {
+          const r = routes[route];
+          const count = busStudents(route).length;
+          const pct = Math.round(count / (r.capacity || 40) * 100);
+          return <Card key={route} style={{ borderLeft: `4px solid ${ROUTE_COLORS[route]}` }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10 }}>
+              <div>
+                <div style={{ fontWeight: "bold", color: "#1e3a5f", fontSize: 15 }}>{route}</div>
+                <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>
+                  Driver: {editRoute === route ? <input value={r.driver} onChange={e => setRoutes(p => ({ ...p, [route]: { ...p[route], driver: e.target.value } }))} style={{ border: "1.5px solid #93c5fd", borderRadius: 6, padding: "3px 8px", fontSize: 12, fontFamily: "Georgia,serif", width: 160 }} /> : <b>{r.driver || "Not assigned"}</b>}
+                </div>
+                <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+                  Vehicle: {editRoute === route ? <input value={r.vehicle} onChange={e => setRoutes(p => ({ ...p, [route]: { ...p[route], vehicle: e.target.value } }))} style={{ border: "1.5px solid #93c5fd", borderRadius: 6, padding: "3px 8px", fontSize: 12, fontFamily: "Georgia,serif", width: 140 }} /> : <b>{r.vehicle || "Not assigned"}</b>}
+                </div>
+                <div style={{ marginTop: 8, display: "flex", gap: 4, flexWrap: "wrap" }}>
+                  {(r.stops || []).map((stop, i) => <span key={i} style={{ fontSize: 10, background: "#f8fafc", border: "1px solid #e2e8f0", padding: "2px 8px", borderRadius: 12 }}>{i === (r.stops.length - 1) ? "🏫" : "📍"} {stop}</span>)}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontWeight: "bold", color: ROUTE_COLORS[route], fontSize: 20 }}>{count} <span style={{ fontSize: 12, color: "#94a3b8" }}>/ {r.capacity}</span></div>
+                <div style={{ width: 100, height: 6, background: "#f1f5f9", borderRadius: 99, marginTop: 4 }}>
+                  <div style={{ width: `${pct}%`, height: "100%", borderRadius: 99, background: pct > 90 ? "#b91c1c" : ROUTE_COLORS[route] }} />
+                </div>
+                <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 2 }}>{pct}% full</div>
+                {user.role === "admin" && <button onClick={() => setEditRoute(editRoute === route ? null : route)} style={{ marginTop: 6, background: "#eff6ff", color: "#1d4ed8", border: "none", borderRadius: 7, padding: "4px 10px", cursor: "pointer", fontSize: 11, fontFamily: "Georgia,serif" }}>{editRoute === route ? "✓ Save" : "✏️ Edit"}</button>}
+              </div>
+            </div>
+          </Card>;
+        })}
+      </div>}
+
+      {tab === "assign" && user.role === "admin" && <Card>
+        <div style={{ fontWeight: "bold", color: "#1e3a5f", marginBottom: 14, fontSize: 14 }}>Assign Student to Bus Route</div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <Sel label="ROUTE" value={selRoute} onChange={setSelRoute} options={ROUTES} />
+          <div style={{ flex: 2, minWidth: 220 }}>
+            <label style={{ fontSize: 11, fontWeight: "bold", color: "#374151", display: "block", marginBottom: 3 }}>STUDENT</label>
+            <select value={assignId} onChange={e => setAssignId(e.target.value)} style={{ width: "100%", border: "1.5px solid #e2e8f0", borderRadius: 8, padding: "8px 10px", fontSize: 13, fontFamily: "Georgia,serif" }}>
+              <option value="">-- Select student --</option>
+              {students.filter(s => s.status !== "transferred").sort((a, b) => a.name.localeCompare(b.name)).map(s => <option key={s.id} value={s.id}>{s.name} ({s.class}) {s.busRoute ? `[Currently: ${s.busRoute}]` : ""}</option>)}
+            </select>
+          </div>
+          <Btn onClick={assignStudent} v="green">Assign to {selRoute}</Btn>
+        </div>
+      </Card>}
+
+      {tab === "roster" && <>
+        <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+          {ROUTES.map(r => <Btn key={r} onClick={() => setSelRoute(r)} v={selRoute === r ? "primary" : "ghost"} style={{ fontSize: 12, borderLeft: `3px solid ${ROUTE_COLORS[r]}` }}>{r} ({busStudents(r).length})</Btn>)}
+        </div>
+        <Card style={{ padding: 0, overflow: "hidden" }}>
+          <div style={{ padding: "12px 16px", background: ROUTE_COLORS[selRoute] + "15", fontWeight: "bold", color: ROUTE_COLORS[selRoute], fontSize: 13, borderBottom: "1px solid #e2e8f0" }}>{selRoute} Roster — {busStudents(selRoute).length} students</div>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead><tr>{["#", "Name", "Class", "Adm No", "Parent", "Phone", user.role === "admin" ? "Action" : ""].filter(Boolean).map(h => <th key={h} style={th}>{h}</th>)}</tr></thead>
+            <tbody>
+              {busStudents(selRoute).length ? busStudents(selRoute).sort((a, b) => a.name.localeCompare(b.name)).map((s, i) => <tr key={s.id} style={{ background: i % 2 === 0 ? "white" : "#fafafa" }}>
+                <td style={{ ...td, color: "#94a3b8" }}>{i + 1}</td>
+                <td style={{ ...td, fontWeight: "bold" }}>{s.name}</td>
+                <td style={td}>{s.class}</td>
+                <td style={{ ...td, fontFamily: "monospace", fontSize: 11 }}>{s.admNo || "—"}</td>
+                <td style={td}>{s.parentName || "—"}</td>
+                <td style={td}>{s.parentPhone || "—"}</td>
+                {user.role === "admin" && <td style={td}><button onClick={() => removeFromBus(s.id)} style={{ color: "#b91c1c", background: "none", border: "none", cursor: "pointer", fontSize: 12 }}>Remove</button></td>}
+              </tr>) : <tr><td colSpan={7} style={{ padding: 30, textAlign: "center", color: "#94a3b8" }}>No students on {selRoute}.</td></tr>}
+            </tbody>
+          </table>
+        </Card>
+      </>}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// 9. PARENT-TEACHER COMMUNICATION LOG
+// ══════════════════════════════════════════════════════════
+function ParentCommPage({ students, staff, user, parentComms, setParentComms }) {
+  const blank = { studentId: "", type: "Phone Call", direction: "Outgoing", summary: "", outcome: "", followUp: "", date: new Date().toISOString().split("T")[0], time: "", staffName: user.name, confidential: false };
+  const [form, setForm] = useState(blank);
+  const [tab, setTab] = useState("log");
+  const [filterCls, setFilterCls] = useState("All");
+  const [search, setSearch] = useState("");
+  const [msg, setMsg] = useState({ t: "", ok: true });
+  const flash = (t, ok = true) => { setMsg({ t, ok }); setTimeout(() => setMsg({ t: "", ok: true }), 2500); };
+
+  function doAdd() {
+    if (!form.studentId || !form.summary) return flash("Select student and enter summary.", false);
+    setParentComms(p => [...(p || []), { ...form, id: Date.now().toString() }]);
+    flash("✅ Communication logged!"); setForm({ ...blank, studentId: form.studentId });
+    setTab("log");
+  }
+
+  const records = (parentComms || []);
+  const filtered = records.filter(r => {
+    const s = students.find(x => x.id === r.studentId);
+    return s && (filterCls === "All" || s.class === filterCls) && (!search || s.name.toLowerCase().includes(search.toLowerCase()) || r.summary.toLowerCase().includes(search.toLowerCase()));
+  });
+  const pendingFollowUp = records.filter(r => r.followUp && !r.followUpDone);
+
+  const TYPE_COLORS = { "Phone Call": "#1d4ed8", "Meeting": "#15803d", "Email": "#7c3aed", "WhatsApp": "#25d366", "Note Sent": "#b45309", "Home Visit": "#b91c1c" };
+
+  const th = { textAlign: "left", padding: "9px 12px", fontWeight: "bold", fontSize: 11, color: "#1d4ed8", background: "#eff6ff" };
+  const td = { padding: "8px 12px", fontSize: 12, borderTop: "1px solid #f1f5f9" };
+
+  return (
+    <div style={{ padding: 24 }}>
+      <PageH title="📞 Parent-Teacher Communication" sub="Log parent contacts, meetings and follow-ups">
+        <Btn onClick={() => setTab(tab === "add" ? "log" : "add")} v={tab === "add" ? "ghost" : "primary"} style={{ fontSize: 12 }}>{tab === "add" ? "📋 View Log" : "➕ Log Contact"}</Btn>
+      </PageH>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12, marginBottom: 18 }}>
+        <Stat icon="📞" label="Total Contacts" value={records.length} color="#1d4ed8" />
+        <Stat icon="⏰" label="Follow-ups Due" value={pendingFollowUp.length} color="#b91c1c" />
+        <Stat icon="📅" label="This Week" value={records.filter(r => { const d = new Date(r.date); const now = new Date(); return (now - d) / 86400000 <= 7; }).length} color="#15803d" />
+      </div>
+      {msg.t && <div style={{ background: msg.ok ? "#f0fdf4" : "#fef2f2", border: `1px solid ${msg.ok ? "#bbf7d0" : "#fecaca"}`, borderRadius: 8, padding: "10px 16px", marginBottom: 14, color: msg.ok ? "#15803d" : "#b91c1c", fontWeight: "bold", fontSize: 13 }}>{msg.t}</div>}
+
+      {tab === "add" && <Card style={{ marginBottom: 18 }}>
+        <div style={{ fontWeight: "bold", color: "#1e3a5f", marginBottom: 14, fontSize: 14 }}>Log New Communication</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
+          <div><label style={{ fontSize: 11, fontWeight: "bold", color: "#374151", display: "block", marginBottom: 3 }}>STUDENT *</label>
+            <select value={form.studentId} onChange={e => setForm({ ...form, studentId: e.target.value })} style={{ width: "100%", border: "1.5px solid #e2e8f0", borderRadius: 8, padding: "8px", fontSize: 13, fontFamily: "Georgia,serif" }}>
+              <option value="">-- Select --</option>
+              {students.sort((a, b) => a.name.localeCompare(b.name)).map(s => <option key={s.id} value={s.id}>{s.name} ({s.class})</option>)}
+            </select>
+          </div>
+          <Sel label="TYPE" value={form.type} onChange={v => setForm({ ...form, type: v })} options={Object.keys(TYPE_COLORS)} />
+          <Sel label="DIRECTION" value={form.direction} onChange={v => setForm({ ...form, direction: v })} options={["Outgoing", "Incoming"]} />
+          <Inp label="DATE" value={form.date} onChange={v => setForm({ ...form, date: v })} type="date" />
+          <Inp label="TIME" value={form.time} onChange={v => setForm({ ...form, time: v })} type="time" />
+          <Inp label="STAFF NAME" value={form.staffName} onChange={v => setForm({ ...form, staffName: v })} placeholder="Your name" />
+        </div>
+        <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
+          <Textarea label="SUMMARY *" value={form.summary} onChange={v => setForm({ ...form, summary: v })} placeholder="What was discussed? What did the parent say?" rows={3} />
+          <Textarea label="OUTCOME / ACTION TAKEN" value={form.outcome} onChange={v => setForm({ ...form, outcome: v })} placeholder="What was agreed? What action was taken?" rows={2} />
+          <Inp label="FOLLOW-UP REQUIRED (optional)" value={form.followUp} onChange={v => setForm({ ...form, followUp: v })} placeholder="e.g. Call back on Monday to check progress" />
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <input type="checkbox" id="conf" checked={form.confidential} onChange={e => setForm({ ...form, confidential: e.target.checked })} style={{ width: 16, height: 16 }} />
+            <label htmlFor="conf" style={{ fontSize: 12, color: "#374151" }}>🔒 Mark as confidential (visible to admin only)</label>
+          </div>
+        </div>
+        <div style={{ marginTop: 14 }}><Btn onClick={doAdd} v="primary">📋 Log Contact</Btn></div>
+      </Card>}
+
+      {pendingFollowUp.length > 0 && <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "12px 16px", marginBottom: 16 }}>
+        <div style={{ fontWeight: "bold", color: "#b91c1c", marginBottom: 8, fontSize: 13 }}>⏰ {pendingFollowUp.length} Follow-up(s) Required</div>
+        {pendingFollowUp.slice(0, 3).map(r => {
+          const s = students.find(x => x.id === r.studentId);
+          return <div key={r.id} style={{ background: "white", borderRadius: 8, padding: "8px 12px", marginBottom: 6, fontSize: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div><b>{s?.name || "—"}</b> — {r.followUp}</div>
+            <button onClick={() => setParentComms(p => p.map(x => x.id === r.id ? { ...x, followUpDone: true } : x))} style={{ background: "#15803d", color: "white", border: "none", borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontSize: 11, fontFamily: "Georgia,serif" }}>✓ Done</button>
+          </div>;
+        })}
+      </div>}
+
+      <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Search by student or content..." style={{ flex: 1, minWidth: 200, border: "1.5px solid #e2e8f0", borderRadius: 9, padding: "8px 12px", fontSize: 13, fontFamily: "Georgia,serif", outline: "none" }} />
+        <Sel value={filterCls} onChange={setFilterCls} options={["All", ...ALL_CLASSES]} />
+      </div>
+      <Card style={{ padding: 0, overflow: "hidden" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead><tr>{["Date", "Student", "Class", "Type", "Direction", "Summary", "By", "Follow-up", ""].map(h => <th key={h} style={th}>{h}</th>)}</tr></thead>
+          <tbody>
+            {filtered.length ? [...filtered].reverse().map((r, i) => {
+              if (r.confidential && user.role !== "admin") return null;
+              const s = students.find(x => x.id === r.studentId);
+              return <tr key={r.id} style={{ background: i % 2 === 0 ? "white" : "#fafafa" }}>
+                <td style={{ ...td, fontFamily: "monospace", fontSize: 11 }}>{r.date} {r.time}</td>
+                <td style={{ ...td, fontWeight: "bold" }}>{s?.name || "—"}</td>
+                <td style={td}>{s?.class || "—"}</td>
+                <td style={td}><span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 20, fontWeight: "bold", background: (TYPE_COLORS[r.type] || "#64748b") + "20", color: TYPE_COLORS[r.type] || "#64748b" }}>{r.type}</span></td>
+                <td style={td}><span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 20, fontWeight: "bold", background: r.direction === "Outgoing" ? "#eff6ff" : "#f0fdf4", color: r.direction === "Outgoing" ? "#1d4ed8" : "#15803d" }}>{r.direction}</span></td>
+                <td style={{ ...td, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.summary}>{r.confidential ? "🔒 " : ""}{r.summary}</td>
+                <td style={{ ...td, fontSize: 11, color: "#64748b" }}>{r.staffName}</td>
+                <td style={{ ...td, fontSize: 11 }}>{r.followUp ? <span style={{ color: r.followUpDone ? "#15803d" : "#b91c1c" }}>{r.followUpDone ? "✅ Done" : "⏰ Pending"}</span> : "—"}</td>
+                <td style={td}><button onClick={() => setParentComms(p => p.filter(x => x.id !== r.id))} style={{ background: "none", border: "none", color: "#b91c1c", cursor: "pointer", fontSize: 13 }}>🗑️</button></td>
+              </tr>;
+            }) : <tr><td colSpan={9} style={{ padding: 30, textAlign: "center", color: "#94a3b8" }}>No communication records yet.</td></tr>}
+          </tbody>
+        </table>
+      </Card>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// 10. STOCK / INVENTORY
+// ══════════════════════════════════════════════════════════
+function InventoryPage({ user, inventory, setInventory }) {
+  const blank = { name: "", category: "Stationery", unit: "Pieces", quantity: 0, minStock: 10, unitCost: 0, supplier: "", location: "", notes: "" };
+  const [form, setForm] = useState(blank);
+  const [tab, setTab] = useState("stock");
+  const [editId, setEditId] = useState(null);
+  const [adjId, setAdjId] = useState(null);
+  const [adjQty, setAdjQty] = useState("");
+  const [adjType, setAdjType] = useState("Add");
+  const [adjNote, setAdjNote] = useState("");
+  const [search, setSearch] = useState("");
+  const [filterCat, setFilterCat] = useState("All");
+  const [msg, setMsg] = useState({ t: "", ok: true });
+  const flash = (t, ok = true) => { setMsg({ t, ok }); setTimeout(() => setMsg({ t: "", ok: true }), 2500); };
+
+  const CATEGORIES = ["Stationery", "Cleaning", "Sports Equipment", "Lab Supplies", "Kitchen", "Furniture", "Electronics", "Books", "Uniform", "Medical", "Maintenance", "Other"];
+
+  function doSave() {
+    if (!form.name) return flash("Item name required.", false);
+    if (editId) {
+      setInventory(p => p.map(x => x.id === editId ? { ...form, id: editId, history: x.history } : x));
+      setEditId(null); flash("✅ Item updated!");
+    } else {
+      setInventory(p => [...(p || []), { ...form, id: Date.now().toString(), history: [], dateAdded: new Date().toLocaleDateString("en-KE"), quantity: parseInt(form.quantity) || 0 }]);
+      flash("✅ Item added!");
+    }
+    setForm(blank);
+  }
+
+  function doAdj() {
+    if (!adjId || !adjQty) { flash("Enter quantity.", false); return; }
+    const qty = parseInt(adjQty) || 0;
+    setInventory(p => p.map(x => {
+      if (x.id !== adjId) return x;
+      const newQty = adjType === "Add" ? x.quantity + qty : Math.max(0, x.quantity - qty);
+      const entry = { type: adjType, qty, note: adjNote, date: new Date().toLocaleDateString("en-KE"), by: user.name };
+      return { ...x, quantity: newQty, history: [...(x.history || []), entry] };
+    }));
+    setAdjId(null); setAdjQty(""); setAdjNote(""); flash(`✅ Stock ${adjType.toLowerCase()}ed!`);
+  }
+
+  const items = (inventory || []);
+  const filtered = items.filter(x => (filterCat === "All" || x.category === filterCat) && (!search || x.name.toLowerCase().includes(search.toLowerCase())));
+  const lowStock = items.filter(x => x.quantity <= (x.minStock || 10));
+  const totalValue = items.reduce((a, x) => a + (x.quantity || 0) * (x.unitCost || 0), 0);
+
+  const th = { textAlign: "left", padding: "9px 12px", fontWeight: "bold", fontSize: 11, color: "#1d4ed8", background: "#eff6ff" };
+  const td = { padding: "8px 12px", fontSize: 12, borderTop: "1px solid #f1f5f9" };
+
+  return (
+    <div style={{ padding: 24 }}>
+      <PageH title="📦 Stock & Inventory" sub="Track school supplies, equipment and consumables">
+        {user.role === "admin" && <Btn onClick={() => setTab(tab === "add" ? "stock" : "add")} v={tab === "add" ? "ghost" : "primary"} style={{ fontSize: 12 }}>{tab === "add" ? "📦 View Stock" : "➕ Add Item"}</Btn>}
+      </PageH>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12, marginBottom: 18 }}>
+        <Stat icon="📦" label="Total Items" value={items.length} color="#1d4ed8" />
+        <Stat icon="⚠️" label="Low Stock" value={lowStock.length} color="#b91c1c" sub="below minimum" />
+        <Stat icon="💰" label="Stock Value" value={`KES ${totalValue.toLocaleString()}`} color="#15803d" />
+        <Stat icon="📋" label="Categories" value={[...new Set(items.map(x => x.category))].length} color="#7c3aed" />
+      </div>
+      {msg.t && <div style={{ background: msg.ok ? "#f0fdf4" : "#fef2f2", border: `1px solid ${msg.ok ? "#bbf7d0" : "#fecaca"}`, borderRadius: 8, padding: "10px 16px", marginBottom: 14, color: msg.ok ? "#15803d" : "#b91c1c", fontWeight: "bold", fontSize: 13 }}>{msg.t}</div>}
+
+      {adjId && <Modal title={`📦 Adjust Stock — ${items.find(x => x.id === adjId)?.name}`} onClose={() => setAdjId(null)}>
+        <div style={{ display: "grid", gap: 12 }}>
+          <Sel label="ADJUSTMENT TYPE" value={adjType} onChange={setAdjType} options={["Add", "Remove", "Issued", "Damaged", "Lost"]} />
+          <Inp label="QUANTITY" value={adjQty} onChange={setAdjQty} placeholder="0" type="number" />
+          <Inp label="NOTE (optional)" value={adjNote} onChange={setAdjNote} placeholder="Reason for adjustment..." />
+        </div>
+        <div style={{ marginTop: 14, display: "flex", gap: 8 }}>
+          <Btn onClick={doAdj} v="primary">Adjust Stock</Btn>
+          <Btn onClick={() => setAdjId(null)} v="ghost">Cancel</Btn>
+        </div>
+      </Modal>}
+
+      {lowStock.length > 0 && <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "12px 16px", marginBottom: 16 }}>
+        <div style={{ fontWeight: "bold", color: "#b91c1c", marginBottom: 8, fontSize: 13 }}>⚠️ Low Stock Alerts</div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {lowStock.map(x => <span key={x.id} style={{ background: "white", border: "1px solid #fecaca", borderRadius: 8, padding: "4px 12px", fontSize: 12, color: "#b91c1c", fontWeight: "bold" }}>{x.name}: {x.quantity} {x.unit}</span>)}
+        </div>
+      </div>}
+
+      {tab === "add" && user.role === "admin" && <Card style={{ marginBottom: 16 }}>
+        <div style={{ fontWeight: "bold", color: "#1e3a5f", marginBottom: 14, fontSize: 14 }}>{editId ? "Edit Item" : "Add New Inventory Item"}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
+          <Inp label="ITEM NAME *" value={form.name} onChange={v => setForm({ ...form, name: v })} placeholder="e.g. A4 Paper Ream" />
+          <Sel label="CATEGORY" value={form.category} onChange={v => setForm({ ...form, category: v })} options={CATEGORIES} />
+          <Sel label="UNIT" value={form.unit} onChange={v => setForm({ ...form, unit: v })} options={["Pieces", "Reams", "Boxes", "Litres", "Kg", "Sets", "Pairs", "Units", "Packets"]} />
+          <Inp label="QUANTITY" value={form.quantity} onChange={v => setForm({ ...form, quantity: v })} placeholder="0" type="number" />
+          <Inp label="MIN STOCK LEVEL" value={form.minStock} onChange={v => setForm({ ...form, minStock: v })} placeholder="10" type="number" />
+          <Inp label="UNIT COST (KES)" value={form.unitCost} onChange={v => setForm({ ...form, unitCost: v })} placeholder="0" type="number" />
+          <Inp label="SUPPLIER" value={form.supplier} onChange={v => setForm({ ...form, supplier: v })} placeholder="Supplier name" />
+          <Inp label="STORAGE LOCATION" value={form.location} onChange={v => setForm({ ...form, location: v })} placeholder="e.g. Storeroom A" />
+        </div>
+        <div style={{ marginTop: 14, display: "flex", gap: 8 }}>
+          <Btn onClick={doSave} v="primary">{editId ? "Update Item" : "Add Item"}</Btn>
+          {editId && <Btn onClick={() => { setEditId(null); setForm(blank); }} v="ghost">Cancel</Btn>}
+        </div>
+      </Card>}
+
+      <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Search items..." style={{ flex: 1, minWidth: 200, border: "1.5px solid #e2e8f0", borderRadius: 9, padding: "8px 12px", fontSize: 13, fontFamily: "Georgia,serif", outline: "none" }} />
+        <Sel value={filterCat} onChange={setFilterCat} options={["All", ...CATEGORIES]} />
+      </div>
+      <Card style={{ padding: 0, overflow: "hidden" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead><tr>{["#", "Item", "Category", "Qty", "Unit", "Min", "Status", "Unit Cost", "Total Value", "Location", user.role === "admin" ? "Actions" : ""].filter(Boolean).map(h => <th key={h} style={th}>{h}</th>)}</tr></thead>
+          <tbody>
+            {filtered.length ? filtered.map((x, i) => {
+              const isLow = x.quantity <= (x.minStock || 10);
+              const val = (x.quantity || 0) * (x.unitCost || 0);
+              return <tr key={x.id} style={{ background: isLow ? "#fef9f9" : i % 2 === 0 ? "white" : "#fafafa" }}>
+                <td style={{ ...td, color: "#94a3b8" }}>{i + 1}</td>
+                <td style={{ ...td, fontWeight: "bold" }}>{x.name}</td>
+                <td style={td}><span style={{ fontSize: 10, background: "#eff6ff", color: "#1d4ed8", padding: "2px 8px", borderRadius: 20, fontWeight: "bold" }}>{x.category}</span></td>
+                <td style={{ ...td, fontWeight: "bold", fontSize: 14, color: isLow ? "#b91c1c" : "#15803d" }}>{x.quantity}</td>
+                <td style={td}>{x.unit}</td>
+                <td style={{ ...td, color: "#94a3b8" }}>{x.minStock}</td>
+                <td style={td}><span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 20, fontWeight: "bold", background: isLow ? "#fee2e2" : "#dcfce7", color: isLow ? "#b91c1c" : "#15803d" }}>{isLow ? "⚠️ Low" : "✅ OK"}</span></td>
+                <td style={td}>{x.unitCost ? `KES ${x.unitCost.toLocaleString()}` : "—"}</td>
+                <td style={{ ...td, fontWeight: "bold", color: "#1e3a5f" }}>{val > 0 ? `KES ${val.toLocaleString()}` : "—"}</td>
+                <td style={{ ...td, fontSize: 11, color: "#64748b" }}>{x.location || "—"}</td>
+                {user.role === "admin" && <td style={td}>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <button onClick={() => setAdjId(x.id)} style={{ background: "#eff6ff", color: "#1d4ed8", border: "none", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontSize: 11, fontFamily: "Georgia,serif" }}>±</button>
+                    <button onClick={() => { setEditId(x.id); setForm({ name: x.name, category: x.category, unit: x.unit, quantity: x.quantity, minStock: x.minStock, unitCost: x.unitCost, supplier: x.supplier || "", location: x.location || "", notes: x.notes || "" }); setTab("add"); }} style={{ color: "#1d4ed8", background: "none", border: "none", cursor: "pointer", fontSize: 11 }}>Edit</button>
+                    <button onClick={() => { if (confirm("Delete this item?")) setInventory(p => p.filter(y => y.id !== x.id)); }} style={{ color: "#b91c1c", background: "none", border: "none", cursor: "pointer", fontSize: 11 }}>Del</button>
+                  </div>
+                </td>}
+              </tr>;
+            }) : <tr><td colSpan={11} style={{ padding: 30, textAlign: "center", color: "#94a3b8" }}>No inventory items yet.</td></tr>}
+            {filtered.length > 0 && <tr style={{ background: "#f0fdf4", fontWeight: "bold" }}>
+              <td colSpan={7} style={{ padding: "10px 12px", fontSize: 12, color: "#15803d" }}>TOTAL VALUE ({filtered.length} items)</td>
+              <td colSpan={2} style={{ padding: "10px 12px", fontSize: 13, color: "#1e3a5f", fontWeight: "bold" }}>KES {filtered.reduce((a, x) => a + (x.quantity || 0) * (x.unitCost || 0), 0).toLocaleString()}</td>
+              <td colSpan={user.role === "admin" ? 2 : 1} />
+            </tr>}
+          </tbody>
+        </table>
+      </Card>
+    </div>
+  );
+}
