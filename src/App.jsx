@@ -275,11 +275,17 @@ function Sidebar({view,setView,user,onLogout,logo}) {
     {id:"admissions",icon:"📋",label:"Admissions"},{id:"results",icon:"📝",label:"Results Entry"},
     {id:"analytics",icon:"📈",label:"Analytics"},{id:"reports",icon:"🖨️",label:"Report Forms"},
     {id:"fees",icon:"💰",label:"Fees Manager"},{id:"feestructure",icon:"📑",label:"Fee Structure"},
+    {id:"exams",icon:"✍️",label:"Exam Management"},
     {id:"timetable",icon:"📅",label:"Timetable"},{id:"monitoring",icon:"🏥",label:"Learner Monitoring"},
     {id:"attendance",icon:"✅",label:"Attendance"},{id:"timeinout",icon:"🕐",label:"Time In/Out"},
     {id:"staff",icon:"👨‍🏫",label:"Staff Manager"},{id:"duty",icon:"🛡️",label:"Teachers on Duty"},
-    {id:"council",icon:"🎖️",label:"Student Council"},{id:"library",icon:"📚",label:"Library"},
+    {id:"council",icon:"🎖️",label:"Student Council"},{id:"clubs",icon:"🏆",label:"Clubs & Activities"},
+    {id:"transport",icon:"🚌",label:"Transport"},{id:"library",icon:"📚",label:"Library"},
+    {id:"alumni",icon:"🎓",label:"Alumni"},{id:"calendar",icon:"📅",label:"Calendar"},
     {id:"events",icon:"🎉",label:"Events"},{id:"noticeboard",icon:"📌",label:"Notice Board"},
+    {id:"parentcomms",icon:"📞",label:"Parent Comms"},{id:"notifications",icon:"💬",label:"Notifications"},
+    {id:"ai_comments",icon:"🤖",label:"AI Comments"},{id:"bulk",icon:"📦",label:"Bulk Operations"},
+    {id:"inventory",icon:"🏪",label:"Inventory"},
     {id:"schoolinfo",icon:"🏫",label:"School Info"},{id:"settings",icon:"⚙️",label:"Settings"},
   ];
   const teacherLinks=[
@@ -3639,52 +3645,90 @@ function LearnerMonitoringPage({students,user,monitoring,setMonitoring}) {
 // ══════════════════════════════════════════════════════════
 // FEE STRUCTURE
 // ══════════════════════════════════════════════════════════
-function FeeStructurePage({user,logo}) {
-  const [structure,setStructure]=useState(DEFAULT_FEE_STRUCTURE);
-  const [saved,setSaved]=useState(false);
+// ── ADD THESE CONSTANTS to your main file (near the top, after DEFAULT_FEE_STRUCTURE) ──
+// These are needed by the ttSetup default in App()
+
+const DEFAULT_SCHEDULE = [
+  {time:"05:00–06:30",activity:"Wake Up & Morning Routine",icon:"🌅",editable:false},
+  {time:"06:30–07:00",activity:"Prep & Breakfast",icon:"🍳",editable:false},
+  {time:"07:00–08:00",activity:"Morning Preps / Study",icon:"📖",editable:false},
+  {time:"07:00–12:20",activity:"Lessons (8 Periods)",icon:"📚",editable:false},
+  {time:"15:10–16:30",activity:"General Cleaning",icon:"🧹",editable:false},
+  {time:"16:30–17:30",activity:"Mon/Wed/Fri: Games & Sports · Tue: Clubs · Thu: Debates",icon:"⚽",editable:true},
+  {time:"17:30–18:00",activity:"Personal Cleaning",icon:"🚿",editable:false},
+  {time:"18:00–18:35",activity:"Supper",icon:"🍽️",editable:false},
+  {time:"18:35–19:00",activity:"Prayers",icon:"🙏",editable:false},
+  {time:"19:00–21:30",activity:"Evening Lessons (3 Periods)",icon:"🌙",editable:false},
+  {time:"21:30–22:00",activity:"Personal Studies",icon:"📝",editable:false},
+  {time:"22:00",activity:"Sleep / Lights Off",icon:"😴",editable:false},
+];
+const DEFAULT_SAT = [
+  {id:0,time:"05:00–06:30",activity:"Wake Up & Morning Routine",icon:"🌅"},
+  {id:1,time:"06:30–07:00",activity:"Prep & Breakfast",icon:"🍳"},
+  {id:2,time:"07:00–08:00",activity:"Morning Preps / Study",icon:"📖"},
+  {id:3,time:"08:00–09:00",activity:"Lesson 1 (1 hour)",icon:"📚"},
+  {id:4,time:"09:00–09:20",activity:"Short Break",icon:"☕"},
+  {id:5,time:"09:20–10:20",activity:"Lesson 2 (1 hour)",icon:"📚"},
+  {id:6,time:"10:20–11:20",activity:"Lesson 3 (1 hour)",icon:"📚"},
+  {id:7,time:"11:20–11:30",activity:"Short Break",icon:"☕"},
+  {id:8,time:"11:30–12:30",activity:"Lesson 4 (1 hour)",icon:"📚"},
+  {id:9,time:"12:30–13:30",activity:"Lesson 5 (1 hour)",icon:"📚"},
+  {id:10,time:"13:30–14:00",activity:"Lunch",icon:"🍽️"},
+  {id:11,time:"14:00–17:30",activity:"Afternoon Activities / Games",icon:"⚽"},
+  {id:12,time:"17:30–18:00",activity:"Personal Cleaning",icon:"🚿"},
+  {id:13,time:"18:00–18:35",activity:"Supper",icon:"🍽️"},
+  {id:14,time:"18:35–19:00",activity:"Prayers",icon:"🙏"},
+  {id:15,time:"19:00–22:00",activity:"Evening Studies",icon:"🌙"},
+];
+const DEFAULT_SUN = [
+  {id:0,time:"05:00–06:30",activity:"Wake Up & Morning Routine",icon:"🌅"},
+  {id:1,time:"06:30–07:30",activity:"Breakfast & Preparations",icon:"🍳"},
+  {id:2,time:"07:30–09:00",activity:"Chapel / Worship",icon:"⛪"},
+  {id:3,time:"09:00–12:00",activity:"Rest / Personal Time",icon:"🕐"},
+  {id:4,time:"12:00–13:00",activity:"Lunch",icon:"🍽️"},
+  {id:5,time:"13:00–17:30",activity:"Games & Recreation",icon:"⚽"},
+  {id:6,time:"17:30–18:00",activity:"Personal Cleaning",icon:"🚿"},
+  {id:7,time:"18:00–18:35",activity:"Supper",icon:"🍽️"},
+  {id:8,time:"18:35–19:00",activity:"Prayers",icon:"🙏"},
+  {id:9,time:"19:00–22:00",activity:"Evening Studies",icon:"🌙"},
+];
+
+function FeeStructurePage({user,logo,feeStructure,setFeeStructure}){
+  // feeStructure now comes from App() state — no local useState needed
+  const structure = feeStructure || DEFAULT_FEE_STRUCTURE;
   const [editMode,setEditMode]=useState(false);
-  const [draft,setDraft]=useState(JSON.parse(JSON.stringify(DEFAULT_FEE_STRUCTURE)));
-  function handleSave(){setStructure(JSON.parse(JSON.stringify(draft)));setSaved(true);setEditMode(false);setTimeout(()=>setSaved(false),2000);}
+  const [draft,setDraft]=useState(null);
+  const [saved,setSaved]=useState(false);
+  
+  function startEdit(){setDraft(JSON.parse(JSON.stringify(structure)));setEditMode(true);}
+  function handleSave(){setFeeStructure(JSON.parse(JSON.stringify(draft)));setSaved(true);setEditMode(false);setTimeout(()=>setSaved(false),2500);}
+  function cancelEdit(){setDraft(null);setEditMode(false);}
+  
   function printFeeStructure(){
     const rows=STUDENT_TYPES.map(type=>`
-      <tr style="border-bottom:1px solid #e2e8f0;">
-        <td style="padding:10px 12px;font-weight:bold;font-size:13px;">${type}</td>
-        ${["term1","term2","term3"].map(t=>`<td style="padding:10px 12px;text-align:right;font-weight:bold;color:#1e3a5f;">KES ${(structure[type]?.[t]||0).toLocaleString()}</td>`).join("")}
-        <td style="padding:10px 12px;text-align:right;font-weight:bold;color:#15803d;">KES ${["term1","term2","term3"].reduce((a,t)=>a+(structure[type]?.[t]||0),0).toLocaleString()}</td>
+      <tr><td style="padding:10px 12px;font-weight:bold;">${type}</td>
+        ${["term1","term2","term3"].map(t=>`<td style="padding:10px 12px;text-align:right;">KES ${(structure[type]?.[t]||0).toLocaleString()}</td>`).join("")}
+        <td style="padding:10px 12px;text-align:right;color:#15803d;font-weight:bold;">KES ${["term1","term2","term3"].reduce((a,t)=>a+(structure[type]?.[t]||0),0).toLocaleString()}</td>
       </tr>`).join("");
-    const html=`
-      <h3 style="margin:0 0 16px;color:#1e3a5f;font-size:16px;">Fee Structure — Academic Year ${new Date().getFullYear()}</h3>
+    printWindow("Fee Structure",`<h3 style="color:#1e3a5f;">Fee Structure — ${new Date().getFullYear()}</h3>
       <table style="width:100%;border-collapse:collapse;font-size:12px;">
-        <thead><tr style="background:#1e3a5f;color:white;">
-          <th style="padding:10px 12px;text-align:left;">Student Type</th>
-          <th style="padding:10px 12px;text-align:right;">Term 1</th>
-          <th style="padding:10px 12px;text-align:right;">Term 2</th>
-          <th style="padding:10px 12px;text-align:right;">Term 3</th>
-          <th style="padding:10px 12px;text-align:right;">Annual Total</th>
-        </tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-      <div style="margin-top:20px;padding:12px 16px;background:#f0fdf4;border-radius:8px;font-size:11px;color:#15803d;font-weight:bold;">
-        ✅ These fees are set by the school administration and are subject to change. Contact the school for more information.
-      </div>
-      <div style="margin-top:24px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;">
-        ${["Principal","Bursar","Date"].map(l=>`<div style="text-align:center;"><div style="border-top:1px solid #374151;padding-top:4px;font-size:10px;color:#64748b;">${l}</div></div>`).join("")}
-      </div>`;
-    printWindow("Fee Structure", html, logo||null);
+        <thead><tr style="background:#1e3a5f;color:white;">${["Student Type","Term 1","Term 2","Term 3","Annual Total"].map(h=>`<th style="padding:10px 12px;text-align:left;">${h}</th>`).join("")}</tr></thead>
+        <tbody>${rows}</tbody></table>`,logo||null);
   }
   const terms=["term1","term2","term3"];
   const termLabels={"term1":"Term 1","term2":"Term 2","term3":"Term 3"};
+  const displayStructure=editMode?draft:structure;
   return (
     <div style={{padding:24}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,flexWrap:"wrap",gap:10}}>
         <div><h2 style={{margin:0,color:"#1e3a5f",fontSize:22,fontFamily:F}}>📑 Fee Structure</h2><div style={{fontSize:13,color:"#64748b",marginTop:2}}>Fees payable per term by student type</div></div>
         <div style={{display:"flex",gap:8}}>
           <Btn onClick={printFeeStructure} v="teal" style={{fontSize:12}}>🖨️ Print / Download</Btn>
-          {user.role==="admin"&&<Btn onClick={()=>{setDraft(JSON.parse(JSON.stringify(structure)));setEditMode(e=>!e);}} v={editMode?"ghost":"primary"} style={{fontSize:12}}>{editMode?"✕ Cancel":"✏️ Edit"}</Btn>}
-          {editMode&&<Btn onClick={handleSave} v="green" style={{fontSize:12}}>💾 Save</Btn>}
+          {user.role==="admin"&&!editMode&&<Btn onClick={startEdit} v="primary" style={{fontSize:12}}>✏️ Edit</Btn>}
+          {editMode&&<><Btn onClick={handleSave} v="green" style={{fontSize:12}}>💾 Save Changes</Btn><Btn onClick={cancelEdit} v="ghost" style={{fontSize:12}}>✕ Cancel</Btn></>}
         </div>
       </div>
-      {saved&&<div style={{background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:8,padding:"10px 16px",marginBottom:14,color:"#15803d",fontWeight:"bold",fontSize:13}}>✅ Fee structure saved!</div>}
+      {saved&&<div style={{background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:8,padding:"10px 16px",marginBottom:14,color:"#15803d",fontWeight:"bold",fontSize:13}}>✅ Fee structure saved! Changes will persist across sessions.</div>}
       <div style={{display:"grid",gap:16}}>
         {STUDENT_TYPES.map(type=>(
           <Card key={type}>
@@ -3696,16 +3740,18 @@ function FeeStructurePage({user,logo}) {
                 <div key={t} style={{background:"#f8fafc",borderRadius:10,padding:"14px 16px",textAlign:"center",border:"1.5px solid #e2e8f0"}}>
                   <div style={{fontSize:11,color:"#64748b",marginBottom:6,fontWeight:"bold"}}>{termLabels[t]}</div>
                   {editMode?(
-                    <input type="number" value={draft[type]?.[t]||0} onChange={e=>setDraft(d=>{const n={...d,[type]:{...(d[type]||{})}};n[type][t]=parseInt(e.target.value)||0;return n;})} style={{width:"100%",border:"1.5px solid #93c5fd",borderRadius:8,padding:"8px",fontSize:16,fontWeight:"bold",textAlign:"center",fontFamily:F,color:"#1e3a5f",boxSizing:"border-box"}}/>
+                    <input type="number" value={draft[type]?.[t]||0}
+                      onChange={e=>setDraft(d=>{const n={...d,[type]:{...(d[type]||{})}};n[type][t]=parseInt(e.target.value)||0;return n;})}
+                      style={{width:"100%",border:"1.5px solid #93c5fd",borderRadius:8,padding:"8px",fontSize:16,fontWeight:"bold",textAlign:"center",fontFamily:"Georgia,serif",color:"#1e3a5f",boxSizing:"border-box"}}/>
                   ):(
-                    <div style={{fontSize:20,fontWeight:"bold",color:"#1e3a5f"}}>KES {(structure[type]?.[t]||0).toLocaleString()}</div>
+                    <div style={{fontSize:20,fontWeight:"bold",color:"#1e3a5f"}}>KES {(displayStructure[type]?.[t]||0).toLocaleString()}</div>
                   )}
                   <div style={{fontSize:10,color:"#94a3b8",marginTop:4}}>per term</div>
                 </div>
               ))}
             </div>
             <div style={{marginTop:10,padding:"8px 12px",background:"#f0fdf4",borderRadius:8,fontSize:12,color:"#15803d",fontWeight:"bold"}}>
-              Annual Total: KES {terms.reduce((a,t)=>a+(structure[type]?.[t]||0),0).toLocaleString()}
+              Annual Total: KES {terms.reduce((a,t)=>a+(displayStructure[type]?.[t]||0),0).toLocaleString()}
             </div>
           </Card>
         ))}
@@ -3713,6 +3759,9 @@ function FeeStructurePage({user,logo}) {
     </div>
   );
 }
+
+// ── 2. NEW SIDEBAR adminLinks (replace existing adminLinks array) ─
+// Add these entries to your adminLinks array in Sidebar():
 
 // ══════════════════════════════════════════════════════════
 // PRINT / DOWNLOAD UTILITIES (with watermark)
@@ -3840,170 +3889,6 @@ function SchoolInfoPage({logo}) {
     </div>
   );
 }
-
-// ══════════════════════════════════════════════════════════
-// MAIN APP
-// ══════════════════════════════════════════════════════════
-export default function App() {
-  const [ready,setReady]=useState(false);
-  const [user,setUser]=useState(null);
-  const [view,setView]=useState("dashboard");
-  const [users,setUsers]=useState(DEFAULT_USERS);
-  const [students,setStudents]=useState([]);
-  const [results,setResults]=useState([]);
-  const [comments,setComments]=useState([]);
-  const [announcements,setAnnouncements]=useState([]);
-  const [fees,setFees]=useState([]);
-  const [staff,setStaff]=useState([]);
-  const [term,setTerm]=useState("Term 1");
-  const [year,setYear]=useState(String(new Date().getFullYear()));
-  const [examType,setExamType]=useState("End Term Exam");
-  const [logo,setLogo]=useState(null);
-  const [monitoring,setMonitoring]=useState([]);
-  const [timetable,setTimetable]=useState({});
-  // Timetable setup state (persisted so settings survive navigation)
-  const [ttSetup,setTtSetup]=useState({
-    name:"TNKS Timetable 2025",desc:"",session:"2024-2025",startDate:"",endDate:"",
-    setupData:{subjectTeachers:{},subjectAvailability:{},classTeachers:{}},
-    customLpw:{},customDouble:{},
-    bellPeriods:[
-      {id:1,type:"period",name:"Period 1",start:"07:00",end:"07:40"},
-      {id:2,type:"period",name:"Period 2",start:"07:40",end:"08:20"},
-      {id:3,type:"break",name:"Short Break ☕",start:"08:20",end:"08:30"},
-      {id:4,type:"period",name:"Period 3",start:"08:30",end:"09:10"},
-      {id:5,type:"period",name:"Period 4",start:"09:10",end:"09:50"},
-      {id:6,type:"break",name:"Long Break 🧘",start:"09:50",end:"10:10"},
-      {id:7,type:"period",name:"Period 5",start:"10:10",end:"10:50"},
-      {id:8,type:"period",name:"Period 6",start:"10:50",end:"11:30"},
-      {id:9,type:"break",name:"Lunch 🍽️",start:"11:30",end:"12:10"},
-      {id:10,type:"period",name:"Period 7",start:"12:10",end:"12:50"},
-      {id:11,type:"period",name:"Period 8",start:"12:50",end:"13:30"},
-    ],
-    workingDays:["Monday","Tuesday","Wednesday","Thursday","Friday"],
-    rooms:[{id:1,name:"Main Classroom"},{id:2,name:"Science Lab"},{id:3,name:"Computer Lab"},{id:4,name:"Library"}],
-    daySchedule:DEFAULT_CFG.schedule,
-    satSchedule:DEFAULT_CFG.weekendSchedule.Saturday.map((s,i)=>({...s,id:i})),
-    sunSchedule:DEFAULT_CFG.weekendSchedule.Sunday.map((s,i)=>({...s,id:i})),
-  });
-  // Library
-  const [books,setBooks]=useState([]);
-  const [borrows,setBorrows]=useState([]);
-  // Events
-  const [events,setEvents]=useState([]);
-  // Council & student duties
-  const [council,setCouncil]=useState([]);
-  const [stuDuties,setStuDuties]=useState([]);
-  // Teacher duties & roster
-  const [duties,setDuties]=useState([]);
-  const [teacherAvail,setTeacherAvail]=useState({});
-  const [stuRoster,setStuRoster]=useState([]);
-
-  useEffect(()=>{
-    (async()=>{
-      const [u,s,r,c,a,f,st,lg,mon,tt,tts,bk,br,ev,co,sd,du,ta,sr]=await Promise.all([
-        load("tnks_users"),load("tnks_students"),load("tnks_results"),load("tnks_comments"),
-        load("tnks_announcements"),load("tnks_fees"),load("tnks_staff"),load("tnks_logo"),
-        load("tnks_monitoring"),load("tnks_timetable"),load("tnks_ttsetup"),
-        load("tnks_books"),load("tnks_borrows"),load("tnks_events"),
-        load("tnks_council"),load("tnks_studuties"),load("tnks_duties"),
-        load("tnks_teacher_avail"),load("tnks_stu_roster"),
-      ]);
-      if(u) setUsers(u); if(s) setStudents(s); if(r) setResults(r);
-      if(c) setComments(c); if(a) setAnnouncements(a); if(f) setFees(f);
-      if(st) setStaff(st); if(lg) setLogo(lg); if(mon) setMonitoring(mon);
-      if(tt) setTimetable(tt); if(tts) setTtSetup(prev=>({...prev,...tts}));
-      if(bk) setBooks(bk); if(br) setBorrows(br); if(ev) setEvents(ev);
-      if(co) setCouncil(co); if(sd) setStuDuties(sd);
-      if(du) setDuties(du); if(ta) setTeacherAvail(ta); if(sr) setStuRoster(sr);
-      setReady(true);
-    })();
-  },[]);
-
-  useEffect(()=>{if(ready) save("tnks_users",users);},[users,ready]);
-  useEffect(()=>{if(ready) save("tnks_students",students);},[students,ready]);
-  useEffect(()=>{if(ready) save("tnks_results",results);},[results,ready]);
-  useEffect(()=>{if(ready) save("tnks_comments",comments);},[comments,ready]);
-  useEffect(()=>{if(ready) save("tnks_announcements",announcements);},[announcements,ready]);
-  useEffect(()=>{if(ready) save("tnks_fees",fees);},[fees,ready]);
-  useEffect(()=>{if(ready) save("tnks_staff",staff);},[staff,ready]);
-  useEffect(()=>{if(ready) save("tnks_monitoring",monitoring);},[monitoring,ready]);
-  useEffect(()=>{if(ready) save("tnks_timetable",timetable);},[timetable,ready]);
-  useEffect(()=>{if(ready) save("tnks_ttsetup",ttSetup);},[ttSetup,ready]);
-  useEffect(()=>{if(ready) save("tnks_books",books);},[books,ready]);
-  useEffect(()=>{if(ready) save("tnks_borrows",borrows);},[borrows,ready]);
-  useEffect(()=>{if(ready) save("tnks_events",events);},[events,ready]);
-  useEffect(()=>{if(ready) save("tnks_council",council);},[council,ready]);
-  useEffect(()=>{if(ready) save("tnks_studuties",stuDuties);},[stuDuties,ready]);
-  useEffect(()=>{if(ready) save("tnks_duties",duties);},[duties,ready]);
-  useEffect(()=>{if(ready) save("tnks_teacher_avail",teacherAvail);},[teacherAvail,ready]);
-  useEffect(()=>{if(ready) save("tnks_stu_roster",stuRoster);},[stuRoster,ready]);
-  useEffect(()=>{
-    const handler=(e)=>setView(e.detail);
-    window.addEventListener("tnks-nav",handler);
-    return ()=>window.removeEventListener("tnks-nav",handler);
-  },[]);
-
-  if(!ready) return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",background:"linear-gradient(135deg,#1e3a5f,#15803d)",fontFamily:F}}><div style={{textAlign:"center",color:"white"}}><Logo size={90} src={OFFICIAL_LOGO}/><div style={{fontSize:18,fontWeight:"bold",marginTop:14}}>Loading TNKS System…</div><div style={{fontSize:13,opacity:.8,marginTop:6}}>{SCHOOL.name}</div><div style={{marginTop:16,display:"flex",gap:6,justifyContent:"center"}}>{[0,1,2].map(i=><div key={i} style={{width:8,height:8,borderRadius:"50%",background:"white",opacity:.6,animation:`pulse ${0.8+i*0.2}s infinite alternate`}}/>)}</div></div></div>;
-
-  if(!user) return <LoginPage users={users} setUsers={setUsers} students={students} onLogin={setUser} logo={logo}/>;
-
-  const ctx={user,students,setStudents,results,setResults,comments,setComments,announcements,setAnnouncements,users,setUsers,fees,setFees,staff,setStaff,term,setTerm,year,setYear,examType,setExamType,logo,monitoring,setMonitoring};
-
-  if(user.role==="parent") return (
-    <div style={{display:"flex",height:"100vh",fontFamily:F,background:"#f1f5f9",overflow:"hidden"}}>
-      <Sidebar view={view} setView={setView} user={user} onLogout={()=>{setUser(null);setView("dashboard");}} logo={logo}/>
-      <main style={{flex:1,overflowY:"auto"}}>
-        {view==="schoolinfo"?<SchoolInfoPage logo={logo}/>:view==="noticeboard"?<NoticeBoard {...ctx}/>:<ParentView {...ctx}/>}
-      </main>
-    </div>
-  );
-
-  return (
-    <div style={{display:"flex",height:"100vh",fontFamily:F,background:"#f1f5f9",overflow:"hidden"}}>
-      <Sidebar view={view} setView={setView} user={user} onLogout={()=>{setUser(null);setView("dashboard");}} logo={logo}/>
-      <main style={{flex:1,overflowY:"auto"}}>
-        {view==="dashboard"&&<Dashboard {...ctx}/>}
-        {view==="students"&&<StudentsPage students={students} setStudents={setStudents} results={results} setResults={setResults} comments={comments} setComments={setComments} fees={fees} setFees={setFees} monitoring={monitoring} setMonitoring={setMonitoring}/>}
-        {view==="admissions"&&<AdmissionsPage students={students} setStudents={setStudents}/>}
-        {view==="results"&&<ResultsPage {...ctx}/>}
-        {view==="analytics"&&<AnalyticsPage {...ctx}/>}
-        {view==="reports"&&<ReportsPage {...ctx}/>}
-        {view==="fees"&&<FeesPage students={students} fees={fees} setFees={setFees} user={user} logo={logo}/>}
-        {view==="feestructure"&&<FeeStructurePage user={user} logo={logo}/>}
-        {view==="timetable"&&<TimetablePage students={students} staff={staff} user={user} timetable={timetable} setTimetable={setTimetable} ttSetup={ttSetup} setTtSetup={setTtSetup}/>}
-        {view==="monitoring"&&<LearnerMonitoringPage students={students} user={user} monitoring={monitoring} setMonitoring={setMonitoring}/>}
-        {view==="attendance"&&<AttendancePage {...ctx}/>}
-        {view==="timeinout"&&<TimeInOutPage students={students} staff={staff} user={user}/>}
-        {view==="staff"&&user.role==="admin"&&<StaffPage staff={staff} setStaff={setStaff} users={users} setUsers={setUsers}/>}
-        {view==="staff"&&user.role!=="admin"&&<div style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Admin access required.</div>}
-        {view==="duty"&&<DutyPage staff={staff} user={user} students={students} duties={duties} setDuties={setDuties} teacherAvail={teacherAvail} setTeacherAvail={setTeacherAvail} stuRoster={stuRoster} setStuRoster={setStuRoster}/>}
-        {view==="council"&&<CouncilPage students={students} user={user} council={council} setCouncil={setCouncil} stuDuties={stuDuties} setStuDuties={setStuDuties}/>}
-        {view==="library"&&<LibraryPage books={books} setBooks={setBooks} borrows={borrows} setBorrows={setBorrows}/>}
-        {view==="events"&&<EventsPage user={user} events={events} setEvents={setEvents}/>}
-        {view==="noticeboard"&&<NoticeBoard {...ctx}/>}
-        {view==="settings"&&user.role==="admin"&&<SettingsPage users={users} setUsers={setUsers} logo={logo} setLogo={setLogo}/>}
-        {view==="settings"&&user.role!=="admin"&&<div style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Admin access required.</div>}
-        {view==="schoolinfo"&&<SchoolInfoPage logo={logo}/>}
-      </main>
-    </div>
-  );
-}
-// ══════════════════════════════════════════════════════════
-// TNKS NEW MODULES — 10 additions
-// Paste each component into the main App file in the
-// appropriate location. The App() nav additions are at
-// the bottom of this file.
-// ══════════════════════════════════════════════════════════
-
-// ── Dependencies (already in main file) ──────────────────
-// useState, useEffect, useRef, useCallback — from React
-// Card, Btn, Inp, Sel, Textarea, Modal, PageH, Empty,
-// Avatar, Stat, F, CC, printWindow, ALL_CLASSES, DAYS,
-// TERMS, YEARS, EXAM_TYPES, getSubs, getGrade — from main
-
-// ══════════════════════════════════════════════════════════
-// 1. EXAM MANAGEMENT
-// ══════════════════════════════════════════════════════════
 function ExamManagementPage({ students, staff, user, examSchedules, setExamSchedules, logo }) {
   const teachingStaff = (staff || []).filter(s => s.staffType === "teaching");
   const blankExam = {
@@ -5368,6 +5253,247 @@ function InventoryPage({ user, inventory, setInventory }) {
           </tbody>
         </table>
       </Card>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// ADDITIONS TO App() — paste these into the main App function
+// ══════════════════════════════════════════════════════════
+/*
+STEP 1: Add state variables inside App():
+
+  const [examSchedules, setExamSchedules] = useState([]);
+  const [clubs, setClubs] = useState([]);
+  const [parentComms, setParentComms] = useState([]);
+  const [inventory, setInventory] = useState([]);
+
+STEP 2: Add persistence useEffects:
+
+  useEffect(()=>{if(ready) save("tnks_exam_schedules",examSchedules);},[examSchedules,ready]);
+  useEffect(()=>{if(ready) save("tnks_clubs",clubs);},[clubs,ready]);
+  useEffect(()=>{if(ready) save("tnks_parent_comms",parentComms);},[parentComms,ready]);
+  useEffect(()=>{if(ready) save("tnks_inventory",inventory);},[inventory,ready]);
+
+STEP 3: Add load calls in the initial useEffect (in Promise.all):
+  load("tnks_exam_schedules"), load("tnks_clubs"),
+  load("tnks_parent_comms"), load("tnks_inventory")
+  
+  And in the loading handlers:
+  const [es, cl, pc, inv] = [last4results...];
+  if(es) setExamSchedules(es);
+  if(cl) setClubs(cl);
+  if(pc) setParentComms(pc);
+  if(inv) setInventory(inv);
+
+STEP 4: Add new links to adminLinks in Sidebar:
+  {id:"exams",icon:"📝",label:"Exam Management"},
+  {id:"bulk",icon:"📦",label:"Bulk Operations"},
+  {id:"notifications",icon:"💬",label:"Notifications"},
+  {id:"ai_comments",icon:"🤖",label:"AI Comments"},
+  {id:"alumni",icon:"🎓",label:"Alumni"},
+  {id:"calendar",icon:"📅",label:"Calendar"},
+  {id:"clubs",icon:"🏆",label:"Clubs & Activities"},
+  {id:"transport",icon:"🚌",label:"Transport"},
+  {id:"parentcomms",icon:"📞",label:"Parent Comms"},
+  {id:"inventory",icon:"📦",label:"Inventory"},
+
+STEP 5: Add route handlers in the main <main> block:
+  {view==="exams"&&<ExamManagementPage students={students} staff={staff} user={user} examSchedules={examSchedules} setExamSchedules={setExamSchedules} logo={logo}/>}
+  {view==="bulk"&&<BulkOperationsPage students={students} setStudents={setStudents} results={results} setResults={setResults} fees={fees} setFees={setFees} user={user}/>}
+  {view==="notifications"&&<NotificationsPage students={students} fees={fees} results={results} user={user} monitoring={monitoring}/>}
+  {view==="ai_comments"&&<AICommentAssistant students={students} results={results} comments={comments} setComments={setComments} term={term} year={year} examType={examType}/>}
+  {view==="alumni"&&<AlumniPage students={students} setStudents={setStudents} user={user}/>}
+  {view==="calendar"&&<SchoolCalendarPage events={events} setEvents={setEvents} user={user}/>}
+  {view==="clubs"&&<ClubsPage students={students} staff={staff} user={user} clubs={clubs} setClubs={setClubs}/>}
+  {view==="transport"&&<TransportPage students={students} setStudents={setStudents} user={user}/>}
+  {view==="parentcomms"&&<ParentCommPage students={students} staff={staff} user={user} parentComms={parentComms} setParentComms={setParentComms}/>}
+  {view==="inventory"&&<InventoryPage user={user} inventory={inventory} setInventory={setInventory}/>}
+*/
+// {id:"transport",icon:"🚌",label:"Transport"},
+// {id:"parentcomms",icon:"📞",label:"Parent Comms"},
+// {id:"inventory",icon:"🏪",label:"Inventory"},
+// Also update icon for feestructure: {id:"feestructure",icon:"📑",label:"Fee Structure"},
+
+// ── 3. COMPLETE App() FUNCTION — replace yours with this ────────
+export default function App(){
+  const [ready,setReady]=useState(false);
+  const [user,setUser]=useState(null);
+  const [view,setView]=useState("dashboard");
+  const [users,setUsers]=useState(DEFAULT_USERS);
+  const [students,setStudents]=useState([]);
+  const [results,setResults]=useState([]);
+  const [comments,setComments]=useState([]);
+  const [announcements,setAnnouncements]=useState([]);
+  const [fees,setFees]=useState([]);
+  const [staff,setStaff]=useState([]);
+  const [monitoring,setMonitoring]=useState([]);
+  const [term,setTerm]=useState("Term 1");
+  const [year,setYear]=useState(String(new Date().getFullYear()));
+  const [examType,setExamType]=useState("End Term Exam");
+  const [logo,setLogo]=useState(null);
+  // ── ALL PERSISTENT STATE LIVES HERE ──
+  const [feeStructure,setFeeStructure]=useState(DEFAULT_FEE_STRUCTURE); // FIX: was local state
+  const [timetable,setTimetable]=useState({});
+  const [ttSetup,setTtSetup]=useState({
+    name:"TNKS Timetable 2025",desc:"",session:"2024-2025",startDate:"",endDate:"",
+    setupData:{subjectTeachers:{},subjectAvailability:{},classTeachers:{}},
+    customLpw:{},customDouble:{},
+    bellPeriods:[
+      {id:1,type:"period",name:"Period 1",start:"07:00",end:"07:40"},
+      {id:2,type:"period",name:"Period 2",start:"07:40",end:"08:20"},
+      {id:3,type:"break",name:"Short Break ☕",start:"08:20",end:"08:30"},
+      {id:4,type:"period",name:"Period 3",start:"08:30",end:"09:10"},
+      {id:5,type:"period",name:"Period 4",start:"09:10",end:"09:50"},
+      {id:6,type:"break",name:"Long Break 🧘",start:"09:50",end:"10:10"},
+      {id:7,type:"period",name:"Period 5",start:"10:10",end:"10:50"},
+      {id:8,type:"period",name:"Period 6",start:"10:50",end:"11:30"},
+      {id:9,type:"break",name:"Lunch 🍽️",start:"11:30",end:"12:10"},
+      {id:10,type:"period",name:"Period 7",start:"12:10",end:"12:50"},
+      {id:11,type:"period",name:"Period 8",start:"12:50",end:"13:30"},
+    ],
+    workingDays:["Monday","Tuesday","Wednesday","Thursday","Friday"],
+    rooms:[{id:1,name:"Main Classroom"},{id:2,name:"Science Lab"},{id:3,name:"Computer Lab"},{id:4,name:"Library"}],
+    daySchedule:DEFAULT_SCHEDULE,
+    satSchedule:DEFAULT_SAT,
+    sunSchedule:DEFAULT_SUN,
+  });
+  const [books,setBooks]=useState([]);
+  const [borrows,setBorrows]=useState([]);
+  const [events,setEvents]=useState([]);
+  const [council,setCouncil]=useState([]);
+  const [stuDuties,setStuDuties]=useState([]);
+  const [duties,setDuties]=useState([]);
+  const [teacherAvail,setTeacherAvail]=useState({});
+  const [stuRoster,setStuRoster]=useState([]);
+  // NEW MODULES
+  const [examSchedules,setExamSchedules]=useState([]);
+  const [clubs,setClubs]=useState([]);
+  const [parentComms,setParentComms]=useState([]);
+  const [inventory,setInventory]=useState([]);
+
+  // ── LOAD ALL ON MOUNT ──────────────────────────────────
+  useEffect(()=>{
+    (async()=>{
+      try{
+        const [u,s,r,c,a,f,st,lg,mon,tt,tts,bk,br,ev,co,sd,du,ta,sr,fs,es,cl,pc,inv]=await Promise.all([
+          load("tnks_users"),load("tnks_students"),load("tnks_results"),load("tnks_comments"),
+          load("tnks_announcements"),load("tnks_fees"),load("tnks_staff"),load("tnks_logo"),
+          load("tnks_monitoring"),load("tnks_timetable"),load("tnks_ttsetup"),
+          load("tnks_books"),load("tnks_borrows"),load("tnks_events"),
+          load("tnks_council"),load("tnks_studuties"),load("tnks_duties"),
+          load("tnks_teacher_avail"),load("tnks_stu_roster"),
+          load("tnks_fee_structure"),
+          load("tnks_exam_schedules"),load("tnks_clubs"),
+          load("tnks_parent_comms"),load("tnks_inventory"),
+        ]);
+        if(u)setUsers(u);if(s)setStudents(s);if(r)setResults(r);
+        if(c)setComments(c);if(a)setAnnouncements(a);if(f)setFees(f);
+        if(st)setStaff(st);if(lg)setLogo(lg);if(mon)setMonitoring(mon);
+        if(tt)setTimetable(tt);if(tts)setTtSetup(prev=>({...prev,...tts}));
+        if(bk)setBooks(bk);if(br)setBorrows(br);if(ev)setEvents(ev);
+        if(co)setCouncil(co);if(sd)setStuDuties(sd);if(du)setDuties(du);
+        if(ta)setTeacherAvail(ta);if(sr)setStuRoster(sr);
+        if(fs)setFeeStructure(fs);   // ← THE KEY FIX
+        if(es)setExamSchedules(es);if(cl)setClubs(cl);
+        if(pc)setParentComms(pc);if(inv)setInventory(inv);
+      }catch(e){console.error("Load error",e);}
+      setReady(true);
+    })();
+  },[]);
+
+  // ── PERSIST ALL STATE ──────────────────────────────────
+  useEffect(()=>{if(ready)save("tnks_users",users);},[users,ready]);
+  useEffect(()=>{if(ready)save("tnks_students",students);},[students,ready]);
+  useEffect(()=>{if(ready)save("tnks_results",results);},[results,ready]);
+  useEffect(()=>{if(ready)save("tnks_comments",comments);},[comments,ready]);
+  useEffect(()=>{if(ready)save("tnks_announcements",announcements);},[announcements,ready]);
+  useEffect(()=>{if(ready)save("tnks_fees",fees);},[fees,ready]);
+  useEffect(()=>{if(ready)save("tnks_staff",staff);},[staff,ready]);
+  useEffect(()=>{if(ready)save("tnks_monitoring",monitoring);},[monitoring,ready]);
+  useEffect(()=>{if(ready)save("tnks_timetable",timetable);},[timetable,ready]);
+  useEffect(()=>{if(ready)save("tnks_ttsetup",ttSetup);},[ttSetup,ready]);
+  useEffect(()=>{if(ready)save("tnks_books",books);},[books,ready]);
+  useEffect(()=>{if(ready)save("tnks_borrows",borrows);},[borrows,ready]);
+  useEffect(()=>{if(ready)save("tnks_events",events);},[events,ready]);
+  useEffect(()=>{if(ready)save("tnks_council",council);},[council,ready]);
+  useEffect(()=>{if(ready)save("tnks_studuties",stuDuties);},[stuDuties,ready]);
+  useEffect(()=>{if(ready)save("tnks_duties",duties);},[duties,ready]);
+  useEffect(()=>{if(ready)save("tnks_teacher_avail",teacherAvail);},[teacherAvail,ready]);
+  useEffect(()=>{if(ready)save("tnks_stu_roster",stuRoster);},[stuRoster,ready]);
+  useEffect(()=>{if(ready)save("tnks_fee_structure",feeStructure);},[feeStructure,ready]); // FIX
+  useEffect(()=>{if(ready)save("tnks_exam_schedules",examSchedules);},[examSchedules,ready]);
+  useEffect(()=>{if(ready)save("tnks_clubs",clubs);},[clubs,ready]);
+  useEffect(()=>{if(ready)save("tnks_parent_comms",parentComms);},[parentComms,ready]);
+  useEffect(()=>{if(ready)save("tnks_inventory",inventory);},[inventory,ready]);
+
+  useEffect(()=>{
+    const handler=(e)=>setView(e.detail);
+    window.addEventListener("tnks-nav",handler);
+    return()=>window.removeEventListener("tnks-nav",handler);
+  },[]);
+
+  if(!ready)return(
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",background:"linear-gradient(135deg,#1e3a5f,#15803d)",fontFamily:"Georgia,serif"}}>
+      <div style={{textAlign:"center",color:"white"}}>
+        <Logo size={90} src={OFFICIAL_LOGO}/>
+        <div style={{fontSize:18,fontWeight:"bold",marginTop:14}}>Loading TNKS System…</div>
+        <div style={{fontSize:13,opacity:.8,marginTop:6}}>{SCHOOL.name}</div>
+        <div style={{marginTop:16,display:"flex",gap:6,justifyContent:"center"}}>{[0,1,2].map(i=><div key={i} style={{width:8,height:8,borderRadius:"50%",background:"white",opacity:.6}}/>)}</div>
+      </div>
+    </div>
+  );
+
+  if(!user)return <LoginPage users={users} students={students} onLogin={setUser} logo={logo}/>;
+
+  const ctx={user,students,setStudents,results,setResults,comments,setComments,announcements,setAnnouncements,users,setUsers,fees,setFees,staff,setStaff,term,setTerm,year,setYear,examType,setExamType,logo,monitoring,setMonitoring};
+
+  if(user.role==="parent")return(
+    <div style={{display:"flex",height:"100vh",fontFamily:"Georgia,serif",background:"#f1f5f9",overflow:"hidden"}}>
+      <Sidebar view={view} setView={setView} user={user} onLogout={()=>{setUser(null);setView("dashboard");}} logo={logo}/>
+      <main style={{flex:1,overflowY:"auto"}}>
+        {view==="schoolinfo"?<SchoolInfoPage logo={logo}/>:view==="noticeboard"?<NoticeBoard {...ctx}/>:<ParentView {...ctx}/>}
+      </main>
+    </div>
+  );
+
+  return(
+    <div style={{display:"flex",height:"100vh",fontFamily:"Georgia,serif",background:"#f1f5f9",overflow:"hidden"}}>
+      <Sidebar view={view} setView={setView} user={user} onLogout={()=>{setUser(null);setView("dashboard");}} logo={logo}/>
+      <main style={{flex:1,overflowY:"auto"}}>
+        {view==="dashboard"&&<Dashboard {...ctx}/>}
+        {view==="students"&&<StudentsPage students={students} setStudents={setStudents} results={results} setResults={setResults} comments={comments} setComments={setComments} fees={fees} setFees={setFees} monitoring={monitoring} setMonitoring={setMonitoring}/>}
+        {view==="admissions"&&<AdmissionsPage students={students} setStudents={setStudents}/>}
+        {view==="results"&&<ResultsPage {...ctx}/>}
+        {view==="analytics"&&<AnalyticsPage {...ctx}/>}
+        {view==="reports"&&<ReportsPage {...ctx}/>}
+        {view==="fees"&&<FeesPage students={students} fees={fees} setFees={setFees} user={user} logo={logo}/>}
+        {view==="feestructure"&&<FeeStructurePage user={user} logo={logo} feeStructure={feeStructure} setFeeStructure={setFeeStructure}/>}
+        {view==="exams"&&<ExamManagementPage students={students} staff={staff} user={user} examSchedules={examSchedules} setExamSchedules={setExamSchedules} logo={logo}/>}
+        {view==="timetable"&&<TimetablePage students={students} staff={staff} user={user} timetable={timetable} setTimetable={setTimetable} ttSetup={ttSetup} setTtSetup={setTtSetup}/>}
+        {view==="monitoring"&&<LearnerMonitoringPage students={students} user={user} monitoring={monitoring} setMonitoring={setMonitoring}/>}
+        {view==="attendance"&&<AttendancePage {...ctx}/>}
+        {view==="timeinout"&&<TimeInOutPage students={students} staff={staff} user={user}/>}
+        {view==="staff"&&user.role==="admin"&&<StaffPage staff={staff} setStaff={setStaff} users={users} setUsers={setUsers}/>}
+        {view==="staff"&&user.role!=="admin"&&<div style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Admin access required.</div>}
+        {view==="duty"&&<DutyPage staff={staff} user={user} students={students} duties={duties} setDuties={setDuties} teacherAvail={teacherAvail} setTeacherAvail={setTeacherAvail} stuRoster={stuRoster} setStuRoster={setStuRoster}/>}
+        {view==="council"&&<CouncilPage students={students} user={user} council={council} setCouncil={setCouncil} stuDuties={stuDuties} setStuDuties={setStuDuties}/>}
+        {view==="clubs"&&<ClubsPage students={students} staff={staff} user={user} clubs={clubs} setClubs={setClubs}/>}
+        {view==="transport"&&<TransportPage students={students} setStudents={setStudents} user={user}/>}
+        {view==="library"&&<LibraryPage books={books} setBooks={setBooks} borrows={borrows} setBorrows={setBorrows}/>}
+        {view==="calendar"&&<SchoolCalendarPage events={events} setEvents={setEvents} user={user}/>}
+        {view==="events"&&<EventsPage user={user} events={events} setEvents={setEvents}/>}
+        {view==="noticeboard"&&<NoticeBoard {...ctx}/>}
+        {view==="parentcomms"&&<ParentCommPage students={students} staff={staff} user={user} parentComms={parentComms} setParentComms={setParentComms}/>}
+        {view==="notifications"&&<NotificationsPage students={students} fees={fees} results={results} user={user} monitoring={monitoring}/>}
+        {view==="alumni"&&<AlumniPage students={students} setStudents={setStudents} user={user}/>}
+        {view==="bulk"&&<BulkOperationsPage students={students} setStudents={setStudents} results={results} setResults={setResults} fees={fees} setFees={setFees} user={user}/>}
+        {view==="ai_comments"&&<AICommentAssistant students={students} results={results} comments={comments} setComments={setComments} term={term} year={year} examType={examType}/>}
+        {view==="inventory"&&<InventoryPage user={user} inventory={inventory} setInventory={setInventory}/>}
+        {view==="settings"&&user.role==="admin"&&<SettingsPage users={users} setUsers={setUsers} logo={logo} setLogo={setLogo}/>}
+        {view==="settings"&&user.role!=="admin"&&<div style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Admin access required.</div>}
+        {view==="schoolinfo"&&<SchoolInfoPage logo={logo}/>}
+      </main>
     </div>
   );
 }
