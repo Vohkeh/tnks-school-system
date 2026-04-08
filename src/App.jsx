@@ -14,7 +14,10 @@ const SCHOOL = {
   name: "The Nyaga Kindiki Schools- Tharaka", location: "Tharaka North District, Tharaka Nithi County",
   address: "Gaciongo-Mukothima Road, Meru-Mukothima-Gatunga Road", poBox: "P.O Box 2511-60200, Meru – Kenya",
   phone: "+254 722 679747 / +254 720 537265", email: "thenyagakindikischools@gmail.com",
-  motto: "Education Liberates", vision: "A model school with the best practices in the region and beyond",
+  motto: "Education Liberates",
+  vision: "To be the school of choice preferred to achieve high academic standards",
+  mission: "To achieve excellence in academics",
+  philosophy: "Investing in Children for Sustainability",
   website: "nyagakindikischools.sc.ke", founded: "7th January 2015",
 };
 const ALL_CLASSES = ["PP1","PP2","Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"];
@@ -3859,6 +3862,8 @@ function SchoolInfoPage({logo}) {
     {label:"Website",value:SCHOOL.website,icon:"🌐"},
     {label:"Motto",value:SCHOOL.motto,icon:"⭐"},
     {label:"Vision",value:SCHOOL.vision,icon:"🎯"},
+    {label:"Mission",value:SCHOOL.mission,icon:"🚀"},
+    {label:"Philosophy",value:SCHOOL.philosophy,icon:"💡"},
   ];
   return(
     <div style={{padding:24}}>
@@ -3894,9 +3899,21 @@ function SchoolInfoPage({logo}) {
 
         {/* Contact & Vision */}
         <div style={{display:"grid",gap:16,alignContent:"start"}}>
-          <Card style={{background:"linear-gradient(135deg,#eff6ff,#f0fdf4)"}}>
-            <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:15,marginBottom:6}}>🎯 Our Vision</div>
+          <Card style={{background:"linear-gradient(135deg,#f3e8ff,#ede9fe)"}}>
+            <div style={{fontWeight:"bold",color:"#7c3aed",fontSize:14,marginBottom:6}}>⭐ Our Motto</div>
+            <div style={{fontSize:13,color:"#374151",lineHeight:1.7,fontStyle:"italic"}}>"{SCHOOL.motto}"</div>
+          </Card>
+          <Card style={{background:"linear-gradient(135deg,#eff6ff,#dbeafe)"}}>
+            <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:14,marginBottom:6}}>🎯 Our Vision</div>
             <div style={{fontSize:13,color:"#374151",lineHeight:1.7,fontStyle:"italic"}}>"{SCHOOL.vision}"</div>
+          </Card>
+          <Card style={{background:"linear-gradient(135deg,#f0fdf4,#dcfce7)"}}>
+            <div style={{fontWeight:"bold",color:"#15803d",fontSize:14,marginBottom:6}}>🚀 Our Mission</div>
+            <div style={{fontSize:13,color:"#374151",lineHeight:1.7,fontStyle:"italic"}}>"{SCHOOL.mission}"</div>
+          </Card>
+          <Card style={{background:"linear-gradient(135deg,#fef3c7,#fde68a)"}}>
+            <div style={{fontWeight:"bold",color:"#b45309",fontSize:14,marginBottom:6}}>💡 Philosophy of Life</div>
+            <div style={{fontSize:13,color:"#374151",lineHeight:1.7,fontStyle:"italic"}}>"{SCHOOL.philosophy}"</div>
           </Card>
           <Card>
             <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:15,marginBottom:14}}>📞 Contact Us</div>
