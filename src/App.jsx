@@ -159,8 +159,23 @@ async function save(k, v) {
 }
 
 const DEFAULT_USERS = [
-  {id:"u1",name:"Administrator",username:"admin",password:"admin123",role:"admin",email:"admin@tnks.sc.ke",staffType:"teaching",subject:"Administration",phone:"+254 722 000001"},
-  {id:"u2",name:"Gitonga Kelvin",username:"kelvin",password:"kelvin123",role:"teacher",email:"kelvin@tnks.sc.ke",staffType:"teaching",subject:"Mathematics",phone:"+254 722 000002"},
+  {id:"u1",name:"Administrator",username:"admin",password:"Admin@TNKS1",role:"admin",email:"admin@tnks.sc.ke",staffType:"non-teaching",subject:"Administration",phone:"+254 722 679747",contactRole:"admin"},
+  {id:"u2",name:"Director",username:"director",password:"Director@TNKS2",role:"admin",email:"director@nyagakindikischools.sc.ke",staffType:"non-teaching",subject:"Director",phone:"+254 722 679747",contactRole:"director"},
+  {id:"u3",name:"Manager",username:"manager",password:"Manager@TNKS3",role:"admin",email:"manager@tnks.sc.ke",staffType:"non-teaching",subject:"Manager",phone:"+254 720 537265",contactRole:"manager"},
+  {id:"u4",name:"Secretary",username:"secretary",password:"Secretary@TNKS4",role:"teacher",email:"secretary@tnks.sc.ke",staffType:"non-teaching",subject:"Secretary",phone:"+254 722 679747",contactRole:"secretary"},
+  {id:"u5",name:"Ms. Purity",username:"purity",password:"Purity@TNKS5",role:"teacher",email:"purity@tnks.sc.ke",staffType:"teaching",subject:"",phone:"",contactRole:"teacher"},
+  {id:"u6",name:"Mr. Gitonga",username:"gitonga",password:"Gitonga@TNKS6",role:"teacher",email:"gitonga@tnks.sc.ke",staffType:"teaching",subject:"",phone:"",contactRole:"teacher"},
+  {id:"u7",name:"Mr. Mwangangi",username:"mwangangi",password:"Mwangangi@TNKS7",role:"teacher",email:"mwangangi@tnks.sc.ke",staffType:"teaching",subject:"",phone:"",contactRole:"teacher"},
+  {id:"u8",name:"Mr. Mwandiki",username:"mwandiki",password:"Mwandiki@TNKS8",role:"teacher",email:"mwandiki@tnks.sc.ke",staffType:"teaching",subject:"",phone:"",contactRole:"teacher"},
+  {id:"u9",name:"Mr. Alex",username:"alex",password:"Alex@TNKS9",role:"teacher",email:"alex@tnks.sc.ke",staffType:"teaching",subject:"",phone:"",contactRole:"teacher"},
+  {id:"u10",name:"Ms. Caroline Ngugi",username:"caroline.ngugi",password:"CarolineN@TNKS10",role:"teacher",email:"caroline.ngugi@tnks.sc.ke",staffType:"teaching",subject:"",phone:"",contactRole:"teacher"},
+  {id:"u11",name:"Ms. Caroline",username:"caroline",password:"Caroline@TNKS11",role:"teacher",email:"caroline@tnks.sc.ke",staffType:"teaching",subject:"",phone:"",contactRole:"teacher"},
+  {id:"u12",name:"Ms. Fridah",username:"fridah",password:"Fridah@TNKS12",role:"teacher",email:"fridah@tnks.sc.ke",staffType:"teaching",subject:"",phone:"",contactRole:"teacher"},
+  {id:"u13",name:"Ms. Victoria",username:"victoria",password:"Victoria@TNKS13",role:"teacher",email:"victoria@tnks.sc.ke",staffType:"teaching",subject:"",phone:"",contactRole:"teacher"},
+  {id:"u14",name:"Ms. Faith",username:"faith",password:"Faith@TNKS14",role:"teacher",email:"faith@tnks.sc.ke",staffType:"teaching",subject:"",phone:"",contactRole:"teacher"},
+  {id:"u15",name:"Ms. Charity",username:"charity",password:"Charity@TNKS15",role:"teacher",email:"charity@tnks.sc.ke",staffType:"teaching",subject:"",phone:"",contactRole:"teacher"},
+  {id:"u16",name:"Ms. Josephine",username:"josephine",password:"Josephine@TNKS16",role:"teacher",email:"josephine@tnks.sc.ke",staffType:"teaching",subject:"",phone:"",contactRole:"teacher"},
+  {id:"u17",name:"Ms. Monicah",username:"monicah",password:"Monicah@TNKS17",role:"teacher",email:"monicah@tnks.sc.ke",staffType:"teaching",subject:"",phone:"",contactRole:"teacher"},
 ];
 const DEFAULT_CFG = {
   // Full day schedule (display only, editable)
@@ -316,6 +331,7 @@ function Sidebar({view,setView,user,onLogout,logo}) {
     {id:"alumni",icon:"🎓",label:"Alumni"},{id:"calendar",icon:"📅",label:"Calendar"},
     {id:"events",icon:"🎉",label:"Events"},{id:"noticeboard",icon:"📌",label:"Notice Board"},
     {id:"parentcomms",icon:"📞",label:"Parent Comms"},{id:"notifications",icon:"💬",label:"Notifications"},
+    {id:"messages",icon:"📨",label:"Messages"},
     {id:"ai_comments",icon:"🤖",label:"AI Comments"},{id:"bulk",icon:"📦",label:"Bulk Operations"},
     {id:"inventory",icon:"🏪",label:"Inventory"},
     {id:"settings",icon:"⚙️",label:"Settings"},
@@ -329,6 +345,7 @@ function Sidebar({view,setView,user,onLogout,logo}) {
     {id:"attendance",icon:"✅",label:"Attendance"},{id:"timeinout",icon:"🕐",label:"Time In/Out"},
     {id:"duty",icon:"🛡️",label:"Teachers on Duty"},{id:"council",icon:"🎖️",label:"Student Council"},
     {id:"library",icon:"📚",label:"Library"},{id:"noticeboard",icon:"📌",label:"Notice Board"},
+    {id:"messages",icon:"📨",label:"Messages"},
   ];
   const parentLinks=[{id:"schoolinfo",icon:"🏫",label:"School Info"},{id:"parent_report",icon:"🖨️",label:"My Child's Report"},{id:"parent_fees",icon:"💰",label:"Fee Statement"},{id:"noticeboard",icon:"📌",label:"Notice Board"}];
   const links=user.role==="admin"?adminLinks:user.role==="parent"?parentLinks:teacherLinks;
@@ -369,9 +386,22 @@ function LoginPage({users,setUsers,students,onLogin,logo}) {
   const [mode,setMode]=useState("staff");
   const [un,setUn]=useState(""); const [pw,setPw]=useState(""); const [err,setErr]=useState("");
   const [showChat,setShowChat]=useState(false);
-  const [chatMsg,setChatMsg]=useState(""); const [chatHistory,setChatHistory]=useState([{role:"assistant",content:`Hello! I'm the TNKS assistant. Ask me anything about ${SCHOOL.name}, or use the contact buttons below to reach the school directly.`}]);
+  // chat modes: "menu" | "ai" | "staff_select" | "staff_msg" | "sent"
+  const [chatMode,setChatMode]=useState("menu");
+  const [selectedStaff,setSelectedStaff]=useState(null);
+  const [visitorName,setVisitorName]=useState("");
+  const [visitorMsg,setVisitorMsg]=useState("");
+  const [msgSent,setMsgSent]=useState(false);
+  const [chatMsg,setChatMsg]=useState("");
+  const [chatHistory,setChatHistory]=useState([{role:"assistant",content:`Hello! Welcome to ${SCHOOL.name}. How can I help you today?`}]);
   const [chatLoading,setChatLoading]=useState(false);
+  const [inboxMsgs,setInboxMsgs]=useState([]);
   const chatRef=useRef();
+
+  // Load inbox messages from storage on mount
+  useEffect(()=>{
+    try{const stored=localStorage.getItem("tnks_inbox"); if(stored) setInboxMsgs(JSON.parse(stored));}catch{}
+  },[]);
 
   async function sendChat(){
     if(!chatMsg.trim()||chatLoading) return;
@@ -379,13 +409,24 @@ function LoginPage({users,setUsers,students,onLogin,logo}) {
     const newHistory=[...chatHistory,{role:"user",content:msg}];
     setChatHistory(newHistory); setChatLoading(true);
     try{
-      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:400,system:`You are a helpful assistant for ${SCHOOL.name}, ${SCHOOL.location}. Phone: ${SCHOOL.phone}, Email: ${SCHOOL.email}, Website: ${SCHOOL.website}. Be brief and helpful. For login issues, advise contacting the admin on ${SCHOOL.phone}.`,messages:newHistory})});
+      const staffList=users.filter(u=>u.contactRole&&u.contactRole!=="admin").map(u=>u.name).join(", ");
+      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:400,system:`You are a helpful assistant for ${SCHOOL.name}, ${SCHOOL.location}. Phone: ${SCHOOL.phone}, Email: ${SCHOOL.email}, Website: ${SCHOOL.website}. Vision: ${SCHOOL.vision}. Mission: ${SCHOOL.mission}. Philosophy: ${SCHOOL.philosophy}. Classes: PP1, PP2, Grade 1-9 (CBC curriculum). Staff: ${staffList}. Founded: ${SCHOOL.founded}. Be brief, friendly and helpful. For login issues advise contacting admin on ${SCHOOL.phone}. For fee or management issues direct to Director or Manager.`,messages:newHistory})});
       const data=await res.json();
-      const reply=data.content?.map(c=>c.text||"").join("")||"Please contact the admin at "+SCHOOL.phone;
+      const reply=data.content?.map(c=>c.text||"").join("")||"Please contact the school at "+SCHOOL.phone;
       setChatHistory(h=>[...h,{role:"assistant",content:reply}]);
     }catch{setChatHistory(h=>[...h,{role:"assistant",content:"Connectivity issue. Please call "+SCHOOL.phone}]);}
     setChatLoading(false);
     setTimeout(()=>{if(chatRef.current) chatRef.current.scrollTop=chatRef.current.scrollHeight;},100);
+  }
+
+  function sendStaffMessage(){
+    if(!visitorName.trim()||!visitorMsg.trim()) return;
+    const newMsg={id:Date.now().toString(),to:selectedStaff.id,toName:selectedStaff.name,from:visitorName,message:visitorMsg,timestamp:new Date().toLocaleString("en-KE"),read:false};
+    const updated=[...inboxMsgs,newMsg];
+    setInboxMsgs(updated);
+    try{localStorage.setItem("tnks_inbox",JSON.stringify(updated));}catch{}
+    setMsgSent(true);
+    setChatMode("sent");
   }
 
   function doLogin(){
@@ -405,9 +446,17 @@ function LoginPage({users,setUsers,students,onLogin,logo}) {
     {icon:"📍",label:"Location",color:"#ea4335",bg:"#fef2f2",action:()=>window.open("https://maps.app.goo.gl/rGYT8sXkSSrNKWNW8")},
   ];
 
+  // Group staff by role for the contact picker
+  const roleGroups=[
+    {label:"👨‍💼 Director",role:"director",icon:"👨‍💼",color:"#1e3a5f",bg:"#eff6ff"},
+    {label:"👩‍💼 Manager",role:"manager",icon:"👩‍💼",color:"#15803d",bg:"#f0fdf4"},
+    {label:"📋 Secretary",role:"secretary",icon:"📋",color:"#b45309",bg:"#fef3c7"},
+    {label:"👨‍🏫 Teacher",role:"teacher",icon:"👨‍🏫",color:"#7c3aed",bg:"#f3e8ff"},
+  ];
+
   return (
     <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#1e3a5f 0%,#15803d 100%)",display:"flex",alignItems:"center",justifyContent:"center",padding:16,fontFamily:F}}>
-      <div style={{width:"100%",maxWidth:960,display:"grid",gridTemplateColumns:showChat?"1fr 1fr":"1fr",gap:16,alignItems:"start"}}>
+      <div style={{width:"100%",maxWidth:980,display:"grid",gridTemplateColumns:showChat?"1fr 1fr":"1fr",gap:16,alignItems:"start"}}>
         {/* Login Card */}
         <div style={{background:"white",borderRadius:20,boxShadow:"0 24px 64px rgba(0,0,0,.25)",padding:36}}>
           <div style={{textAlign:"center",marginBottom:24}}>
@@ -422,7 +471,7 @@ function LoginPage({users,setUsers,students,onLogin,logo}) {
             ))}
           </div>
           <div style={{display:"grid",gap:12}}>
-            <Inp label={mode==="staff"?"USERNAME":"LEARNER EMAIL"} value={un} onChange={setUn} placeholder={mode==="staff"?"e.g. kelvin":"student@gmail.com"} />
+            <Inp label={mode==="staff"?"USERNAME":"LEARNER EMAIL"} value={un} onChange={setUn} placeholder={mode==="staff"?"e.g. gitonga":"student@gmail.com"} />
             <Inp label={mode==="staff"?"PASSWORD":"PARENT PASSWORD"} value={pw} onChange={setPw} placeholder="Enter password" type="password" />
             {err&&<div style={{fontSize:13,color:"#b91c1c",fontWeight:"bold"}}>{err}</div>}
             <Btn onClick={doLogin} v="primary" full>🔐 Login</Btn>
@@ -465,7 +514,7 @@ function LoginPage({users,setUsers,students,onLogin,logo}) {
               </div>
             </div>
             <div style={{marginTop:10,textAlign:"center"}}>
-              <button onClick={()=>setShowChat(s=>!s)} style={{background:showChat?"#1e3a5f":"#eff6ff",border:"none",borderRadius:10,padding:"8px 18px",cursor:"pointer",fontFamily:F,fontSize:12,color:showChat?"white":"#1d4ed8",fontWeight:"bold"}}>
+              <button onClick={()=>{setShowChat(s=>!s);setChatMode("menu");setSelectedStaff(null);setVisitorName("");setVisitorMsg("");setMsgSent(false);}} style={{background:showChat?"#1e3a5f":"#eff6ff",border:"none",borderRadius:10,padding:"8px 18px",cursor:"pointer",fontFamily:F,fontSize:12,color:showChat?"white":"#1d4ed8",fontWeight:"bold"}}>
                 {showChat?"✕ Close Chat":"💬 Chat with School"}
               </button>
             </div>
@@ -474,31 +523,125 @@ function LoginPage({users,setUsers,students,onLogin,logo}) {
 
         {/* Chat Panel */}
         {showChat&&(
-          <div style={{background:"white",borderRadius:20,boxShadow:"0 24px 64px rgba(0,0,0,.25)",padding:0,overflow:"hidden",display:"flex",flexDirection:"column",minHeight:480}}>
-            <div style={{background:"linear-gradient(135deg,#1e3a5f,#15803d)",padding:"16px 20px",color:"white"}}>
-              <div style={{fontWeight:"bold",fontSize:15}}>💬 School Chat Assistant</div>
-              <div style={{fontSize:11,opacity:.8,marginTop:2}}>Powered by AI · {SCHOOL.name}</div>
+          <div style={{background:"white",borderRadius:20,boxShadow:"0 24px 64px rgba(0,0,0,.25)",padding:0,overflow:"hidden",display:"flex",flexDirection:"column",minHeight:520}}>
+            <div style={{background:"linear-gradient(135deg,#1e3a5f,#15803d)",padding:"16px 20px",color:"white",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div>
+                <div style={{fontWeight:"bold",fontSize:15}}>💬 {chatMode==="ai"?"School AI Assistant":chatMode==="staff_select"||chatMode==="staff_msg"?"Contact Staff":"How Can We Help?"}</div>
+                <div style={{fontSize:11,opacity:.8,marginTop:2}}>{SCHOOL.name}</div>
+              </div>
+              {chatMode!=="menu"&&<button onClick={()=>{setChatMode("menu");setSelectedStaff(null);setVisitorName("");setVisitorMsg("");setMsgSent(false);}} style={{background:"rgba(255,255,255,.15)",border:"none",borderRadius:8,padding:"4px 10px",cursor:"pointer",color:"white",fontSize:11,fontFamily:F}}>← Back</button>}
             </div>
-            <div ref={chatRef} style={{flex:1,overflowY:"auto",padding:16,display:"flex",flexDirection:"column",gap:10,minHeight:320,maxHeight:380}}>
-              {chatHistory.map((m,i)=>(
-                <div key={i} style={{display:"flex",justifyContent:m.role==="user"?"flex-end":"flex-start"}}>
-                  <div style={{maxWidth:"80%",background:m.role==="user"?"#1e3a5f":"#f1f5f9",color:m.role==="user"?"white":"#374151",borderRadius:12,padding:"10px 14px",fontSize:13,lineHeight:1.5}}>
-                    {m.content}
+
+            {/* MENU MODE */}
+            {chatMode==="menu"&&(
+              <div style={{flex:1,padding:20,display:"flex",flexDirection:"column",gap:12}}>
+                <div style={{fontSize:13,color:"#374151",textAlign:"center",marginBottom:4}}>What would you like to do?</div>
+                <button onClick={()=>setChatMode("ai")} style={{background:"linear-gradient(135deg,#eff6ff,#dbeafe)",border:"1.5px solid #bfdbfe",borderRadius:14,padding:"16px 18px",cursor:"pointer",fontFamily:F,textAlign:"left",display:"flex",alignItems:"center",gap:14,transition:"transform .15s"}} onMouseEnter={e=>e.currentTarget.style.transform="scale(1.02)"} onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}>
+                  <span style={{fontSize:32}}>🤖</span>
+                  <div><div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:13}}>Ask the AI Assistant</div><div style={{fontSize:11,color:"#64748b",marginTop:2}}>Get instant answers about the school, classes, fees, CBC curriculum and more</div></div>
+                </button>
+                <button onClick={()=>setChatMode("staff_select")} style={{background:"linear-gradient(135deg,#f0fdf4,#dcfce7)",border:"1.5px solid #bbf7d0",borderRadius:14,padding:"16px 18px",cursor:"pointer",fontFamily:F,textAlign:"left",display:"flex",alignItems:"center",gap:14,transition:"transform .15s"}} onMouseEnter={e=>e.currentTarget.style.transform="scale(1.02)"} onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}>
+                  <span style={{fontSize:32}}>👤</span>
+                  <div><div style={{fontWeight:"bold",color:"#15803d",fontSize:13}}>Send a Message to Staff</div><div style={{fontSize:11,color:"#64748b",marginTop:2}}>Reach the Director, Manager, Secretary or a specific Teacher directly</div></div>
+                </button>
+              </div>
+            )}
+
+            {/* AI CHAT MODE */}
+            {chatMode==="ai"&&(
+              <>
+                <div ref={chatRef} style={{flex:1,overflowY:"auto",padding:16,display:"flex",flexDirection:"column",gap:10,minHeight:340,maxHeight:400}}>
+                  {chatHistory.map((m,i)=>(
+                    <div key={i} style={{display:"flex",justifyContent:m.role==="user"?"flex-end":"flex-start"}}>
+                      <div style={{maxWidth:"80%",background:m.role==="user"?"#1e3a5f":"#f1f5f9",color:m.role==="user"?"white":"#374151",borderRadius:12,padding:"10px 14px",fontSize:13,lineHeight:1.5}}>{m.content}</div>
+                    </div>
+                  ))}
+                  {chatLoading&&<div style={{display:"flex",gap:4,padding:10}}>{[0,1,2].map(i=><div key={i} style={{width:8,height:8,borderRadius:"50%",background:"#94a3b8"}}/>)}</div>}
+                </div>
+                {/* Quick reply suggestions */}
+                <div style={{padding:"8px 12px",borderTop:"1px solid #f1f5f9",display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {["What classes do you offer?","How do I enroll?","Where are you located?","What are school fees?"].map(q=>(
+                    <button key={q} onClick={()=>{setChatMsg(q);}} style={{background:"#f1f5f9",border:"1px solid #e2e8f0",borderRadius:20,padding:"4px 10px",cursor:"pointer",fontFamily:F,fontSize:10,color:"#374151"}}>{q}</button>
+                  ))}
+                </div>
+                <div style={{padding:12,borderTop:"1px solid #f1f5f9",display:"flex",gap:8}}>
+                  <input value={chatMsg} onChange={e=>setChatMsg(e.target.value)} onKeyDown={e=>e.key==="Enter"&&sendChat()} placeholder="Ask a question..." style={{flex:1,border:"1.5px solid #e2e8f0",borderRadius:10,padding:"10px 14px",fontSize:13,fontFamily:F,outline:"none"}}/>
+                  <button onClick={sendChat} disabled={chatLoading} style={{background:"linear-gradient(135deg,#1e3a5f,#15803d)",color:"white",border:"none",borderRadius:10,padding:"10px 16px",cursor:"pointer",fontFamily:F,fontWeight:"bold",fontSize:13}}>Send</button>
+                </div>
+              </>
+            )}
+
+            {/* STAFF SELECT MODE */}
+            {chatMode==="staff_select"&&(
+              <div style={{flex:1,padding:16,overflowY:"auto"}}>
+                <div style={{fontSize:12,color:"#64748b",marginBottom:14,textAlign:"center"}}>Who would you like to contact?</div>
+                {roleGroups.map(group=>{
+                  const members=users.filter(u=>u.contactRole===group.role);
+                  if(!members.length) return null;
+                  return(
+                    <div key={group.role} style={{marginBottom:14}}>
+                      <div style={{fontSize:11,fontWeight:"bold",color:"#94a3b8",letterSpacing:1,marginBottom:6}}>{group.label.toUpperCase().replace(group.icon+" ","")}</div>
+                      <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                        {members.map(s=>(
+                          <button key={s.id} onClick={()=>{setSelectedStaff(s);setChatMode("staff_msg");}} style={{background:group.bg,border:`1.5px solid ${group.color}20`,borderRadius:12,padding:"12px 16px",cursor:"pointer",fontFamily:F,textAlign:"left",display:"flex",alignItems:"center",gap:12,transition:"transform .15s"}} onMouseEnter={e=>e.currentTarget.style.transform="scale(1.01)"} onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}>
+                            <span style={{fontSize:28,flexShrink:0}}>{group.icon}</span>
+                            <div>
+                              <div style={{fontWeight:"bold",color:group.color,fontSize:13}}>{s.name}</div>
+                              <div style={{fontSize:11,color:"#64748b",marginTop:1,textTransform:"capitalize"}}>{s.contactRole}{s.subject?` · ${s.subject}`:""}</div>
+                            </div>
+                            <span style={{marginLeft:"auto",color:group.color,fontSize:16}}>→</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* STAFF MESSAGE FORM */}
+            {chatMode==="staff_msg"&&selectedStaff&&(
+              <div style={{flex:1,padding:20,display:"flex",flexDirection:"column",gap:14}}>
+                <div style={{background:"#f8fafc",borderRadius:12,padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
+                  <span style={{fontSize:28}}>👤</span>
+                  <div>
+                    <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:13}}>To: {selectedStaff.name}</div>
+                    <div style={{fontSize:11,color:"#64748b",textTransform:"capitalize"}}>{selectedStaff.contactRole}{selectedStaff.subject?` · ${selectedStaff.subject}`:""}</div>
                   </div>
                 </div>
-              ))}
-              {chatLoading&&<div style={{display:"flex",gap:4,padding:10}}>{[0,1,2].map(i=><div key={i} style={{width:8,height:8,borderRadius:"50%",background:"#94a3b8",animation:`pulse ${0.8+i*0.2}s infinite alternate`}}/>)}</div>}
-            </div>
-            <div style={{padding:12,borderTop:"1px solid #f1f5f9",display:"flex",gap:8}}>
-              <input value={chatMsg} onChange={e=>setChatMsg(e.target.value)} onKeyDown={e=>e.key==="Enter"&&sendChat()} placeholder="Ask a question..." style={{flex:1,border:"1.5px solid #e2e8f0",borderRadius:10,padding:"10px 14px",fontSize:13,fontFamily:F,outline:"none"}}/>
-              <button onClick={sendChat} disabled={chatLoading} style={{background:"linear-gradient(135deg,#1e3a5f,#15803d)",color:"white",border:"none",borderRadius:10,padding:"10px 16px",cursor:"pointer",fontFamily:F,fontWeight:"bold",fontSize:13}}>Send</button>
-            </div>
+                <div style={{display:"grid",gap:10}}>
+                  <Inp label="YOUR NAME *" value={visitorName} onChange={setVisitorName} placeholder="e.g. John Kamau"/>
+                  <div>
+                    <div style={{fontSize:10,fontWeight:"bold",color:"#94a3b8",letterSpacing:.5,marginBottom:4}}>YOUR MESSAGE *</div>
+                    <textarea value={visitorMsg} onChange={e=>setVisitorMsg(e.target.value)} placeholder={`Type your message to ${selectedStaff.name}...`} rows={4} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:10,padding:"10px 14px",fontSize:13,fontFamily:F,outline:"none",resize:"vertical",boxSizing:"border-box"}}/>
+                  </div>
+                </div>
+                <Btn onClick={sendStaffMessage} v="primary" full>📨 Send Message to {selectedStaff.name}</Btn>
+                <div style={{fontSize:11,color:"#94a3b8",textAlign:"center"}}>{selectedStaff.name} will see your message when they log into the portal</div>
+              </div>
+            )}
+
+            {/* SENT CONFIRMATION */}
+            {chatMode==="sent"&&(
+              <div style={{flex:1,padding:24,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,textAlign:"center"}}>
+                <span style={{fontSize:56}}>✅</span>
+                <div style={{fontWeight:"bold",color:"#15803d",fontSize:16}}>Message Sent!</div>
+                <div style={{fontSize:13,color:"#374151",lineHeight:1.6}}>Your message to <b>{selectedStaff?.name}</b> has been delivered. They will see it when they next log into the school portal.</div>
+                <div style={{background:"#f0fdf4",borderRadius:12,padding:"12px 16px",fontSize:12,color:"#374151",width:"100%"}}>
+                  <div style={{fontWeight:"bold",color:"#15803d",marginBottom:4}}>Your message:</div>
+                  <div style={{fontStyle:"italic"}}>"{visitorMsg}"</div>
+                  <div style={{marginTop:4,color:"#94a3b8",fontSize:11}}>From: {visitorName}</div>
+                </div>
+                <button onClick={()=>{setChatMode("menu");setSelectedStaff(null);setVisitorName("");setVisitorMsg("");setMsgSent(false);}} style={{background:"#1e3a5f",color:"white",border:"none",borderRadius:10,padding:"10px 20px",cursor:"pointer",fontFamily:F,fontWeight:"bold",fontSize:13}}>Send Another Message</button>
+              </div>
+            )}
           </div>
         )}
       </div>
     </div>
   );
 }
+
 
 // ══════════════════════════════════════════════════════════
 // DASHBOARD
@@ -3466,8 +3609,137 @@ function NoticeBoard({announcements,setAnnouncements,user}) {
 // ══════════════════════════════════════════════════════════
 // SETTINGS (with logo editor, no share link)
 // ══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════
+// MESSAGES INBOX
+// ══════════════════════════════════════════════════════════
+function MessagesPage({user}) {
+  const [msgs,setMsgs]=useState([]);
+  const [selected,setSelected]=useState(null);
+  const [replyText,setReplyText]=useState("");
+  const [replyMsg,setReplyMsg]=useState("");
+
+  useEffect(()=>{
+    try{const stored=localStorage.getItem("tnks_inbox"); if(stored) setMsgs(JSON.parse(stored));}catch{}
+  },[]);
+
+  function markRead(id){
+    const updated=msgs.map(m=>m.id===id?{...m,read:true}:m);
+    setMsgs(updated);
+    try{localStorage.setItem("tnks_inbox",JSON.stringify(updated));}catch{}
+  }
+
+  function deleteMsg(id){
+    if(!window.confirm("Delete this message?")) return;
+    const updated=msgs.filter(m=>m.id!==id);
+    setMsgs(updated);
+    setSelected(null);
+    try{localStorage.setItem("tnks_inbox",JSON.stringify(updated));}catch{}
+  }
+
+  function sendReply(){
+    if(!replyText.trim()) return;
+    const updated=msgs.map(m=>m.id===selected.id?{...m,reply:replyText,repliedAt:new Date().toLocaleString("en-KE"),repliedBy:user.name}:m);
+    setMsgs(updated);
+    setSelected({...selected,reply:replyText,repliedAt:new Date().toLocaleString("en-KE"),repliedBy:user.name});
+    try{localStorage.setItem("tnks_inbox",JSON.stringify(updated));}catch{}
+    setReplyMsg("✅ Reply saved!");
+    setTimeout(()=>setReplyMsg(""),2000);
+    setReplyText("");
+  }
+
+  // Filter messages for this user (admin sees all, others see only their messages)
+  const myMsgs = user.role==="admin"
+    ? msgs
+    : msgs.filter(m=>m.to===user.id||m.toName===user.name);
+
+  const unread=myMsgs.filter(m=>!m.read).length;
+
+  return(
+    <div style={{padding:24}}>
+      <PageH title="📨 Messages Inbox" sub={`${unread} unread message${unread!==1?"s":""}`}/>
+      {myMsgs.length===0?(
+        <Card style={{textAlign:"center",padding:40}}>
+          <div style={{fontSize:48,marginBottom:12}}>📭</div>
+          <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:15}}>No messages yet</div>
+          <div style={{fontSize:13,color:"#64748b",marginTop:4}}>Messages sent from the school chat will appear here</div>
+        </Card>
+      ):(
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1.4fr",gap:16,alignItems:"start"}}>
+          {/* Message List */}
+          <Card style={{padding:0,overflow:"hidden"}}>
+            <div style={{padding:"12px 16px",background:"#1e3a5f",color:"white",fontWeight:"bold",fontSize:13}}>
+              📨 Messages ({myMsgs.length}) {unread>0&&<span style={{background:"#ef4444",borderRadius:20,padding:"1px 8px",fontSize:11,marginLeft:8}}>{unread} new</span>}
+            </div>
+            <div style={{maxHeight:500,overflowY:"auto"}}>
+              {myMsgs.sort((a,b)=>b.id-a.id).map(m=>(
+                <div key={m.id} onClick={()=>{setSelected(m);markRead(m.id);setReplyText("");setReplyMsg("");}}
+                  style={{padding:"12px 16px",borderBottom:"1px solid #f1f5f9",cursor:"pointer",background:selected?.id===m.id?"#eff6ff":m.read?"white":"#fefce8",transition:"background .15s"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                    <div style={{fontWeight:"bold",fontSize:13,color:"#1e3a5f"}}>{m.from}</div>
+                    {!m.read&&<span style={{background:"#1d4ed8",color:"white",borderRadius:20,padding:"1px 7px",fontSize:10,fontWeight:"bold"}}>NEW</span>}
+                  </div>
+                  <div style={{fontSize:11,color:"#64748b",marginBottom:3}}>To: {m.toName} · {m.timestamp}</div>
+                  <div style={{fontSize:12,color:"#374151",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.message}</div>
+                  {m.reply&&<div style={{fontSize:11,color:"#15803d",marginTop:3}}>✅ Replied</div>}
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          {/* Message Detail */}
+          {selected?(
+            <Card>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+                <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:14}}>Message from {selected.from}</div>
+                <button onClick={()=>deleteMsg(selected.id)} style={{background:"#fee2e2",color:"#b91c1c",border:"none",borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:11,fontFamily:F,fontWeight:"bold"}}>🗑️ Delete</button>
+              </div>
+              <div style={{display:"grid",gap:10,marginBottom:16}}>
+                <div style={{background:"#f8fafc",borderRadius:10,padding:"10px 14px"}}>
+                  <div style={{fontSize:10,color:"#94a3b8",fontWeight:"bold",marginBottom:4}}>FROM</div>
+                  <div style={{fontSize:13,fontWeight:"bold",color:"#1e3a5f"}}>{selected.from}</div>
+                </div>
+                <div style={{background:"#f8fafc",borderRadius:10,padding:"10px 14px"}}>
+                  <div style={{fontSize:10,color:"#94a3b8",fontWeight:"bold",marginBottom:4}}>TO</div>
+                  <div style={{fontSize:13,color:"#374151"}}>{selected.toName}</div>
+                </div>
+                <div style={{background:"#f8fafc",borderRadius:10,padding:"10px 14px"}}>
+                  <div style={{fontSize:10,color:"#94a3b8",fontWeight:"bold",marginBottom:4}}>RECEIVED</div>
+                  <div style={{fontSize:13,color:"#374151"}}>{selected.timestamp}</div>
+                </div>
+                <div style={{background:"#eff6ff",borderRadius:10,padding:"14px 16px"}}>
+                  <div style={{fontSize:10,color:"#94a3b8",fontWeight:"bold",marginBottom:6}}>MESSAGE</div>
+                  <div style={{fontSize:14,color:"#1e3a5f",lineHeight:1.6}}>{selected.message}</div>
+                </div>
+              </div>
+              {selected.reply?(
+                <div style={{background:"#f0fdf4",borderRadius:10,padding:"14px 16px",borderLeft:"3px solid #15803d"}}>
+                  <div style={{fontSize:10,color:"#15803d",fontWeight:"bold",marginBottom:4}}>YOUR REPLY · {selected.repliedAt}</div>
+                  <div style={{fontSize:13,color:"#374151"}}>{selected.reply}</div>
+                </div>
+              ):(
+                <div>
+                  <div style={{fontSize:12,fontWeight:"bold",color:"#1e3a5f",marginBottom:8}}>📝 Write a Reply</div>
+                  <textarea value={replyText} onChange={e=>setReplyText(e.target.value)} placeholder="Type your reply..." rows={3} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:10,padding:"10px 14px",fontSize:13,fontFamily:F,outline:"none",resize:"vertical",boxSizing:"border-box",marginBottom:8}}/>
+                  {replyMsg&&<div style={{fontSize:13,color:"#15803d",fontWeight:"bold",marginBottom:8}}>{replyMsg}</div>}
+                  <Btn onClick={sendReply} v="primary">Send Reply</Btn>
+                  <div style={{fontSize:11,color:"#94a3b8",marginTop:6}}>Note: Replies are saved in the portal. To reply directly, use the sender's contact info if available.</div>
+                </div>
+              )}
+            </Card>
+          ):(
+            <Card style={{textAlign:"center",padding:40,color:"#94a3b8"}}>
+              <div style={{fontSize:36,marginBottom:8}}>👈</div>
+              <div style={{fontSize:13}}>Select a message to read it</div>
+            </Card>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SettingsPage({users,setUsers,logo,setLogo}) {
-  const blank={name:"",username:"",email:"",phone:"",password:"",role:"teacher",staffType:"teaching",subject:""};
+  const blank={name:"",username:"",email:"",phone:"",password:"",role:"teacher",staffType:"teaching",subject:"",contactRole:"teacher"};
   const [form,setForm]=useState(blank); const [msg,setMsg]=useState({t:"",ok:true});
   const [resetTarget,setResetTarget]=useState(null); const [nPw,setNPw]=useState(""); const [rMsg,setRMsg]=useState("");
   const [logoMsg,setLogoMsg]=useState("");
@@ -3527,6 +3799,7 @@ function SettingsPage({users,setUsers,logo,setLogo}) {
             <Inp label="PASSWORD *" value={form.password} onChange={v=>setForm({...form,password:v})} placeholder="Set a password" type="password"/>
             <Sel label="ROLE" value={form.role} onChange={v=>setForm({...form,role:v})} options={["teacher","admin"]}/>
             <Sel label="STAFF TYPE" value={form.staffType} onChange={v=>setForm({...form,staffType:v})} options={["teaching","non-teaching"]}/>
+            <Sel label="CONTACT ROLE" value={form.contactRole||"teacher"} onChange={v=>setForm({...form,contactRole:v})} options={["teacher","director","manager","secretary","admin"]}/>
             <Inp label="SUBJECT/DEPT" value={form.subject} onChange={v=>setForm({...form,subject:v})} placeholder="e.g. Mathematics"/>
           </div>
           {msg.t&&<div style={{marginTop:10,fontSize:13,color:msg.ok?"#15803d":"#b91c1c",fontWeight:"bold"}}>{msg.t}</div>}
@@ -3534,10 +3807,19 @@ function SettingsPage({users,setUsers,logo,setLogo}) {
         </Card>
         <Card style={{padding:0,overflow:"hidden"}}>
           <div style={{padding:"12px 16px",background:"#eff6ff",fontWeight:"bold",color:"#1e3a5f",fontSize:13,borderBottom:"1px solid #dbeafe"}}>Staff Accounts ({users.length})</div>
+          <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse"}}>
-            <thead><tr>{["Name","Username","Role","Type","Actions"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
-            <tbody>{users.map((u,i)=><tr key={u.id} style={{background:i%2===0?"white":"#fafafa"}}><td style={{...td,fontWeight:"bold"}}>{u.name}</td><td style={{...td,fontFamily:"monospace",fontSize:11}}>{u.username}</td><td style={td}><span style={{background:u.role==="admin"?"#eff6ff":"#f0fdf4",color:u.role==="admin"?"#1d4ed8":"#15803d",fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:"bold"}}>{u.role}</span></td><td style={{...td,fontSize:11}}>{u.staffType||"teaching"}</td><td style={td}><button onClick={()=>{setResetTarget(u);setNPw("");setRMsg("");}} style={{color:"#1d4ed8",background:"none",border:"none",cursor:"pointer",fontSize:11,marginRight:8}}>Reset PW</button><button onClick={()=>doDel(u.id)} style={{color:"#b91c1c",background:"none",border:"none",cursor:"pointer",fontSize:11}}>Delete</button></td></tr>)}</tbody>
+            <thead><tr>{["Name","Username","Password","Role","Contact As","Actions"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
+            <tbody>{users.map((u,i)=><tr key={u.id} style={{background:i%2===0?"white":"#fafafa"}}>
+              <td style={{...td,fontWeight:"bold"}}>{u.name}</td>
+              <td style={{...td,fontFamily:"monospace",fontSize:11}}>{u.username}</td>
+              <td style={{...td,fontFamily:"monospace",fontSize:11,color:"#7c3aed",fontWeight:"bold"}}>{u.password}</td>
+              <td style={td}><span style={{background:u.role==="admin"?"#eff6ff":"#f0fdf4",color:u.role==="admin"?"#1d4ed8":"#15803d",fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:"bold"}}>{u.role}</span></td>
+              <td style={{...td,fontSize:11,textTransform:"capitalize"}}>{u.contactRole||"teacher"}</td>
+              <td style={td}><button onClick={()=>{setResetTarget(u);setNPw("");setRMsg("");}} style={{color:"#1d4ed8",background:"none",border:"none",cursor:"pointer",fontSize:11,marginRight:8}}>Reset PW</button><button onClick={()=>doDel(u.id)} style={{color:"#b91c1c",background:"none",border:"none",cursor:"pointer",fontSize:11}}>Delete</button></td>
+            </tr>)}</tbody>
           </table>
+          </div>
         </Card>
       </div>
     </div>
@@ -5570,6 +5852,7 @@ STEP 5: Add route handlers in the main <main> block:
   {view==="exams"&&<ExamManagementPage students={students} staff={staff} user={user} examSchedules={examSchedules} setExamSchedules={setExamSchedules} logo={logo}/>}
   {view==="bulk"&&<BulkOperationsPage students={students} setStudents={setStudents} results={results} setResults={setResults} fees={fees} setFees={setFees} user={user}/>}
   {view==="notifications"&&<NotificationsPage students={students} fees={fees} results={results} user={user} monitoring={monitoring}/>}
+  {view==="messages"&&<MessagesPage user={user}/>}
   {view==="ai_comments"&&<AICommentAssistant students={students} results={results} comments={comments} setComments={setComments} term={term} year={year} examType={examType}/>}
   {view==="alumni"&&<AlumniPage students={students} setStudents={setStudents} user={user}/>}
   {view==="calendar"&&<SchoolCalendarPage events={events} setEvents={setEvents} user={user}/>}
