@@ -394,7 +394,11 @@ function LoginPage({users,setUsers,students,onLogin,logo}) {
     {icon:"💬",label:"WhatsApp",color:"#25d366",bg:"#f0fdf4",action:()=>window.open(`https://wa.me/${SCHOOL.phone.split("/")[0].replace(/[^0-9]/g,"").replace(/^0/,"254")}`)},
     {icon:"📧",label:"Email",color:"#1d4ed8",bg:"#eff6ff",action:()=>window.open(`mailto:${SCHOOL.email}`)},
     {icon:"📱",label:"SMS",color:"#7c3aed",bg:"#f3e8ff",action:()=>window.open(`sms:${SCHOOL.phone.split("/")[0].replace(/\s/g,"")}`)},
-    {icon:"📘",label:"Facebook",color:"#1877f2",bg:"#eff6ff",action:()=>window.open(`https://www.facebook.com/search/top?q=${encodeURIComponent(SCHOOL.name)}`)},
+    {icon:"📘",label:"Facebook",color:"#1877f2",bg:"#eff6ff",action:()=>window.open("https://www.facebook.com/nyagakindikischools")},
+    {icon:"💼",label:"LinkedIn",color:"#0a66c2",bg:"#e8f0fe",action:()=>window.open("https://www.linkedin.com/in/the-nyaga-kindiki-schools-97663b401")},
+    {icon:"🎵",label:"TikTok",color:"#010101",bg:"#f9f9f9",action:()=>window.open("https://www.tiktok.com/@thenyagakindikischools")},
+    {icon:"🐦",label:"X",color:"#000000",bg:"#f5f5f5",action:()=>window.open("https://x.com/thenyagakindiki")},
+    {icon:"📍",label:"Location",color:"#ea4335",bg:"#fef2f2",action:()=>window.open("https://maps.app.goo.gl/rGYT8sXkSSrNKWNW8")},
   ];
 
   return (
@@ -424,11 +428,37 @@ function LoginPage({users,setUsers,students,onLogin,logo}) {
           <div style={{marginTop:20,borderTop:"1px solid #f1f5f9",paddingTop:16}}>
             <div style={{fontSize:11,color:"#94a3b8",textAlign:"center",marginBottom:10,fontWeight:"bold",letterSpacing:1}}>CONTACT SCHOOL</div>
             <div style={{display:"flex",gap:6,justifyContent:"center",flexWrap:"wrap"}}>
-              {contactBtns.map(b=>(
+              {contactBtns.slice(0,4).map(b=>(
                 <button key={b.label} onClick={b.action} style={{background:b.bg,border:`1px solid ${b.color}20`,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontFamily:F,fontSize:11,color:b.color,fontWeight:"bold",display:"flex",flexDirection:"column",alignItems:"center",gap:2,minWidth:52}}>
                   <span style={{fontSize:18}}>{b.icon}</span>{b.label}
                 </button>
               ))}
+            </div>
+            {/* Social Media Banner */}
+            <div style={{marginTop:14,borderTop:"1px solid #f1f5f9",paddingTop:12}}>
+              <div style={{fontSize:11,color:"#94a3b8",textAlign:"center",marginBottom:10,fontWeight:"bold",letterSpacing:1}}>FOLLOW US</div>
+              <div style={{display:"flex",gap:6,justifyContent:"center",flexWrap:"wrap"}}>
+                <button onClick={()=>window.open("https://www.facebook.com/nyagakindikischools")} title="Facebook" style={{background:"linear-gradient(135deg,#1877f2,#42a5f5)",border:"none",borderRadius:12,padding:"10px 14px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,minWidth:58,boxShadow:"0 2px 8px rgba(24,119,242,0.3)"}}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
+                  <span style={{fontSize:9,color:"white",fontWeight:"bold",fontFamily:F}}>Facebook</span>
+                </button>
+                <button onClick={()=>window.open("https://www.linkedin.com/in/the-nyaga-kindiki-schools-97663b401")} title="LinkedIn" style={{background:"linear-gradient(135deg,#0a66c2,#00a0dc)",border:"none",borderRadius:12,padding:"10px 14px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,minWidth:58,boxShadow:"0 2px 8px rgba(10,102,194,0.3)"}}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+                  <span style={{fontSize:9,color:"white",fontWeight:"bold",fontFamily:F}}>LinkedIn</span>
+                </button>
+                <button onClick={()=>window.open("https://www.tiktok.com/@thenyagakindikischools")} title="TikTok" style={{background:"linear-gradient(135deg,#010101,#2d2d2d)",border:"none",borderRadius:12,padding:"10px 14px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,minWidth:58,boxShadow:"0 2px 8px rgba(0,0,0,0.3)"}}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.34 6.34 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.18 8.18 0 0 0 4.78 1.52V6.76a4.85 4.85 0 0 1-1.01-.07z"/></svg>
+                  <span style={{fontSize:9,color:"white",fontWeight:"bold",fontFamily:F}}>TikTok</span>
+                </button>
+                <button onClick={()=>window.open("https://x.com/thenyagakindiki")} title="X (Twitter)" style={{background:"linear-gradient(135deg,#000000,#333333)",border:"none",borderRadius:12,padding:"10px 14px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,minWidth:58,boxShadow:"0 2px 8px rgba(0,0,0,0.3)"}}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                  <span style={{fontSize:9,color:"white",fontWeight:"bold",fontFamily:F}}>X</span>
+                </button>
+                <button onClick={()=>window.open("https://maps.app.goo.gl/rGYT8sXkSSrNKWNW8")} title="Find us on Maps" style={{background:"linear-gradient(135deg,#ea4335,#fbbc04)",border:"none",borderRadius:12,padding:"10px 14px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,minWidth:58,boxShadow:"0 2px 8px rgba(234,67,53,0.3)"}}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                  <span style={{fontSize:9,color:"white",fontWeight:"bold",fontFamily:F}}>Maps</span>
+                </button>
+              </div>
             </div>
             <div style={{marginTop:10,textAlign:"center"}}>
               <button onClick={()=>setShowChat(s=>!s)} style={{background:showChat?"#1e3a5f":"#eff6ff",border:"none",borderRadius:10,padding:"8px 18px",cursor:"pointer",fontFamily:F,fontSize:12,color:showChat?"white":"#1d4ed8",fontWeight:"bold"}}>
