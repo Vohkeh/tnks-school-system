@@ -299,6 +299,7 @@ function Logo({size=60,src}) {
 function Sidebar({view,setView,user,onLogout,logo}) {
   const [collapsed,setCollapsed]=useState(false);
   const adminLinks=[
+    {id:"schoolinfo",icon:"🏫",label:"School Info"},
     {id:"dashboard",icon:"📊",label:"Dashboard"},{id:"students",icon:"👥",label:"Students"},
     {id:"admissions",icon:"📋",label:"Admissions"},{id:"results",icon:"📝",label:"Results Entry"},
     {id:"analytics",icon:"📈",label:"Analytics"},{id:"reports",icon:"🖨️",label:"Report Forms"},
@@ -314,9 +315,10 @@ function Sidebar({view,setView,user,onLogout,logo}) {
     {id:"parentcomms",icon:"📞",label:"Parent Comms"},{id:"notifications",icon:"💬",label:"Notifications"},
     {id:"ai_comments",icon:"🤖",label:"AI Comments"},{id:"bulk",icon:"📦",label:"Bulk Operations"},
     {id:"inventory",icon:"🏪",label:"Inventory"},
-    {id:"schoolinfo",icon:"🏫",label:"School Info"},{id:"settings",icon:"⚙️",label:"Settings"},
+    {id:"settings",icon:"⚙️",label:"Settings"},
   ];
   const teacherLinks=[
+    {id:"schoolinfo",icon:"🏫",label:"School Info"},
     {id:"dashboard",icon:"📊",label:"Dashboard"},{id:"students",icon:"👥",label:"Students"},
     {id:"results",icon:"📝",label:"Results Entry"},{id:"analytics",icon:"📈",label:"Analytics"},
     {id:"reports",icon:"🖨️",label:"Report Forms"},{id:"timetable",icon:"📅",label:"Timetable"},
@@ -324,9 +326,8 @@ function Sidebar({view,setView,user,onLogout,logo}) {
     {id:"attendance",icon:"✅",label:"Attendance"},{id:"timeinout",icon:"🕐",label:"Time In/Out"},
     {id:"duty",icon:"🛡️",label:"Teachers on Duty"},{id:"council",icon:"🎖️",label:"Student Council"},
     {id:"library",icon:"📚",label:"Library"},{id:"noticeboard",icon:"📌",label:"Notice Board"},
-    {id:"schoolinfo",icon:"🏫",label:"School Info"},
   ];
-  const parentLinks=[{id:"parent_report",icon:"🖨️",label:"My Child's Report"},{id:"parent_fees",icon:"💰",label:"Fee Statement"},{id:"schoolinfo",icon:"🏫",label:"School Info"},{id:"noticeboard",icon:"📌",label:"Notice Board"}];
+  const parentLinks=[{id:"schoolinfo",icon:"🏫",label:"School Info"},{id:"parent_report",icon:"🖨️",label:"My Child's Report"},{id:"parent_fees",icon:"💰",label:"Fee Statement"},{id:"noticeboard",icon:"📌",label:"Notice Board"}];
   const links=user.role==="admin"?adminLinks:user.role==="parent"?parentLinks:teacherLinks;
   const w=collapsed?52:215;
   return (
@@ -390,10 +391,10 @@ function LoginPage({users,setUsers,students,onLogin,logo}) {
   }
 
   const contactBtns=[
-    {icon:"📞",label:"Call",color:"#15803d",bg:"#f0fdf4",action:()=>window.open(`tel:${SCHOOL.phone.split("/")[0].replace(/\s/g,"")}`)},
-    {icon:"💬",label:"WhatsApp",color:"#25d366",bg:"#f0fdf4",action:()=>window.open(`https://wa.me/${SCHOOL.phone.split("/")[0].replace(/[^0-9]/g,"").replace(/^0/,"254")}`)},
+    {icon:"📞",label:"Call",color:"#15803d",bg:"#f0fdf4",action:()=>window.open("tel:+254722679747")},
+    {icon:"💬",label:"WhatsApp",color:"#25d366",bg:"#f0fdf4",action:()=>window.open("https://wa.me/254722679747")},
     {icon:"📧",label:"Email",color:"#1d4ed8",bg:"#eff6ff",action:()=>window.open(`mailto:${SCHOOL.email}`)},
-    {icon:"📱",label:"SMS",color:"#7c3aed",bg:"#f3e8ff",action:()=>window.open(`sms:${SCHOOL.phone.split("/")[0].replace(/\s/g,"")}`)},
+    {icon:"📱",label:"SMS",color:"#7c3aed",bg:"#f3e8ff",action:()=>window.open("sms:+254722679747")},
     {icon:"📘",label:"Facebook",color:"#1877f2",bg:"#eff6ff",action:()=>window.open("https://www.facebook.com/nyagakindikischools")},
     {icon:"💼",label:"LinkedIn",color:"#0a66c2",bg:"#e8f0fe",action:()=>window.open("https://www.linkedin.com/in/the-nyaga-kindiki-schools-97663b401")},
     {icon:"🎵",label:"TikTok",color:"#010101",bg:"#f9f9f9",action:()=>window.open("https://www.tiktok.com/@thenyagakindikischools")},
@@ -3842,11 +3843,10 @@ function PrintFrame({title,logo,children}) {
 // ══════════════════════════════════════════════════════════
 function SchoolInfoPage({logo}) {
   const contactBtns=[
-    {icon:"📞",label:"Call Us",color:"#15803d",bg:"#f0fdf4",action:()=>window.open(`tel:${SCHOOL.phone.split("/")[0].replace(/\s/g,"")}`)},
-    {icon:"💬",label:"WhatsApp",color:"#25d366",bg:"#dcfce7",action:()=>window.open(`https://wa.me/${SCHOOL.phone.split("/")[0].replace(/[^0-9]/g,"").replace(/^0/,"254")}`)},
+    {icon:"📞",label:"Call Us",color:"#15803d",bg:"#f0fdf4",action:()=>window.open("tel:+254722679747")},
+    {icon:"💬",label:"WhatsApp",color:"#25d366",bg:"#dcfce7",action:()=>window.open("https://wa.me/254722679747")},
     {icon:"📧",label:"Email",color:"#1d4ed8",bg:"#eff6ff",action:()=>window.open(`mailto:${SCHOOL.email}`)},
-    {icon:"📱",label:"SMS",color:"#7c3aed",bg:"#f3e8ff",action:()=>window.open(`sms:${SCHOOL.phone.split("/")[0].replace(/\s/g,"")}`)},
-    {icon:"📘",label:"Facebook",color:"#1877f2",bg:"#dbeafe",action:()=>window.open(`https://www.facebook.com/search/top?q=${encodeURIComponent(SCHOOL.name)}`)},
+    {icon:"📱",label:"SMS",color:"#7c3aed",bg:"#f3e8ff",action:()=>window.open("sms:+254722679747")},
     {icon:"🌐",label:"Website",color:"#0e7490",bg:"#ccfbf1",action:()=>window.open(`https://${SCHOOL.website}`)},
   ];
   const infoRows=[
@@ -3900,7 +3900,7 @@ function SchoolInfoPage({logo}) {
           </Card>
           <Card>
             <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:15,marginBottom:14}}>📞 Contact Us</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:12}}>
               {contactBtns.map(b=>(
                 <button key={b.label} onClick={b.action} style={{background:b.bg,border:`1.5px solid ${b.color}25`,borderRadius:12,padding:"12px 10px",cursor:"pointer",fontFamily:F,textAlign:"center",transition:"transform .15s"}} onMouseEnter={e=>e.currentTarget.style.transform="scale(1.03)"} onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}>
                   <div style={{fontSize:24,marginBottom:4}}>{b.icon}</div>
@@ -3908,18 +3908,44 @@ function SchoolInfoPage({logo}) {
                 </button>
               ))}
             </div>
+            {/* Social Media Banner */}
+            <div style={{borderTop:"1px solid #f1f5f9",paddingTop:12}}>
+              <div style={{fontSize:11,color:"#94a3b8",fontWeight:"bold",letterSpacing:1,marginBottom:10,textAlign:"center"}}>FOLLOW US ON SOCIAL MEDIA</div>
+              <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
+                <button onClick={()=>window.open("https://www.facebook.com/nyagakindikischools")} title="Facebook" style={{background:"linear-gradient(135deg,#1877f2,#42a5f5)",border:"none",borderRadius:12,padding:"10px 14px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,minWidth:60,boxShadow:"0 2px 8px rgba(24,119,242,0.3)",transition:"transform .15s"}} onMouseEnter={e=>e.currentTarget.style.transform="scale(1.06)"} onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
+                  <span style={{fontSize:9,color:"white",fontWeight:"bold",fontFamily:F}}>Facebook</span>
+                </button>
+                <button onClick={()=>window.open("https://www.linkedin.com/in/the-nyaga-kindiki-schools-97663b401")} title="LinkedIn" style={{background:"linear-gradient(135deg,#0a66c2,#00a0dc)",border:"none",borderRadius:12,padding:"10px 14px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,minWidth:60,boxShadow:"0 2px 8px rgba(10,102,194,0.3)",transition:"transform .15s"}} onMouseEnter={e=>e.currentTarget.style.transform="scale(1.06)"} onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+                  <span style={{fontSize:9,color:"white",fontWeight:"bold",fontFamily:F}}>LinkedIn</span>
+                </button>
+                <button onClick={()=>window.open("https://www.tiktok.com/@thenyagakindikischools")} title="TikTok" style={{background:"linear-gradient(135deg,#010101,#2d2d2d)",border:"none",borderRadius:12,padding:"10px 14px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,minWidth:60,boxShadow:"0 2px 8px rgba(0,0,0,0.25)",transition:"transform .15s"}} onMouseEnter={e=>e.currentTarget.style.transform="scale(1.06)"} onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.34 6.34 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.18 8.18 0 0 0 4.78 1.52V6.76a4.85 4.85 0 0 1-1.01-.07z"/></svg>
+                  <span style={{fontSize:9,color:"white",fontWeight:"bold",fontFamily:F}}>TikTok</span>
+                </button>
+                <button onClick={()=>window.open("https://x.com/thenyagakindiki")} title="X (Twitter)" style={{background:"linear-gradient(135deg,#000000,#333333)",border:"none",borderRadius:12,padding:"10px 14px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,minWidth:60,boxShadow:"0 2px 8px rgba(0,0,0,0.25)",transition:"transform .15s"}} onMouseEnter={e=>e.currentTarget.style.transform="scale(1.06)"} onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                  <span style={{fontSize:9,color:"white",fontWeight:"bold",fontFamily:F}}>X</span>
+                </button>
+                <button onClick={()=>window.open("https://maps.app.goo.gl/rGYT8sXkSSrNKWNW8")} title="Find us on Maps" style={{background:"linear-gradient(135deg,#ea4335,#fbbc04)",border:"none",borderRadius:12,padding:"10px 14px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,minWidth:60,boxShadow:"0 2px 8px rgba(234,67,53,0.3)",transition:"transform .15s"}} onMouseEnter={e=>e.currentTarget.style.transform="scale(1.06)"} onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                  <span style={{fontSize:9,color:"white",fontWeight:"bold",fontFamily:F}}>Maps</span>
+                </button>
+              </div>
+            </div>
             <div style={{marginTop:14,padding:"10px 14px",background:"#f8fafc",borderRadius:8,fontSize:12}}>
               <div style={{fontWeight:"bold",color:"#374151",marginBottom:4}}>Direct Lines:</div>
               <div style={{color:"#1d4ed8",fontWeight:"bold"}}>{SCHOOL.phone}</div>
               <div style={{color:"#64748b",marginTop:2}}>{SCHOOL.email}</div>
             </div>
           </Card>
-          {/* Map placeholder */}
+          {/* Map */}
           <Card style={{background:"#f8fafc",textAlign:"center",padding:"20px 16px"}}>
             <div style={{fontSize:36,marginBottom:8}}>📍</div>
             <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:13}}>{SCHOOL.address}</div>
             <div style={{color:"#64748b",fontSize:11,marginTop:4}}>{SCHOOL.location}</div>
-            <button onClick={()=>window.open(`https://maps.google.com?q=${encodeURIComponent(SCHOOL.name+", "+SCHOOL.location)}`)} style={{marginTop:12,background:"#1e3a5f",color:"white",border:"none",borderRadius:9,padding:"8px 20px",cursor:"pointer",fontFamily:F,fontSize:12,fontWeight:"bold"}}>
+            <button onClick={()=>window.open("https://maps.app.goo.gl/rGYT8sXkSSrNKWNW8")} style={{marginTop:12,background:"#1e3a5f",color:"white",border:"none",borderRadius:9,padding:"8px 20px",cursor:"pointer",fontFamily:F,fontSize:12,fontWeight:"bold"}}>
               📍 Open in Maps
             </button>
           </Card>
