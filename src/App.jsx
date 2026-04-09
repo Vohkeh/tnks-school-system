@@ -88,7 +88,7 @@ function hasDoubleLesson(cls, subject) {
   return (DOUBLE_LESSON_SUBJECTS[g] || []).includes(subject);
 }
 const DUTY_TYPES = ["Morning Duty","Gate Duty","Lunch Duty","Preps Supervision","Evening Duty","Exam Supervision","Games Supervision","Library Duty","Dining Hall Duty"];
-const COUNCIL_POSITIONS = ["Head Boy","Head Girl","Deputy Head Boy","Deputy Head Girl","Games Captain (Boys)","Games Captain (Girls)","Secretary","Treasurer","Environment Prefect","Discipline Prefect","Library Prefect","Health Prefect","Cultural Prefect","Chapel Prefect","Class Monitor G7","Class Monitor G8","Class Monitor G9","Deputy Class Monitor G7","Deputy Class Monitor G8","Deputy Class Monitor G9"];
+const COUNCIL_POSITIONS = ["President","Vice President","Secretary General","Deputy Secretary General","Chief Timekeeper","Minister of Academics & Excellence","Minister of Order & Welfare","Minister of Environment & Sustainability","Minister of Sports & Recreation","Minister of Culture & Creativity","Minister of Health & Nutrition","Minister of Information & Communication","Minister of Spiritual Affairs","Minister of Finance & Resource Management","Minister of Residential Affairs (Boys & Girls)","Minister of Nutrition & Dining","Grade Ambassador (G7)","Grade Ambassador (G8)","Grade Ambassador (G9)","Deputy Grade Ambassador (G7)","Deputy Grade Ambassador (G8)","Deputy Grade Ambassador (G9)"];
 const STUDENT_DUTIES = ["Dining Hall","Compound Cleaning","Classroom Duty","Gate Duty","Library","Chapel/Assembly","Games Area","Kitchen Helper","Garden Duty","Office Errands","Morning Sweeping","Evening Sweeping"];
 
 function getYears() { const y=new Date().getFullYear(); const a=[]; for(let i=2015;i<=y+5;i++) a.push(String(i)); return a; }
@@ -333,7 +333,6 @@ function Logo({size=60,src}) {
 // SIDEBAR
 // ══════════════════════════════════════════════════════════
 function Sidebar({view,setView,user,onLogout,logo}) {
-  const [collapsed,setCollapsed]=useState(false);
   const adminLinks=[
     {id:"schoolinfo",icon:"🏫",label:"School Info"},
     {id:"dashboard",icon:"📊",label:"Dashboard"},{id:"students",icon:"👥",label:"Students"},
@@ -367,30 +366,26 @@ function Sidebar({view,setView,user,onLogout,logo}) {
   ];
   const parentLinks=[{id:"schoolinfo",icon:"🏫",label:"School Info"},{id:"parent_report",icon:"🖨️",label:"My Child's Report"},{id:"parent_fees",icon:"💰",label:"Fee Statement"},{id:"noticeboard",icon:"📌",label:"Notice Board"},{id:"dashboard",icon:"💬",label:"Chat & Messages"}];
   const links=user.role==="admin"?adminLinks:user.role==="parent"?parentLinks:teacherLinks;
-  const w=collapsed?52:215;
   return (
-    <div style={{width:w,background:"#1e3a5f",color:"white",display:"flex",flexDirection:"column",flexShrink:0,overflowY:"auto",transition:"width .25s",position:"relative"}}>
-      {/* Toggle Button */}
-      <button onClick={()=>setCollapsed(c=>!c)} style={{position:"absolute",top:12,right:-14,zIndex:100,background:"#1e3a5f",border:"2px solid rgba(255,255,255,.2)",borderRadius:"50%",width:28,height:28,cursor:"pointer",color:"white",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"2px 0 8px rgba(0,0,0,.2)"}}>
-        {collapsed?"›":"‹"}
-      </button>
-      <div style={{padding:collapsed?"12px 8px":"16px 14px 12px",borderBottom:"1px solid rgba(255,255,255,0.1)",textAlign:"center"}}>
-        <Logo size={collapsed?32:54} src={logo} />
-        {!collapsed&&<><div style={{fontSize:11,fontWeight:"bold",lineHeight:1.3,marginTop:8}}>{SCHOOL.name}</div><div style={{fontSize:9,color:"rgba(255,255,255,0.5)",marginTop:2,letterSpacing:1}}>{user.role==="admin"?"ADMIN PORTAL":user.role==="teacher"?"STAFF PORTAL":"PARENT PORTAL"}</div></>}
+    <div style={{width:215,background:"#1e3a5f",color:"white",display:"flex",flexDirection:"column",flexShrink:0,overflowY:"auto",position:"relative",height:"100vh",minHeight:0}}>
+      <div style={{padding:"16px 14px 12px",borderBottom:"1px solid rgba(255,255,255,0.1)",textAlign:"center"}}>
+        <Logo size={54} src={logo} />
+        <div style={{fontSize:11,fontWeight:"bold",lineHeight:1.3,marginTop:8}}>{SCHOOL.name}</div>
+        <div style={{fontSize:9,color:"rgba(255,255,255,0.5)",marginTop:2,letterSpacing:1}}>{user.role==="admin"?"ADMIN PORTAL":user.role==="teacher"?"STAFF PORTAL":"PARENT PORTAL"}</div>
       </div>
       <nav style={{flex:1,padding:"10px 0"}}>
         {links.map(l=>(
-          <button key={l.id} onClick={()=>setView(l.id)} title={collapsed?l.label:""} style={{width:"100%",display:"flex",alignItems:"center",gap:collapsed?0:10,padding:collapsed?"10px 0":"9px 16px",border:"none",cursor:"pointer",fontFamily:F,fontSize:12,fontWeight:view===l.id?"bold":"normal",background:view===l.id?"rgba(255,255,255,0.15)":"transparent",color:view===l.id?"white":"rgba(255,255,255,0.75)",borderLeft:view===l.id?"3px solid #60a5fa":"3px solid transparent",transition:"all .15s",justifyContent:collapsed?"center":"flex-start"}}>
-            <span style={{fontSize:collapsed?18:14}}>{l.icon}</span>
-            {!collapsed&&l.label}
+          <button key={l.id} onClick={()=>setView(l.id)} style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"9px 16px",border:"none",cursor:"pointer",fontFamily:F,fontSize:12,fontWeight:view===l.id?"bold":"normal",background:view===l.id?"rgba(255,255,255,0.15)":"transparent",color:view===l.id?"white":"rgba(255,255,255,0.75)",borderLeft:view===l.id?"3px solid #60a5fa":"3px solid transparent",transition:"all .15s",justifyContent:"flex-start"}}>
+            <span style={{fontSize:14}}>{l.icon}</span>
+            {l.label}
           </button>
         ))}
       </nav>
-      <div style={{padding:collapsed?"8px 4px":"12px 14px",borderTop:"1px solid rgba(255,255,255,0.1)"}}>
-        {!collapsed&&<div style={{fontSize:11,fontWeight:"bold",color:"rgba(255,255,255,.9)",marginBottom:1}}>{user.name}</div>}
-        {!collapsed&&<div style={{fontSize:10,color:"rgba(255,255,255,.5)",marginBottom:8,textTransform:"capitalize"}}>{user.role}</div>}
-        <button onClick={onLogout} title={collapsed?"Logout":""} style={{width:"100%",background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.2)",borderRadius:8,padding:collapsed?"8px 4px":"6px 8px",cursor:"pointer",color:"rgba(255,255,255,.8)",fontSize:collapsed?16:11,fontFamily:F,display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
-          {collapsed?"🔓":<>🔓 Logout</>}
+      <div style={{padding:"12px 14px",borderTop:"1px solid rgba(255,255,255,0.1)"}}>
+        <div style={{fontSize:11,fontWeight:"bold",color:"rgba(255,255,255,.9)",marginBottom:1}}>{user.name}</div>
+        <div style={{fontSize:10,color:"rgba(255,255,255,.5)",marginBottom:8,textTransform:"capitalize"}}>{user.role}</div>
+        <button onClick={onLogout} style={{width:"100%",background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.2)",borderRadius:8,padding:"6px 8px",cursor:"pointer",color:"rgba(255,255,255,.8)",fontSize:11,fontFamily:F,display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
+          🔓 Logout
         </button>
       </div>
     </div>
