@@ -471,6 +471,8 @@ function LoginPage({users,setUsers,students,onLogin,logo}) {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
       </div>
     </div>
   );
