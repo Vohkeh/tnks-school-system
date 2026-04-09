@@ -1114,7 +1114,7 @@ function ReportCard({student,results,comments,term,year,examType,isParent,logo,s
             <td style={{padding:"8px 12px",fontSize:11}}>{avg>0?og.lbl:"—"}</td>
           </tr>
         </tfoot>
-      </table>
+      </table></div>
       <div style={{border:"1px solid #e2e8f0",borderRadius:8,padding:12,marginBottom:14}}><div style={{fontSize:12,fontWeight:"bold",color:"#1e3a5f",marginBottom:6}}>Teacher's Comment</div><div style={{fontSize:12,color:"#374151",minHeight:36}}>{comment?comment.text:<i style={{color:"#94a3b8"}}>No comment recorded.</i>}</div>{comment&&<div style={{fontSize:10,color:"#94a3b8",marginTop:6}}>— {comment.teacher} ({comment.date})</div>}</div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16,marginTop:14}}>{["Class Teacher","Head Teacher","Parent/Guardian"].map(l=><div key={l} style={{textAlign:"center"}}><div style={{borderTop:"1px solid #374151",marginBottom:4,paddingTop:4,fontSize:11,color:"#64748b"}}>{l}</div></div>)}</div>
       <div style={{marginTop:14,background:"#f8fafc",borderRadius:8,padding:"10px 12px"}}><div style={{fontSize:10,fontWeight:"bold",color:"#374151",marginBottom:4}}>CBC Grading Scale:</div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{[{g:"EE1",r:"90-100"},{g:"EE2",r:"75-89"},{g:"ME1",r:"58-74"},{g:"ME2",r:"41-57"},{g:"AE1",r:"31-40"},{g:"AE2",r:"21-30"},{g:"BE1",r:"11-20"},{g:"BE2",r:"0-10"}].map(({g,r})=>{const gd=getGrade(g==="EE1"?95:g==="EE2"?80:g==="ME1"?65:g==="ME2"?50:g==="AE1"?35:g==="AE2"?25:g==="BE1"?15:5); return <span key={g} style={{fontSize:9,background:gd.bg,color:gd.col,padding:"2px 6px",borderRadius:12,fontWeight:"bold"}}>{g}: {r}</span>;})}</div></div>
@@ -1424,7 +1424,7 @@ function FeesPage({students,fees,setFees,user,logo}) {
                 <td colSpan={2}/>
               </tr>}
             </tbody>
-          </table>
+          </table></div>
         </Card>
       )}
 
@@ -1449,7 +1449,7 @@ function FeesPage({students,fees,setFees,user,logo}) {
                 </tr>
               )):<tr><td colSpan={7} style={{padding:30,textAlign:"center",color:"#15803d"}}>✅ No defaulters! All students cleared.</td></tr>}
             </tbody>
-          </table>
+          </table></div>
         </Card></>
       )}
 
@@ -1513,7 +1513,7 @@ function FeesPage({students,fees,setFees,user,logo}) {
                   <td style={{padding:"7px 10px",fontSize:12}}>{f.payDate||"—"}</td>
                 </tr>);}):<tr><td colSpan={9} style={{padding:24,textAlign:"center",color:"#94a3b8"}}>No fee records for this student.</td></tr>}
               </tbody>
-            </table>
+            </table></div>
             <div style={{marginTop:16,textAlign:"right"}}><Btn onClick={()=>window.print()} v="primary" style={{fontSize:12}}>🖨️ Print Statement</Btn></div>
           </Modal>
         );
@@ -1612,7 +1612,7 @@ function TimetableSetup({staff,setupData,setSetupData}) {
                 </tr>
               )):<tr><td colSpan={5} style={{padding:30,textAlign:"center",color:"#94a3b8"}}>No classes added yet.</td></tr>}
             </tbody>
-          </table>
+          </table></div>
         </Card>
       </>}
 
@@ -1657,7 +1657,7 @@ function TimetableSetup({staff,setupData,setSetupData}) {
                   </tr>
                 )):<tr><td colSpan={4} style={{padding:24,textAlign:"center",color:"#94a3b8"}}>No subjects yet. Add some above.</td></tr>}
               </tbody>
-            </table>
+            </table></div>
           </Card>
         </>}
         {!selClass&&classes.length===0&&<Empty icon="🏫" text="Add classes first in the 'Classes' tab."/>}
@@ -4455,7 +4455,7 @@ function LearnerMonitoringPage({students,user,monitoring,setMonitoring}) {
                   );
                 }):<tr><td colSpan={8} style={{padding:30,textAlign:"center",color:"#94a3b8"}}>No records found.</td></tr>}
             </tbody>
-          </table>
+          </table></div>
         </Card>
       )}
     </div>
