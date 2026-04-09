@@ -347,7 +347,7 @@ function Sidebar({view,setView,user,onLogout,logo}) {
     {id:"library",icon:"📚",label:"Library"},{id:"noticeboard",icon:"📌",label:"Notice Board"},
     {id:"messages",icon:"📨",label:"Messages"},
   ];
-  const parentLinks=[{id:"schoolinfo",icon:"🏫",label:"School Info"},{id:"parent_report",icon:"🖨️",label:"My Child's Report"},{id:"parent_fees",icon:"💰",label:"Fee Statement"},{id:"noticeboard",icon:"📌",label:"Notice Board"}];
+  const parentLinks=[{id:"schoolinfo",icon:"🏫",label:"School Info"},{id:"parent_report",icon:"🖨️",label:"My Child's Report"},{id:"parent_fees",icon:"💰",label:"Fee Statement"},{id:"noticeboard",icon:"📌",label:"Notice Board"},{id:"dashboard",icon:"💬",label:"Chat & Messages"}];
   const links=user.role==="admin"?adminLinks:user.role==="parent"?parentLinks:teacherLinks;
   const w=collapsed?52:215;
   return (
@@ -385,67 +385,7 @@ function Sidebar({view,setView,user,onLogout,logo}) {
 function LoginPage({users,setUsers,students,onLogin,logo}) {
   const [mode,setMode]=useState("staff");
   const [un,setUn]=useState(""); const [pw,setPw]=useState(""); const [err,setErr]=useState("");
-  const [showChat,setShowChat]=useState(false);
-  // chat modes: "menu" | "ai" | "staff_select" | "staff_msg" | "sent"
-  const [chatMode,setChatMode]=useState("menu");
-  const [selectedStaff,setSelectedStaff]=useState(null);
-  const [visitorName,setVisitorName]=useState("");
-  const [visitorMsg,setVisitorMsg]=useState("");
-  const [msgSent,setMsgSent]=useState(false);
-  const [chatMsg,setChatMsg]=useState("");
-  const [chatHistory,setChatHistory]=useState([{role:"assistant",content:`Hello! Welcome to ${SCHOOL.name}. How can I help you today?`}]);
-  const [chatLoading,setChatLoading]=useState(false);
-  const [inboxMsgs,setInboxMsgs]=useState([]);
-  const chatRef=useRef();
 
-  // Load inbox messages from storage on mount
-  useEffect(()=>{
-    try{const stored=localStorage.getItem("tnks_inbox"); if(stored) setInboxMsgs(JSON.parse(stored));}catch{}
-  },[]);
-
-  async function sendChat(){
-    if(!chatMsg.trim()||chatLoading) return;
-    const msg=chatMsg.trim(); setChatMsg("");
-    const newHistory=[...chatHistory,{role:"user",content:msg}];
-    setChatHistory(newHistory); setChatLoading(true);
-    try{
-      const staffList=users.filter(u=>u.contactRole&&u.contactRole!=="admin").map(u=>u.name).join(", ");
-      // ── Load live portal data for AI context ──
-      let feeInfo="",eventInfo="",noticeInfo="",studentInfo="",calInfo="";
-      try{const fs=localStorage.getItem("tnks_fee_structure");if(fs){const d=JSON.parse(fs);feeInfo="CURRENT FEE STRUCTURE FROM PORTAL: "+JSON.stringify(d).slice(0,800)+". ";}}catch{}
-      try{const ev=localStorage.getItem("tnks_events");if(ev){const d=JSON.parse(ev);if(d.length)eventInfo="UPCOMING SCHOOL EVENTS FROM PORTAL: "+d.slice(0,10).map(e=>`${e.title} (${e.date||e.start||"TBC"})${e.description?" — "+(e.description||"").slice(0,80):""}`).join("; ")+". ";}}catch{}
-      try{const an=localStorage.getItem("tnks_announcements");if(an){const d=JSON.parse(an);if(d.length)noticeInfo="RECENT SCHOOL NOTICES FROM PORTAL: "+d.slice(-6).map(a=>`[${a.date||""}] ${a.title}: ${(a.body||"").slice(0,100)}`).join("; ")+". ";}}catch{}
-      try{const st=localStorage.getItem("tnks_students");if(st){const d=JSON.parse(st);const byClass=[...new Set(d.map(s=>s.class))].map(c=>`${c}: ${d.filter(s=>s.class===c).length} learners`).join(", ");studentInfo=`LEARNER ENROLMENT FROM PORTAL: Total ${d.length} learners. ${byClass}. `;}}catch{}
-      try{const cal=localStorage.getItem("tnks_events");if(cal){const d=JSON.parse(cal);if(d.length)calInfo="";}}catch{}
-      const systemPrompt=`You are the official AI assistant for ${SCHOOL.name}, ${SCHOOL.location}. You have direct access to the school's live portal data.
-
-SCHOOL DETAILS: Phone: ${SCHOOL.phone}, Email: ${SCHOOL.email}, Website: ${SCHOOL.website}. Vision: "${SCHOOL.vision}". Mission: "${SCHOOL.mission}". Philosophy: "${SCHOOL.philosophy}". Founded: ${SCHOOL.founded}. Address: ${SCHOOL.address}, ${SCHOOL.poBox}.
-
-CLASSES OFFERED: PP1, PP2, Grade 1, 2, 3 (Lower Primary), Grade 4, 5, 6 (Upper Primary), Grade 7, 8, 9 (JSS). All follow CBC curriculum. Subjects include Language Activities, Mathematics, Integrated Science, Social Studies, Agriculture & Nutrition, Creative Arts & Sports, Pre-Technical Studies (JSS), CRE/IRE.
-
-STAFF: ${staffList}.
-
-LIVE PORTAL DATA:
-${studentInfo}${feeInfo}${eventInfo}${noticeInfo}
-INSTRUCTIONS: Answer questions using the real portal data above. Be friendly, brief and specific. When asked about fees, give actual amounts from the fee structure data. When asked about events or notices, give real details from the portal. When asked about enrolment or classes, use the real numbers. Do not just refer people to call the school — answer from the data. Only refer to the school contact (${SCHOOL.phone}) for issues you truly cannot resolve, like login problems or urgent matters.`;
-      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:500,system:systemPrompt,messages:newHistory})});
-      const data=await res.json();
-      const reply=data.content?.map(c=>c.text||"").join("")||"Please contact the school at "+SCHOOL.phone;
-      setChatHistory(h=>[...h,{role:"assistant",content:reply}]);
-    }catch{setChatHistory(h=>[...h,{role:"assistant",content:"Connectivity issue. Please call "+SCHOOL.phone}]);}
-    setChatLoading(false);
-    setTimeout(()=>{if(chatRef.current) chatRef.current.scrollTop=chatRef.current.scrollHeight;},100);
-  }
-
-  function sendStaffMessage(){
-    if(!visitorName.trim()||!visitorMsg.trim()) return;
-    const newMsg={id:Date.now().toString(),to:selectedStaff.id,toName:selectedStaff.name,from:visitorName,message:visitorMsg,timestamp:new Date().toLocaleString("en-KE"),read:false};
-    const updated=[...inboxMsgs,newMsg];
-    setInboxMsgs(updated);
-    try{localStorage.setItem("tnks_inbox",JSON.stringify(updated));}catch{}
-    setMsgSent(true);
-    setChatMode("sent");
-  }
 
   function doLogin(){
     if(mode==="staff"){const u=users.find(x=>x.username===un&&x.password===pw); if(u){setErr("");onLogin(u);}else setErr("Invalid username or password.");}
@@ -474,7 +414,7 @@ INSTRUCTIONS: Answer questions using the real portal data above. Be friendly, br
 
   return (
     <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#1e3a5f 0%,#15803d 100%)",display:"flex",alignItems:"center",justifyContent:"center",padding:16,fontFamily:F}}>
-      <div style={{width:"100%",maxWidth:980,display:"grid",gridTemplateColumns:showChat?"1fr 1fr":"1fr",gap:16,alignItems:"start"}}>
+      <div style={{width:"100%",maxWidth:980,display:"grid",gridTemplateColumns:"1fr",gap:16,alignItems:"start"}}>
         {/* Login Card */}
         <div style={{background:"white",borderRadius:20,boxShadow:"0 24px 64px rgba(0,0,0,.25)",padding:36}}>
           <div style={{textAlign:"center",marginBottom:24}}>
@@ -531,130 +471,6 @@ INSTRUCTIONS: Answer questions using the real portal data above. Be friendly, br
                 </button>
               </div>
             </div>
-            <div style={{marginTop:10,textAlign:"center"}}>
-              <button onClick={()=>{setShowChat(s=>!s);setChatMode("menu");setSelectedStaff(null);setVisitorName("");setVisitorMsg("");setMsgSent(false);}} style={{background:showChat?"#1e3a5f":"#eff6ff",border:"none",borderRadius:10,padding:"8px 18px",cursor:"pointer",fontFamily:F,fontSize:12,color:showChat?"white":"#1d4ed8",fontWeight:"bold"}}>
-                {showChat?"✕ Close Chat":"💬 Chat with School"}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Chat Panel */}
-        {showChat&&(
-          <div style={{background:"white",borderRadius:20,boxShadow:"0 24px 64px rgba(0,0,0,.25)",padding:0,overflow:"hidden",display:"flex",flexDirection:"column",minHeight:520}}>
-            <div style={{background:"linear-gradient(135deg,#1e3a5f,#15803d)",padding:"16px 20px",color:"white",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-              <div>
-                <div style={{fontWeight:"bold",fontSize:15}}>💬 {chatMode==="ai"?"School AI Assistant":chatMode==="staff_select"||chatMode==="staff_msg"?"Contact Staff":"How Can We Help?"}</div>
-                <div style={{fontSize:11,opacity:.8,marginTop:2}}>{SCHOOL.name}</div>
-              </div>
-              {chatMode!=="menu"&&<button onClick={()=>{setChatMode("menu");setSelectedStaff(null);setVisitorName("");setVisitorMsg("");setMsgSent(false);}} style={{background:"rgba(255,255,255,.15)",border:"none",borderRadius:8,padding:"4px 10px",cursor:"pointer",color:"white",fontSize:11,fontFamily:F}}>← Back</button>}
-            </div>
-
-            {/* MENU MODE */}
-            {chatMode==="menu"&&(
-              <div style={{flex:1,padding:20,display:"flex",flexDirection:"column",gap:12}}>
-                <div style={{fontSize:13,color:"#374151",textAlign:"center",marginBottom:4}}>What would you like to do?</div>
-                <button onClick={()=>setChatMode("ai")} style={{background:"linear-gradient(135deg,#eff6ff,#dbeafe)",border:"1.5px solid #bfdbfe",borderRadius:14,padding:"16px 18px",cursor:"pointer",fontFamily:F,textAlign:"left",display:"flex",alignItems:"center",gap:14,transition:"transform .15s"}} onMouseEnter={e=>e.currentTarget.style.transform="scale(1.02)"} onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}>
-                  <span style={{fontSize:32}}>🤖</span>
-                  <div><div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:13}}>Ask the AI Assistant</div><div style={{fontSize:11,color:"#64748b",marginTop:2}}>Get instant answers about the school, classes, fees, CBC curriculum and more</div></div>
-                </button>
-                <button onClick={()=>setChatMode("staff_select")} style={{background:"linear-gradient(135deg,#f0fdf4,#dcfce7)",border:"1.5px solid #bbf7d0",borderRadius:14,padding:"16px 18px",cursor:"pointer",fontFamily:F,textAlign:"left",display:"flex",alignItems:"center",gap:14,transition:"transform .15s"}} onMouseEnter={e=>e.currentTarget.style.transform="scale(1.02)"} onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}>
-                  <span style={{fontSize:32}}>👤</span>
-                  <div><div style={{fontWeight:"bold",color:"#15803d",fontSize:13}}>Send a Message to Staff</div><div style={{fontSize:11,color:"#64748b",marginTop:2}}>Reach the Director, Manager, Secretary or a specific Teacher directly</div></div>
-                </button>
-              </div>
-            )}
-
-            {/* AI CHAT MODE */}
-            {chatMode==="ai"&&(
-              <>
-                <div ref={chatRef} style={{flex:1,overflowY:"auto",padding:16,display:"flex",flexDirection:"column",gap:10,minHeight:340,maxHeight:400}}>
-                  {chatHistory.map((m,i)=>(
-                    <div key={i} style={{display:"flex",justifyContent:m.role==="user"?"flex-end":"flex-start"}}>
-                      <div style={{maxWidth:"80%",background:m.role==="user"?"#1e3a5f":"#f1f5f9",color:m.role==="user"?"white":"#374151",borderRadius:12,padding:"10px 14px",fontSize:13,lineHeight:1.5}}>{m.content}</div>
-                    </div>
-                  ))}
-                  {chatLoading&&<div style={{display:"flex",gap:4,padding:10}}>{[0,1,2].map(i=><div key={i} style={{width:8,height:8,borderRadius:"50%",background:"#94a3b8"}}/>)}</div>}
-                </div>
-                {/* Quick reply suggestions */}
-                <div style={{padding:"8px 12px",borderTop:"1px solid #f1f5f9",display:"flex",gap:6,flexWrap:"wrap"}}>
-                  {["What are the school fees?","How do I enroll my child?","What classes are offered?","Any upcoming events?","How many learners are enrolled?","Where is the school?"].map(q=>(
-                    <button key={q} onClick={()=>{setChatMsg(q);}} style={{background:"#f1f5f9",border:"1px solid #e2e8f0",borderRadius:20,padding:"4px 10px",cursor:"pointer",fontFamily:F,fontSize:10,color:"#374151"}}>{q}</button>
-                  ))}
-                </div>
-                <div style={{padding:12,borderTop:"1px solid #f1f5f9",display:"flex",gap:8}}>
-                  <input value={chatMsg} onChange={e=>setChatMsg(e.target.value)} onKeyDown={e=>e.key==="Enter"&&sendChat()} placeholder="Ask a question..." style={{flex:1,border:"1.5px solid #e2e8f0",borderRadius:10,padding:"10px 14px",fontSize:13,fontFamily:F,outline:"none"}}/>
-                  <button onClick={sendChat} disabled={chatLoading} style={{background:"linear-gradient(135deg,#1e3a5f,#15803d)",color:"white",border:"none",borderRadius:10,padding:"10px 16px",cursor:"pointer",fontFamily:F,fontWeight:"bold",fontSize:13}}>Send</button>
-                </div>
-              </>
-            )}
-
-            {/* STAFF SELECT MODE */}
-            {chatMode==="staff_select"&&(
-              <div style={{flex:1,padding:16,overflowY:"auto"}}>
-                <div style={{fontSize:12,color:"#64748b",marginBottom:14,textAlign:"center"}}>Who would you like to contact?</div>
-                {roleGroups.map(group=>{
-                  const members=users.filter(u=>u.contactRole===group.role);
-                  if(!members.length) return null;
-                  return(
-                    <div key={group.role} style={{marginBottom:14}}>
-                      <div style={{fontSize:11,fontWeight:"bold",color:"#94a3b8",letterSpacing:1,marginBottom:6}}>{group.label.toUpperCase().replace(group.icon+" ","")}</div>
-                      <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                        {members.map(s=>(
-                          <button key={s.id} onClick={()=>{setSelectedStaff(s);setChatMode("staff_msg");}} style={{background:group.bg,border:`1.5px solid ${group.color}20`,borderRadius:12,padding:"12px 16px",cursor:"pointer",fontFamily:F,textAlign:"left",display:"flex",alignItems:"center",gap:12,transition:"transform .15s"}} onMouseEnter={e=>e.currentTarget.style.transform="scale(1.01)"} onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}>
-                            <span style={{fontSize:28,flexShrink:0}}>{group.icon}</span>
-                            <div>
-                              <div style={{fontWeight:"bold",color:group.color,fontSize:13}}>{s.name}</div>
-                              <div style={{fontSize:11,color:"#64748b",marginTop:1,textTransform:"capitalize"}}>{s.contactRole}{s.subject?` · ${s.subject}`:""}</div>
-                            </div>
-                            <span style={{marginLeft:"auto",color:group.color,fontSize:16}}>→</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* STAFF MESSAGE FORM */}
-            {chatMode==="staff_msg"&&selectedStaff&&(
-              <div style={{flex:1,padding:20,display:"flex",flexDirection:"column",gap:14}}>
-                <div style={{background:"#f8fafc",borderRadius:12,padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
-                  <span style={{fontSize:28}}>👤</span>
-                  <div>
-                    <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:13}}>To: {selectedStaff.name}</div>
-                    <div style={{fontSize:11,color:"#64748b",textTransform:"capitalize"}}>{selectedStaff.contactRole}{selectedStaff.subject?` · ${selectedStaff.subject}`:""}</div>
-                  </div>
-                </div>
-                <div style={{display:"grid",gap:10}}>
-                  <Inp label="YOUR NAME *" value={visitorName} onChange={setVisitorName} placeholder="e.g. John Kamau"/>
-                  <div>
-                    <div style={{fontSize:10,fontWeight:"bold",color:"#94a3b8",letterSpacing:.5,marginBottom:4}}>YOUR MESSAGE *</div>
-                    <textarea value={visitorMsg} onChange={e=>setVisitorMsg(e.target.value)} placeholder={`Type your message to ${selectedStaff.name}...`} rows={4} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:10,padding:"10px 14px",fontSize:13,fontFamily:F,outline:"none",resize:"vertical",boxSizing:"border-box"}}/>
-                  </div>
-                </div>
-                <Btn onClick={sendStaffMessage} v="primary" full>📨 Send Message to {selectedStaff.name}</Btn>
-                <div style={{fontSize:11,color:"#94a3b8",textAlign:"center"}}>{selectedStaff.name} will see your message when they log into the portal</div>
-              </div>
-            )}
-
-            {/* SENT CONFIRMATION */}
-            {chatMode==="sent"&&(
-              <div style={{flex:1,padding:24,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,textAlign:"center"}}>
-                <span style={{fontSize:56}}>✅</span>
-                <div style={{fontWeight:"bold",color:"#15803d",fontSize:16}}>Message Sent!</div>
-                <div style={{fontSize:13,color:"#374151",lineHeight:1.6}}>Your message to <b>{selectedStaff?.name}</b> has been delivered. They will see it when they next log into the school portal.</div>
-                <div style={{background:"#f0fdf4",borderRadius:12,padding:"12px 16px",fontSize:12,color:"#374151",width:"100%"}}>
-                  <div style={{fontWeight:"bold",color:"#15803d",marginBottom:4}}>Your message:</div>
-                  <div style={{fontStyle:"italic"}}>"{visitorMsg}"</div>
-                  <div style={{marginTop:4,color:"#94a3b8",fontSize:11}}>From: {visitorName}</div>
-                </div>
-                <button onClick={()=>{setChatMode("menu");setSelectedStaff(null);setVisitorName("");setVisitorMsg("");setMsgSent(false);}} style={{background:"#1e3a5f",color:"white",border:"none",borderRadius:10,padding:"10px 20px",cursor:"pointer",fontFamily:F,fontWeight:"bold",fontSize:13}}>Send Another Message</button>
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );
@@ -3635,93 +3451,163 @@ function MessagesPage({user}) {
   const [selected,setSelected]=useState(null);
   const [replyText,setReplyText]=useState("");
   const [replyMsg,setReplyMsg]=useState("");
+  const [loading,setLoading]=useState(true);
 
-  useEffect(()=>{
-    try{const stored=localStorage.getItem("tnks_inbox"); if(stored) setMsgs(JSON.parse(stored));}catch{}
-  },[]);
-
-  function markRead(id){
-    const updated=msgs.map(m=>m.id===id?{...m,read:true}:m);
-    setMsgs(updated);
-    try{localStorage.setItem("tnks_inbox",JSON.stringify(updated));}catch{}
+  // Load messages from Supabase
+  async function loadMsgs() {
+    try {
+      const { data } = await supabase.from("tnks_storage").select("data").eq("id","tnks_inbox").single();
+      if (data?.data) {
+        const parsed = JSON.parse(data.data);
+        setMsgs(parsed);
+        // Check for new unread messages and show Chrome notification
+        const myNew = parsed.filter(m => (m.to===user.id||m.toName===user.name) && !m.read);
+        if (myNew.length > 0) {
+          triggerChromeNotification(
+            `📨 ${myNew.length} new message${myNew.length>1?"s":""} — TNKS`,
+            `From: ${myNew[0].fromName} — "${myNew[0].message.slice(0,60)}"`
+          );
+        }
+        setLoading(false);
+        return;
+      }
+    } catch {}
+    try {
+      const local = localStorage.getItem("tnks_inbox");
+      if (local) setMsgs(JSON.parse(local));
+    } catch {}
+    setLoading(false);
   }
 
-  function deleteMsg(id){
-    if(!window.confirm("Delete this message?")) return;
-    const updated=msgs.filter(m=>m.id!==id);
+  useEffect(() => {
+    loadMsgs();
+    // Poll every 30 seconds for new messages
+    const interval = setInterval(loadMsgs, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  async function markRead(id) {
+    const updated = msgs.map(m => m.id===id ? {...m,read:true} : m);
+    setMsgs(updated);
+    const val = JSON.stringify(updated);
+    try { localStorage.setItem("tnks_inbox", val); } catch {}
+    try {
+      await supabase.from("tnks_storage").upsert(
+        { id:"tnks_inbox", data:val, updated_at:new Date().toISOString() },
+        { onConflict:"id" }
+      );
+    } catch {}
+  }
+
+  async function deleteMsg(id) {
+    if (!window.confirm("Delete this message?")) return;
+    const updated = msgs.filter(m => m.id!==id);
     setMsgs(updated);
     setSelected(null);
-    try{localStorage.setItem("tnks_inbox",JSON.stringify(updated));}catch{}
+    const val = JSON.stringify(updated);
+    try { localStorage.setItem("tnks_inbox", val); } catch {}
+    try {
+      await supabase.from("tnks_storage").upsert(
+        { id:"tnks_inbox", data:val, updated_at:new Date().toISOString() },
+        { onConflict:"id" }
+      );
+    } catch {}
   }
 
-  function sendReply(){
-    if(!replyText.trim()) return;
-    const updated=msgs.map(m=>m.id===selected.id?{...m,reply:replyText,repliedAt:new Date().toLocaleString("en-KE"),repliedBy:user.name}:m);
+  async function sendReply() {
+    if (!replyText.trim() || !selected) return;
+    const reply = {
+      ...selected,
+      reply: replyText,
+      repliedAt: new Date().toLocaleString("en-KE"),
+      repliedBy: user.name,
+    };
+    const updated = msgs.map(m => m.id===selected.id ? reply : m);
     setMsgs(updated);
-    setSelected({...selected,reply:replyText,repliedAt:new Date().toLocaleString("en-KE"),repliedBy:user.name});
-    try{localStorage.setItem("tnks_inbox",JSON.stringify(updated));}catch{}
-    setReplyMsg("✅ Reply saved!");
-    setTimeout(()=>setReplyMsg(""),2000);
+    setSelected(reply);
+    const val = JSON.stringify(updated);
+    try { localStorage.setItem("tnks_inbox", val); } catch {}
+    try {
+      await supabase.from("tnks_storage").upsert(
+        { id:"tnks_inbox", data:val, updated_at:new Date().toISOString() },
+        { onConflict:"id" }
+      );
+    } catch {}
+    // Notify the original sender if they are a user
+    await sendParentNotification(
+      selected.from, selected.fromName,
+      user.name,
+      `Reply to your message: ${replyText.slice(0,80)}`
+    );
+    // Chrome notification for reply
+    triggerChromeNotification("Reply sent — TNKS", `Your reply to ${selected.fromName} has been saved`);
+    setReplyMsg("✅ Reply saved & sender notified!");
+    setTimeout(() => setReplyMsg(""), 3000);
     setReplyText("");
   }
 
-  // Filter messages for this user (admin sees all, others see only their messages)
   const myMsgs = user.role==="admin"
     ? msgs
-    : msgs.filter(m=>m.to===user.id||m.toName===user.name);
+    : msgs.filter(m => m.to===user.id || m.toName===user.name);
 
-  const unread=myMsgs.filter(m=>!m.read).length;
+  const unread = myMsgs.filter(m => !m.read).length;
 
-  return(
+  return (
     <div style={{padding:24}}>
-      <PageH title="📨 Messages Inbox" sub={`${unread} unread message${unread!==1?"s":""}`}/>
-      {myMsgs.length===0?(
+      <PageH title="📨 Messages Inbox" sub={`${unread} unread message${unread!==1?"s":""} · Auto-refreshes every 30s`}>
+        <button onClick={loadMsgs} style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:8,padding:"6px 14px",cursor:"pointer",fontFamily:F,fontSize:12,color:"#1d4ed8",fontWeight:"bold"}}>🔄 Refresh</button>
+      </PageH>
+      {loading ? (
+        <Card style={{textAlign:"center",padding:40}}>
+          <div style={{fontSize:32,marginBottom:8}}>⏳</div>
+          <div style={{color:"#64748b"}}>Loading messages...</div>
+        </Card>
+      ) : myMsgs.length===0 ? (
         <Card style={{textAlign:"center",padding:40}}>
           <div style={{fontSize:48,marginBottom:12}}>📭</div>
           <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:15}}>No messages yet</div>
-          <div style={{fontSize:13,color:"#64748b",marginTop:4}}>Messages sent from the school chat will appear here</div>
+          <div style={{fontSize:13,color:"#64748b",marginTop:4}}>Messages from parents will appear here. You will receive a Chrome notification when a new message arrives.</div>
         </Card>
-      ):(
+      ) : (
         <div style={{display:"grid",gridTemplateColumns:"1fr 1.4fr",gap:16,alignItems:"start"}}>
-          {/* Message List */}
           <Card style={{padding:0,overflow:"hidden"}}>
-            <div style={{padding:"12px 16px",background:"#1e3a5f",color:"white",fontWeight:"bold",fontSize:13}}>
-              📨 Messages ({myMsgs.length}) {unread>0&&<span style={{background:"#ef4444",borderRadius:20,padding:"1px 8px",fontSize:11,marginLeft:8}}>{unread} new</span>}
+            <div style={{padding:"12px 16px",background:"#1e3a5f",color:"white",fontWeight:"bold",fontSize:13,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span>📨 Messages ({myMsgs.length})</span>
+              {unread>0&&<span style={{background:"#ef4444",borderRadius:20,padding:"2px 9px",fontSize:11,fontWeight:"bold"}}>{unread} NEW</span>}
             </div>
-            <div style={{maxHeight:500,overflowY:"auto"}}>
-              {myMsgs.sort((a,b)=>b.id-a.id).map(m=>(
-                <div key={m.id} onClick={()=>{setSelected(m);markRead(m.id);setReplyText("");setReplyMsg("");}}
+            <div style={{maxHeight:520,overflowY:"auto"}}>
+              {myMsgs.sort((a,b) => (b.id > a.id ? 1 : -1)).map(m => (
+                <div key={m.id} onClick={() => { setSelected(m); markRead(m.id); setReplyText(""); setReplyMsg(""); }}
                   style={{padding:"12px 16px",borderBottom:"1px solid #f1f5f9",cursor:"pointer",background:selected?.id===m.id?"#eff6ff":m.read?"white":"#fefce8",transition:"background .15s"}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-                    <div style={{fontWeight:"bold",fontSize:13,color:"#1e3a5f"}}>{m.from}</div>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
+                    <div style={{fontWeight:"bold",fontSize:13,color:"#1e3a5f"}}>{m.fromName||m.from}</div>
                     {!m.read&&<span style={{background:"#1d4ed8",color:"white",borderRadius:20,padding:"1px 7px",fontSize:10,fontWeight:"bold"}}>NEW</span>}
                   </div>
                   <div style={{fontSize:11,color:"#64748b",marginBottom:3}}>To: {m.toName} · {m.timestamp}</div>
                   <div style={{fontSize:12,color:"#374151",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.message}</div>
-                  {m.reply&&<div style={{fontSize:11,color:"#15803d",marginTop:3}}>✅ Replied</div>}
+                  {m.reply&&<div style={{fontSize:11,color:"#15803d",marginTop:3}}>✅ Replied by {m.repliedBy}</div>}
                 </div>
               ))}
             </div>
           </Card>
 
-          {/* Message Detail */}
-          {selected?(
+          {selected ? (
             <Card>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-                <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:14}}>Message from {selected.from}</div>
-                <button onClick={()=>deleteMsg(selected.id)} style={{background:"#fee2e2",color:"#b91c1c",border:"none",borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:11,fontFamily:F,fontWeight:"bold"}}>🗑️ Delete</button>
+                <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:14}}>Message from {selected.fromName||selected.from}</div>
+                <button onClick={() => deleteMsg(selected.id)} style={{background:"#fee2e2",color:"#b91c1c",border:"none",borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:11,fontFamily:F,fontWeight:"bold"}}>🗑️ Delete</button>
               </div>
               <div style={{display:"grid",gap:10,marginBottom:16}}>
                 <div style={{background:"#f8fafc",borderRadius:10,padding:"10px 14px"}}>
-                  <div style={{fontSize:10,color:"#94a3b8",fontWeight:"bold",marginBottom:4}}>FROM</div>
-                  <div style={{fontSize:13,fontWeight:"bold",color:"#1e3a5f"}}>{selected.from}</div>
+                  <div style={{fontSize:10,color:"#94a3b8",fontWeight:"bold",marginBottom:3}}>FROM</div>
+                  <div style={{fontSize:13,fontWeight:"bold",color:"#1e3a5f"}}>{selected.fromName||selected.from}</div>
                 </div>
                 <div style={{background:"#f8fafc",borderRadius:10,padding:"10px 14px"}}>
-                  <div style={{fontSize:10,color:"#94a3b8",fontWeight:"bold",marginBottom:4}}>TO</div>
+                  <div style={{fontSize:10,color:"#94a3b8",fontWeight:"bold",marginBottom:3}}>TO</div>
                   <div style={{fontSize:13,color:"#374151"}}>{selected.toName}</div>
                 </div>
                 <div style={{background:"#f8fafc",borderRadius:10,padding:"10px 14px"}}>
-                  <div style={{fontSize:10,color:"#94a3b8",fontWeight:"bold",marginBottom:4}}>RECEIVED</div>
+                  <div style={{fontSize:10,color:"#94a3b8",fontWeight:"bold",marginBottom:3}}>RECEIVED</div>
                   <div style={{fontSize:13,color:"#374151"}}>{selected.timestamp}</div>
                 </div>
                 <div style={{background:"#eff6ff",borderRadius:10,padding:"14px 16px"}}>
@@ -3729,25 +3615,25 @@ function MessagesPage({user}) {
                   <div style={{fontSize:14,color:"#1e3a5f",lineHeight:1.6}}>{selected.message}</div>
                 </div>
               </div>
-              {selected.reply?(
+              {selected.reply ? (
                 <div style={{background:"#f0fdf4",borderRadius:10,padding:"14px 16px",borderLeft:"3px solid #15803d"}}>
-                  <div style={{fontSize:10,color:"#15803d",fontWeight:"bold",marginBottom:4}}>YOUR REPLY · {selected.repliedAt}</div>
+                  <div style={{fontSize:10,color:"#15803d",fontWeight:"bold",marginBottom:4}}>YOUR REPLY · {selected.repliedAt} · by {selected.repliedBy}</div>
                   <div style={{fontSize:13,color:"#374151"}}>{selected.reply}</div>
                 </div>
-              ):(
+              ) : (
                 <div>
-                  <div style={{fontSize:12,fontWeight:"bold",color:"#1e3a5f",marginBottom:8}}>📝 Write a Reply</div>
-                  <textarea value={replyText} onChange={e=>setReplyText(e.target.value)} placeholder="Type your reply..." rows={3} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:10,padding:"10px 14px",fontSize:13,fontFamily:F,outline:"none",resize:"vertical",boxSizing:"border-box",marginBottom:8}}/>
+                  <div style={{fontSize:12,fontWeight:"bold",color:"#1e3a5f",marginBottom:8}}>📝 Reply to {selected.fromName||selected.from}</div>
+                  <textarea value={replyText} onChange={e=>setReplyText(e.target.value)} placeholder="Type your reply..." rows={4} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:10,padding:"10px 14px",fontSize:13,fontFamily:F,outline:"none",resize:"vertical",boxSizing:"border-box",marginBottom:8}}/>
                   {replyMsg&&<div style={{fontSize:13,color:"#15803d",fontWeight:"bold",marginBottom:8}}>{replyMsg}</div>}
-                  <Btn onClick={sendReply} v="primary">Send Reply</Btn>
-                  <div style={{fontSize:11,color:"#94a3b8",marginTop:6}}>Note: Replies are saved in the portal. To reply directly, use the sender's contact info if available.</div>
+                  <Btn onClick={sendReply} v="primary">📤 Send Reply</Btn>
+                  <div style={{fontSize:11,color:"#94a3b8",marginTop:6}}>The parent will see your reply the next time they check their messages.</div>
                 </div>
               )}
             </Card>
-          ):(
+          ) : (
             <Card style={{textAlign:"center",padding:40,color:"#94a3b8"}}>
               <div style={{fontSize:36,marginBottom:8}}>👈</div>
-              <div style={{fontSize:13}}>Select a message to read it</div>
+              <div>Select a message to read and reply</div>
             </Card>
           )}
         </div>
@@ -3847,7 +3733,380 @@ function SettingsPage({users,setUsers,logo,setLogo}) {
 // ══════════════════════════════════════════════════════════
 // PARENT VIEW
 // ══════════════════════════════════════════════════════════
-function ParentView({user,students,results,comments,fees,term,setTerm,year,setYear,examType,setExamType,announcements,logo}) {
+
+// ══════════════════════════════════════════════════════════
+// PARENT CHAT PANEL — AI Assistant + Direct Messages
+// ══════════════════════════════════════════════════════════
+const PARENT_SUGGESTED_QUESTIONS = [
+  "What are the upcoming school events?",
+  "What are the school fees for boarders?",
+  "What are the school fees for day scholars?",
+  "When does the next term begin?",
+  "What is the CBC curriculum?",
+  "What classes does the school offer?",
+  "What subjects do Grade 7–9 learners study?",
+  "How do I enroll my child?",
+  "What time do lessons start and end?",
+  "Is there a school bus service?",
+  "What are the bus route fees?",
+  "How many learners are enrolled?",
+  "What is the school motto?",
+  "What clubs and activities are available?",
+  "How do I contact the school director?",
+  "What is the school's vision and mission?",
+  "Where is the school located?",
+  "What exams do learners sit for?",
+  "How can I check my child's results?",
+  "What is the school WhatsApp number?",
+];
+
+async function sendParentNotification(toUserId, toName, fromName, message) {
+  // Store notification in Supabase for the recipient to pick up
+  try {
+    const notif = {
+      id: Date.now().toString() + Math.random().toString(36).slice(2),
+      to: toUserId,
+      toName,
+      from: fromName,
+      message,
+      timestamp: new Date().toISOString(),
+      read: false,
+    };
+    const stored = localStorage.getItem("tnks_notifs") || "[]";
+    const arr = JSON.parse(stored);
+    arr.push(notif);
+    localStorage.setItem("tnks_notifs", JSON.stringify(arr));
+    // Save to Supabase
+    await supabase.from("tnks_storage").upsert(
+      { id: "tnks_notifs", data: JSON.stringify(arr), updated_at: new Date().toISOString() },
+      { onConflict: "id" }
+    );
+  } catch(e) { console.error("Notif save error:", e); }
+}
+
+function triggerChromeNotification(title, body) {
+  if (!("Notification" in window)) return;
+  const doShow = () => {
+    try { new Notification(title, { body, icon: "/favicon.ico", badge: "/favicon.ico" }); } catch(e) {}
+  };
+  if (Notification.permission === "granted") {
+    doShow();
+  } else if (Notification.permission !== "denied") {
+    Notification.requestPermission().then(p => { if (p === "granted") doShow(); });
+  }
+}
+
+// Request notification permission on load
+function useNotificationPermission() {
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission === "default") {
+      // Ask gently after a delay
+      const t = setTimeout(() => {
+        Notification.requestPermission();
+      }, 3000);
+      return () => clearTimeout(t);
+    }
+  }, []);
+}
+
+function ParentChatPanel({ users, user, announcements, events, feeStructure, students }) {
+  useNotificationPermission();
+  const [panel, setPanel] = useState("menu"); // menu | ai | dm | dm_compose | sent
+  const [selectedStaff, setSelectedStaff] = useState(null);
+  const [dmMsg, setDmMsg] = useState("");
+  const [senderName, setSenderName] = useState(user?.name || "");
+  const [chatMsg, setChatMsg] = useState("");
+  const [chatHistory, setChatHistory] = useState([{
+    role: "assistant",
+    content: `Hello! I am the AI Assistant for ${SCHOOL.name}. I have access to the school's live portal data. How can I help you today? 😊`
+  }]);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [msgSent, setMsgSent] = useState(false);
+  const chatRef = useRef();
+
+  // Load saved messages from Supabase/localStorage
+  useEffect(() => {
+    async function loadMsgs() {
+      try {
+        const { data } = await supabase.from("tnks_storage").select("data").eq("id", "tnks_inbox").single();
+        if (data?.data) {
+          const parsed = JSON.parse(data.data);
+          setMessages(parsed);
+          return;
+        }
+      } catch {}
+      try {
+        const local = localStorage.getItem("tnks_inbox");
+        if (local) setMessages(JSON.parse(local));
+      } catch {}
+    }
+    loadMsgs();
+  }, []);
+
+  async function saveMessage(newMsg) {
+    const updated = [...messages, newMsg];
+    setMessages(updated);
+    const val = JSON.stringify(updated);
+    try { localStorage.setItem("tnks_inbox", val); } catch {}
+    try {
+      await supabase.from("tnks_storage").upsert(
+        { id: "tnks_inbox", data: val, updated_at: new Date().toISOString() },
+        { onConflict: "id" }
+      );
+    } catch(e) { console.error("Save msg error", e); }
+  }
+
+  async function sendDM() {
+    if (!selectedStaff || !dmMsg.trim() || !senderName.trim()) return;
+    const newMsg = {
+      id: Date.now().toString(),
+      to: selectedStaff.id,
+      toName: selectedStaff.name,
+      from: user?.id || "parent",
+      fromName: senderName,
+      message: dmMsg.trim(),
+      timestamp: new Date().toLocaleString("en-KE"),
+      read: false,
+      type: "parent_to_staff",
+    };
+    await saveMessage(newMsg);
+    // Notify the staff member
+    await sendParentNotification(selectedStaff.id, selectedStaff.name, senderName, dmMsg.trim());
+    setMsgSent(true);
+    setPanel("sent");
+  }
+
+  async function sendChat() {
+    if (!chatMsg.trim() || chatLoading) return;
+    const msg = chatMsg.trim();
+    setChatMsg("");
+    const newHistory = [...chatHistory, { role: "user", content: msg }];
+    setChatHistory(newHistory);
+    setChatLoading(true);
+    try {
+      // Pull live portal data — same sources the admin uses
+      let feeInfo = "", eventInfo = "", noticeInfo = "", studentInfo = "";
+      try {
+        const fs = localStorage.getItem("tnks_fee_structure");
+        if (fs) {
+          const d = JSON.parse(fs);
+          feeInfo = "CURRENT FEE STRUCTURE: Day Scholar Term1=KES " + (d["Day Scholar"]?.term1||0) +
+            ", Term2=KES " + (d["Day Scholar"]?.term2||0) + ", Term3=KES " + (d["Day Scholar"]?.term3||0) +
+            ". Boarder Term1=KES " + (d["Boarder"]?.term1||0) + ", Term2=KES " + (d["Boarder"]?.term2||0) +
+            ", Term3=KES " + (d["Boarder"]?.term3||0) +
+            ". Bus Route A=KES " + (d["Bus (Route A)"]?.term1||0) +
+            ", Route B=KES " + (d["Bus (Route B)"]?.term1||0) +
+            ", Route C=KES " + (d["Bus (Route C)"]?.term1||0) + " per term. ";
+        }
+      } catch {}
+      try {
+        const ev = localStorage.getItem("tnks_events");
+        if (ev) {
+          const d = JSON.parse(ev);
+          if (d.length) {
+            const upcoming = d.filter(e => e.date >= new Date().toISOString().split("T")[0]).slice(0, 10);
+            if (upcoming.length) {
+              eventInfo = "UPCOMING EVENTS FROM ADMIN PORTAL: " +
+                upcoming.map(e => `${e.title} on ${e.date}${e.description ? " — " + e.description.slice(0, 80) : ""}`).join("; ") + ". ";
+            } else {
+              const recent = d.slice(-5).reverse();
+              eventInfo = "RECENT EVENTS: " + recent.map(e => `${e.title} (${e.date})`).join("; ") + ". ";
+            }
+          }
+        }
+      } catch {}
+      try {
+        const an = localStorage.getItem("tnks_announcements");
+        if (an) {
+          const d = JSON.parse(an);
+          if (d.length) noticeInfo = "SCHOOL NOTICES: " + d.slice(-6).reverse().map(a => `[${a.date||""}] ${a.title}: ${(a.body||"").slice(0, 100)}`).join("; ") + ". ";
+        }
+      } catch {}
+      try {
+        const st = localStorage.getItem("tnks_students");
+        if (st) {
+          const d = JSON.parse(st);
+          const byClass = [...new Set(d.map(s => s.class))].map(c => `${c}: ${d.filter(s => s.class === c).length}`).join(", ");
+          studentInfo = `ENROLMENT: Total ${d.length} learners. ${byClass}. `;
+        }
+      } catch {}
+
+      const systemPrompt = `You are the official AI assistant for ${SCHOOL.name}, ${SCHOOL.location}. You speak directly to parents.
+
+SCHOOL: Phone: ${SCHOOL.phone}, Email: ${SCHOOL.email}, Website: ${SCHOOL.website}. Founded: ${SCHOOL.founded}. Address: ${SCHOOL.address}, ${SCHOOL.poBox}. Vision: "${SCHOOL.vision}". Mission: "${SCHOOL.mission}". Philosophy: "${SCHOOL.philosophy}".
+
+CLASSES: PP1, PP2, Grade 1–3 (Lower Primary), Grade 4–6 (Upper Primary), Grade 7–9 (JSS). All CBC curriculum.
+
+${feeInfo}${eventInfo}${noticeInfo}${studentInfo}
+
+STAFF YOU CAN CONTACT: ${users.filter(u => u.contactRole && u.contactRole !== "admin").map(u => `${u.name} (${u.contactRole})`).join(", ")}.
+
+INSTRUCTIONS: Answer parents using the LIVE portal data above. Be warm, helpful, and specific. Give actual KES amounts for fees. List actual upcoming events by name and date. For private matters (individual child results, personal data), tell them to use the Direct Message or call the school. Keep answers concise and friendly.`;
+
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 600,
+          system: systemPrompt,
+          messages: newHistory,
+        })
+      });
+      const data = await res.json();
+      const reply = data.content?.map(c => c.text || "").join("") || `Please call the school at ${SCHOOL.phone}`;
+      setChatHistory(h => [...h, { role: "assistant", content: reply }]);
+    } catch {
+      setChatHistory(h => [...h, { role: "assistant", content: "Connectivity issue. Please call " + SCHOOL.phone }]);
+    }
+    setChatLoading(false);
+    setTimeout(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight; }, 100);
+  }
+
+  const staffList = users.filter(u => u.contactRole && u.contactRole !== "admin");
+  const roleGroups = [
+    { label: "Director", role: "director", icon: "👨‍💼", color: "#1e3a5f", bg: "#eff6ff" },
+    { label: "Manager", role: "manager", icon: "👩‍💼", color: "#15803d", bg: "#f0fdf4" },
+    { label: "Secretary", role: "secretary", icon: "📋", color: "#b45309", bg: "#fef3c7" },
+    { label: "Teacher", role: "teacher", icon: "👨‍🏫", color: "#7c3aed", bg: "#f3e8ff" },
+  ];
+
+  return (
+    <div style={{ marginTop: 20 }}>
+      <div style={{ background: "linear-gradient(135deg,#1e3a5f,#15803d)", borderRadius: 16, padding: "14px 18px", marginBottom: 14, color: "white" }}>
+        <div style={{ fontWeight: "bold", fontSize: 15, marginBottom: 2 }}>💬 School Communication Centre</div>
+        <div style={{ fontSize: 12, opacity: 0.85 }}>Ask the AI Assistant or send a direct message to staff</div>
+      </div>
+
+      {panel === "menu" && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <button onClick={() => setPanel("ai")} style={{ background: "linear-gradient(135deg,#eff6ff,#dbeafe)", border: "1.5px solid #bfdbfe", borderRadius: 14, padding: "18px 16px", cursor: "pointer", fontFamily: F, textAlign: "left" }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>🤖</div>
+            <div style={{ fontWeight: "bold", color: "#1e3a5f", fontSize: 13 }}>Ask AI Assistant</div>
+            <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>Get instant answers about events, fees, curriculum, schedule & more</div>
+          </button>
+          <button onClick={() => setPanel("dm")} style={{ background: "linear-gradient(135deg,#f0fdf4,#dcfce7)", border: "1.5px solid #bbf7d0", borderRadius: 14, padding: "18px 16px", cursor: "pointer", fontFamily: F, textAlign: "left" }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>✉️</div>
+            <div style={{ fontWeight: "bold", color: "#15803d", fontSize: 13 }}>Direct Message</div>
+            <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>Send a private message to the Director, Manager, Secretary or a Teacher</div>
+          </button>
+        </div>
+      )}
+
+      {panel === "ai" && (
+        <div style={{ background: "white", borderRadius: 16, boxShadow: "0 4px 20px rgba(0,0,0,.08)", overflow: "hidden" }}>
+          <div style={{ background: "linear-gradient(135deg,#1e3a5f,#15803d)", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ color: "white", fontWeight: "bold", fontSize: 14 }}>🤖 School AI Assistant</div>
+            <button onClick={() => setPanel("menu")} style={{ background: "rgba(255,255,255,.15)", border: "none", borderRadius: 8, padding: "4px 10px", cursor: "pointer", color: "white", fontSize: 11, fontFamily: F }}>← Back</button>
+          </div>
+          <div ref={chatRef} style={{ height: 320, overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+            {chatHistory.map((m, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}>
+                <div style={{ maxWidth: "85%", background: m.role === "user" ? "#1e3a5f" : "#f1f5f9", color: m.role === "user" ? "white" : "#374151", borderRadius: 12, padding: "10px 14px", fontSize: 13, lineHeight: 1.5 }}>{m.content}</div>
+              </div>
+            ))}
+            {chatLoading && <div style={{ display: "flex", gap: 4, padding: 10 }}>{[0,1,2].map(i => <div key={i} style={{ width: 8, height: 8, borderRadius: "50%", background: "#94a3b8", animation: "pulse 1s infinite" }} />)}</div>}
+          </div>
+          {/* Suggested questions */}
+          <div style={{ padding: "8px 14px", borderTop: "1px solid #f1f5f9", background: "#fafafa" }}>
+            <div style={{ fontSize: 10, color: "#94a3b8", fontWeight: "bold", marginBottom: 6, letterSpacing: 0.5 }}>SUGGESTED QUESTIONS</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", maxHeight: 80, overflowY: "auto" }}>
+              {PARENT_SUGGESTED_QUESTIONS.map(q => (
+                <button key={q} onClick={() => setChatMsg(q)} style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 20, padding: "4px 10px", cursor: "pointer", fontFamily: F, fontSize: 10, color: "#1d4ed8", whiteSpace: "nowrap" }}>{q}</button>
+              ))}
+            </div>
+          </div>
+          <div style={{ padding: 12, borderTop: "1px solid #f1f5f9", display: "flex", gap: 8 }}>
+            <input value={chatMsg} onChange={e => setChatMsg(e.target.value)} onKeyDown={e => e.key === "Enter" && sendChat()} placeholder="Type your question or select one above..." style={{ flex: 1, border: "1.5px solid #e2e8f0", borderRadius: 10, padding: "10px 14px", fontSize: 13, fontFamily: F, outline: "none" }} />
+            <button onClick={sendChat} disabled={chatLoading} style={{ background: "linear-gradient(135deg,#1e3a5f,#15803d)", color: "white", border: "none", borderRadius: 10, padding: "10px 16px", cursor: "pointer", fontFamily: F, fontWeight: "bold", fontSize: 13 }}>Send</button>
+          </div>
+        </div>
+      )}
+
+      {panel === "dm" && (
+        <div style={{ background: "white", borderRadius: 16, boxShadow: "0 4px 20px rgba(0,0,0,.08)", overflow: "hidden" }}>
+          <div style={{ background: "linear-gradient(135deg,#1e3a5f,#15803d)", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ color: "white", fontWeight: "bold", fontSize: 14 }}>✉️ Direct Message to Staff</div>
+            <button onClick={() => setPanel("menu")} style={{ background: "rgba(255,255,255,.15)", border: "none", borderRadius: 8, padding: "4px 10px", cursor: "pointer", color: "white", fontSize: 11, fontFamily: F }}>← Back</button>
+          </div>
+          <div style={{ padding: 16, maxHeight: 420, overflowY: "auto" }}>
+            <div style={{ fontSize: 12, color: "#64748b", marginBottom: 14, textAlign: "center" }}>Select a staff member to send a message to</div>
+            {roleGroups.map(group => {
+              const members = staffList.filter(u => u.contactRole === group.role);
+              if (!members.length) return null;
+              return (
+                <div key={group.role} style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 10, fontWeight: "bold", color: "#94a3b8", letterSpacing: 1, marginBottom: 6 }}>{group.label.toUpperCase()}</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {members.map(s => (
+                      <button key={s.id} onClick={() => { setSelectedStaff(s); setPanel("dm_compose"); setMsgSent(false); setDmMsg(""); }} style={{ background: group.bg, border: `1.5px solid ${group.color}20`, borderRadius: 12, padding: "12px 14px", cursor: "pointer", fontFamily: F, textAlign: "left", display: "flex", alignItems: "center", gap: 12 }}>
+                        <span style={{ fontSize: 26 }}>{group.icon}</span>
+                        <div>
+                          <div style={{ fontWeight: "bold", color: group.color, fontSize: 13 }}>{s.name}</div>
+                          <div style={{ fontSize: 11, color: "#64748b", marginTop: 1, textTransform: "capitalize" }}>{s.contactRole}{s.subject ? ` · ${s.subject}` : ""}</div>
+                        </div>
+                        <span style={{ marginLeft: "auto", color: group.color, fontSize: 16 }}>→</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {panel === "dm_compose" && selectedStaff && (
+        <div style={{ background: "white", borderRadius: 16, boxShadow: "0 4px 20px rgba(0,0,0,.08)", overflow: "hidden" }}>
+          <div style={{ background: "linear-gradient(135deg,#1e3a5f,#15803d)", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ color: "white", fontWeight: "bold", fontSize: 14 }}>✉️ Message to {selectedStaff.name}</div>
+            <button onClick={() => setPanel("dm")} style={{ background: "rgba(255,255,255,.15)", border: "none", borderRadius: 8, padding: "4px 10px", cursor: "pointer", color: "white", fontSize: 11, fontFamily: F }}>← Back</button>
+          </div>
+          <div style={{ padding: 18 }}>
+            <div style={{ background: "#f8fafc", borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+              <span style={{ fontSize: 28 }}>👤</span>
+              <div>
+                <div style={{ fontWeight: "bold", color: "#1e3a5f", fontSize: 13 }}>To: {selectedStaff.name}</div>
+                <div style={{ fontSize: 11, color: "#64748b", textTransform: "capitalize" }}>{selectedStaff.contactRole}{selectedStaff.subject ? ` · ${selectedStaff.subject}` : ""}</div>
+              </div>
+            </div>
+            <div style={{ display: "grid", gap: 12 }}>
+              <Inp label="YOUR NAME *" value={senderName} onChange={setSenderName} placeholder="e.g. John Kamau (parent of ...)" />
+              <div>
+                <div style={{ fontSize: 10, fontWeight: "bold", color: "#94a3b8", letterSpacing: 0.5, marginBottom: 4 }}>YOUR MESSAGE *</div>
+                <textarea value={dmMsg} onChange={e => setDmMsg(e.target.value)} placeholder={`Type your message to ${selectedStaff.name}...`} rows={5} style={{ width: "100%", border: "1.5px solid #e2e8f0", borderRadius: 10, padding: "10px 14px", fontSize: 13, fontFamily: F, outline: "none", resize: "vertical", boxSizing: "border-box" }} />
+              </div>
+            </div>
+            <div style={{ marginTop: 14, display: "flex", gap: 8 }}>
+              <Btn onClick={sendDM} v="primary" full>📨 Send Message to {selectedStaff.name}</Btn>
+            </div>
+            <div style={{ fontSize: 11, color: "#94a3b8", textAlign: "center", marginTop: 8 }}>{selectedStaff.name} will be notified of your message</div>
+          </div>
+        </div>
+      )}
+
+      {panel === "sent" && (
+        <div style={{ background: "white", borderRadius: 16, boxShadow: "0 4px 20px rgba(0,0,0,.08)", padding: 28, textAlign: "center" }}>
+          <div style={{ fontSize: 56, marginBottom: 12 }}>✅</div>
+          <div style={{ fontWeight: "bold", color: "#15803d", fontSize: 16, marginBottom: 8 }}>Message Sent!</div>
+          <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.6, marginBottom: 16 }}>Your message to <b>{selectedStaff?.name}</b> has been saved and they will be notified.</div>
+          <div style={{ background: "#f0fdf4", borderRadius: 12, padding: "12px 16px", fontSize: 12, color: "#374151", textAlign: "left", marginBottom: 16 }}>
+            <div style={{ fontWeight: "bold", color: "#15803d", marginBottom: 4 }}>Message sent:</div>
+            <div style={{ fontStyle: "italic" }}>"{dmMsg}"</div>
+            <div style={{ marginTop: 4, color: "#94a3b8", fontSize: 11 }}>From: {senderName}</div>
+          </div>
+          <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+            <Btn onClick={() => { setPanel("menu"); setSelectedStaff(null); setDmMsg(""); setMsgSent(false); }} v="primary">← Back to Menu</Btn>
+            <Btn onClick={() => setPanel("dm")} v="green">Send Another</Btn>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ParentView({user,students,results,comments,fees,term,setTerm,year,setYear,examType,setExamType,announcements,logo,events,feeStructure,users,setUsers}) {
   const student=students.find(s=>s.id===user.studentId);
   const [tab,setTab]=useState("report");
   if(!student) return <div style={{padding:40,textAlign:"center"}}><div style={{fontSize:40}}>⚠️</div><div style={{color:"#b91c1c",marginTop:12}}>Student record not found. Contact school office.</div></div>;
@@ -3862,7 +4121,7 @@ function ParentView({user,students,results,comments,fees,term,setTerm,year,setYe
         <div><div style={{fontSize:18,fontWeight:"bold",color:"#1e3a5f"}}>{student.name}</div><div style={{fontSize:12,color:"#64748b"}}>{student.class} · Adm: {student.admNo}</div><div style={{fontSize:12,color:"#64748b"}}>{student.parentName&&`Parent: ${student.parentName}`}</div></div>
         <div style={{marginLeft:"auto"}}><LiveClock/></div>
       </div>
-      <div style={{display:"flex",gap:8,marginBottom:16}}>{[["report","📋 Report"],["fees","💰 Fees"],["notices","📌 Notices"]].map(([t,l])=><Btn key={t} onClick={()=>setTab(t)} v={tab===t?"primary":"ghost"} style={{fontSize:12}}>{l}</Btn>)}</div>
+      <div style={{display:"flex",gap:8,marginBottom:16}}>{[["report","📋 Report"],["fees","💰 Fees"],["notices","📌 Notices"],["chat","💬 Chat & Messages"]].map(([t,l])=><Btn key={t} onClick={()=>setTab(t)} v={tab===t?"primary":"ghost"} style={{fontSize:12}}>{l}</Btn>)}</div>
       {tab==="report"&&<><div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}><Sel value={term} onChange={setTerm} options={TERMS}/><Sel value={examType} onChange={setExamType} options={EXAM_TYPES}/><Sel value={year} onChange={setYear} options={YEARS}/></div><ReportCard student={student} results={results} comments={comments} term={term} year={year} examType={examType} isParent logo={logo}/></>}
       {tab==="fees"&&(()=>{
         const sDue=stuFees.reduce((a,b)=>a+(b.amount||0),0);
@@ -3887,6 +4146,7 @@ function ParentView({user,students,results,comments,fees,term,setTerm,year,setYe
         </div>);
       })()}
       {tab==="notices"&&<div style={{display:"grid",gap:12}}>{recentAnn.length?recentAnn.map(a=><Card key={a.id} style={{borderLeft:"4px solid #1d4ed8",padding:"12px 16px"}}><div style={{fontWeight:"bold",color:"#1e3a5f",marginBottom:4}}>{a.title}</div><div style={{fontSize:12,color:"#374151"}}>{a.body}</div><div style={{fontSize:11,color:"#94a3b8",marginTop:6}}>{a.date}</div></Card>):<Empty icon="📌" text="No notices."/>}</div>}
+      {tab==="chat"&&<ParentChatPanel users={users} user={user} announcements={announcements} events={events||[]} feeStructure={feeStructure} students={students}/>}
     </div>
   );
 }
@@ -6013,6 +6273,37 @@ export default function App(){
     return()=>window.removeEventListener("tnks-nav",handler);
   },[]);
 
+  // Poll for new messages and trigger Chrome notifications for staff/admin/parents
+  useEffect(()=>{
+    if(!user) return;
+    let lastCount = 0;
+    async function checkNewMessages(){
+      try{
+        const { data } = await supabase.from("tnks_storage").select("data").eq("id","tnks_inbox").single();
+        if(data?.data){
+          const msgs = JSON.parse(data.data);
+          const myNew = user.role==="admin"
+            ? msgs.filter(m=>!m.read)
+            : msgs.filter(m=>(m.to===user.id||m.toName===user.name)&&!m.read);
+          if(myNew.length > lastCount && myNew.length > 0){
+            triggerChromeNotification(
+              `📨 ${myNew.length} new message${myNew.length>1?"s":""} — TNKS Portal`,
+              `From: ${myNew[0].fromName||myNew[0].from} — "${(myNew[0].message||"").slice(0,60)}"`
+            );
+          }
+          lastCount = myNew.length;
+        }
+      }catch{}
+    }
+    // Ask for notification permission
+    if("Notification" in window && Notification.permission==="default"){
+      setTimeout(()=>Notification.requestPermission(),2000);
+    }
+    const interval = setInterval(checkNewMessages, 30000);
+    checkNewMessages();
+    return()=>clearInterval(interval);
+  },[user]);
+
   if(!ready)return(
     <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",background:"linear-gradient(135deg,#1e3a5f,#15803d)",fontFamily:"Georgia,serif"}}>
       <div style={{textAlign:"center",color:"white"}}>
@@ -6032,7 +6323,9 @@ export default function App(){
     <div style={{display:"flex",height:"100vh",fontFamily:"Georgia,serif",background:"#f1f5f9",overflow:"hidden"}}>
       <Sidebar view={view} setView={setView} user={user} onLogout={()=>{setUser(null);setView("dashboard");}} logo={logo}/>
       <main style={{flex:1,overflowY:"auto"}}>
-        {view==="schoolinfo"?<SchoolInfoPage logo={logo}/>:view==="noticeboard"?<NoticeBoard {...ctx}/>:<ParentView {...ctx}/>}
+        {view==="schoolinfo"&&<SchoolInfoPage logo={logo}/>}
+        {view==="noticeboard"&&<NoticeBoard {...ctx}/>}
+        {(view==="dashboard"||view==="parent_report"||view==="parent_fees")&&<ParentView {...ctx} events={events} feeStructure={feeStructure} users={users}/>}
       </main>
     </div>
   );
