@@ -3649,7 +3649,23 @@ function SettingsPage({users,setUsers,logo,setLogo}) {
   const [form,setForm]=useState(blank); const [msg,setMsg]=useState({t:"",ok:true});
   const [resetTarget,setResetTarget]=useState(null); const [nPw,setNPw]=useState(""); const [rMsg,setRMsg]=useState("");
   const [logoMsg,setLogoMsg]=useState("");
+  const [aiKey,setAiKey]=useState(()=>localStorage.getItem("tnks_ai_key")||"");
+  const [aiKeyMsg,setAiKeyMsg]=useState("");
   const logoRef=useRef();
+  function saveAiKey(){
+    if(!aiKey.trim()){setAiKeyMsg("Please enter an API key.");return;}
+    localStorage.setItem("tnks_ai_key",aiKey.trim());
+    save("tnks_ai_key",aiKey.trim());
+    setAiKeyMsg("✅ AI key saved! The School AI Assistant is now active.");
+    setTimeout(()=>setAiKeyMsg(""),4000);
+  }
+  function clearAiKey(){
+    localStorage.removeItem("tnks_ai_key");
+    save("tnks_ai_key","");
+    setAiKey("");
+    setAiKeyMsg("AI key removed. Assistant will be disabled.");
+    setTimeout(()=>setAiKeyMsg(""),3000);
+  }
   const flash=(t,ok=true)=>{setMsg({t,ok});setTimeout(()=>setMsg({t:"",ok:true}),2500);};
   function doAdd(){if(!form.name||!form.username||!form.password) return flash("Name, username and password required.",false); if(users.find(u=>u.username===form.username)) return flash("Username already exists.",false); setUsers(p=>[...p,{...form,id:Date.now().toString()}]); flash("✅ Account created!"); setForm(blank);}
   function doDel(id){if(confirm("Delete this account?")) setUsers(p=>p.filter(u=>u.id!==id));}
@@ -3680,6 +3696,32 @@ function SettingsPage({users,setUsers,logo,setLogo}) {
           <div style={{fontSize:12,color:"#374151",marginTop:2}}>View and manage school details, contact info, motto, and class structure.</div>
         </div>
         <Btn onClick={()=>window.dispatchEvent(new CustomEvent("tnks-nav",{detail:"schoolinfo"}))} v="green" style={{fontSize:12,flexShrink:0}}>🏫 Go to School Info</Btn>
+      </Card>
+
+      {/* AI ASSISTANT KEY */}
+      <Card style={{marginBottom:18,borderLeft:"4px solid #7c3aed"}}>
+        <div style={{fontWeight:"bold",color:"#4c1d95",marginBottom:10,fontSize:14}}>🤖 AI Assistant Key <span style={{background:"#dcfce7",color:"#15803d",fontSize:10,padding:"2px 8px",borderRadius:20,marginLeft:8,fontWeight:"normal"}}>FREE</span></div>
+        <div style={{fontSize:12,color:"#374151",marginBottom:12,lineHeight:1.8}}>
+          Enter your <b>free Groq API key</b> to enable the School AI Assistant in the parent portal.<br/>
+          1. Go to <a href="https://console.groq.com" target="_blank" rel="noreferrer" style={{color:"#7c3aed",fontWeight:"bold"}}>console.groq.com</a> and sign up free<br/>
+          2. Click <b>API Keys</b> → <b>Create API Key</b> → copy the key<br/>
+          3. Paste it below and click Save. Free tier gives 14,400 requests/day — enough for any school.
+        </div>
+        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+          <input
+            type="password"
+            value={aiKey}
+            onChange={e=>setAiKey(e.target.value)}
+            placeholder="sk-ant-api03-..."
+            style={{flex:1,minWidth:220,border:"1.5px solid #ddd6fe",borderRadius:9,padding:"8px 14px",fontSize:13,fontFamily:F,outline:"none"}}
+          />
+          <Btn onClick={saveAiKey} v="purple" style={{fontSize:12}}>💾 Save Key</Btn>
+          {aiKey&&<Btn onClick={clearAiKey} v="red" style={{fontSize:12}}>🗑️ Remove</Btn>}
+        </div>
+        {aiKeyMsg&&<div style={{marginTop:8,fontSize:13,color:aiKeyMsg.startsWith("✅")?"#15803d":"#b91c1c",fontWeight:"bold"}}>{aiKeyMsg}</div>}
+        <div style={{marginTop:10,fontSize:11,color:"#94a3b8"}}>
+          {aiKey?"✅ AI key is set. Parents can use the AI Assistant.":"⚠️ No key set — AI Assistant will show a configuration message to parents."}
+        </div>
       </Card>
 
       {/* ACCESS INFO */}
@@ -3813,7 +3855,7 @@ function useNotificationPermission() {
 
 function ParentChatPanel({ users, user, announcements, events, feeStructure, students }) {
   useNotificationPermission();
-  const [panel, setPanel] = useState("menu"); // menu | ai | dm | dm_compose | sent
+  const [panel, setPanel] = useState("menu"); // menu | ai | dm | dm_compose | sent | replies
   const [selectedStaff, setSelectedStaff] = useState(null);
   const [dmMsg, setDmMsg] = useState("");
   const [senderName, setSenderName] = useState(user?.name || "");
@@ -3946,27 +3988,49 @@ STAFF YOU CAN CONTACT: ${users.filter(u => u.contactRole && u.contactRole !== "a
 
 INSTRUCTIONS: Answer parents using the LIVE portal data above. Be warm, helpful, and specific. Give actual KES amounts for fees. List actual upcoming events by name and date. For private matters (individual child results, personal data), tell them to use the Direct Message or call the school. Keep answers concise and friendly.`;
 
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      // Load Groq AI key configured by admin in Settings (free at console.groq.com)
+      const aiKey = localStorage.getItem("tnks_ai_key") || "";
+      if (!aiKey) {
+        setChatHistory(h => [...h, { role: "assistant", content: `⚠️ The AI Assistant is not yet configured. Please ask the school admin to add a free Groq API key in ⚙️ Settings → AI Assistant. Or call ${SCHOOL.phone}.` }]);
+        setChatLoading(false);
+        return;
+      }
+      // Groq API — free tier, OpenAI-compatible format
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${aiKey}`,
+        },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
+          model: "llama-3.3-70b-versatile",
           max_tokens: 600,
-          system: systemPrompt,
-          messages: newHistory,
+          messages: [
+            { role: "system", content: systemPrompt },
+            ...newHistory,
+          ],
         })
       });
       const data = await res.json();
-      const reply = data.content?.map(c => c.text || "").join("") || `Please call the school at ${SCHOOL.phone}`;
+      if (data.error) throw new Error(data.error.message || data.error);
+      const reply = data.choices?.[0]?.message?.content || `Please call the school at ${SCHOOL.phone}`;
       setChatHistory(h => [...h, { role: "assistant", content: reply }]);
-    } catch {
-      setChatHistory(h => [...h, { role: "assistant", content: "Connectivity issue. Please call " + SCHOOL.phone }]);
+    } catch(err) {
+      const m = err?.message || "";
+      const errMsg = m.includes("invalid_api_key") || m.includes("401")
+        ? "❌ Invalid Groq key. Please ask admin to check the key in ⚙️ Settings."
+        : "Connectivity issue. Please call " + SCHOOL.phone;
+      setChatHistory(h => [...h, { role: "assistant", content: errMsg }]);
     }
     setChatLoading(false);
     setTimeout(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight; }, 100);
   }
 
-  const staffList = users.filter(u => u.contactRole && u.contactRole !== "admin");
+  // FIX: fall back to role field if contactRole was not saved on older records
+  const staffList = users.filter(u => {
+    const cr = u.contactRole || (u.role==="teacher"?"teacher":u.role==="admin"?"admin":null);
+    return cr && cr !== "admin";
+  });
   const roleGroups = [
     { label: "Director", role: "director", icon: "👨‍💼", color: "#1e3a5f", bg: "#eff6ff" },
     { label: "Manager", role: "manager", icon: "👩‍💼", color: "#15803d", bg: "#f0fdf4" },
@@ -3992,6 +4056,11 @@ INSTRUCTIONS: Answer parents using the LIVE portal data above. Be warm, helpful,
             <div style={{ fontSize: 32, marginBottom: 8 }}>✉️</div>
             <div style={{ fontWeight: "bold", color: "#15803d", fontSize: 13 }}>Direct Message</div>
             <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>Send a private message to the Director, Manager, Secretary or a Teacher</div>
+          </button>
+          <button onClick={() => setPanel("replies")} style={{ background: "linear-gradient(135deg,#fdf4ff,#f3e8ff)", border: "1.5px solid #e9d5ff", borderRadius: 14, padding: "18px 16px", cursor: "pointer", fontFamily: F, textAlign: "left", gridColumn: "1 / -1" }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>📬</div>
+            <div style={{ fontWeight: "bold", color: "#7c3aed", fontSize: 13 }}>My Sent Messages & Replies</div>
+            <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>View messages you have sent and any replies from staff</div>
           </button>
         </div>
       )}
@@ -4035,7 +4104,10 @@ INSTRUCTIONS: Answer parents using the LIVE portal data above. Be warm, helpful,
           <div style={{ padding: 16, maxHeight: 420, overflowY: "auto" }}>
             <div style={{ fontSize: 12, color: "#64748b", marginBottom: 14, textAlign: "center" }}>Select a staff member to send a message to</div>
             {roleGroups.map(group => {
-              const members = staffList.filter(u => u.contactRole === group.role);
+              const members = staffList.filter(u => {
+                const cr = u.contactRole || (u.role==="teacher"?"teacher":null);
+                return cr === group.role;
+              });
               if (!members.length) return null;
               return (
                 <div key={group.role} style={{ marginBottom: 14 }}>
@@ -4099,8 +4171,59 @@ INSTRUCTIONS: Answer parents using the LIVE portal data above. Be warm, helpful,
             <div style={{ marginTop: 4, color: "#94a3b8", fontSize: 11 }}>From: {senderName}</div>
           </div>
           <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
-            <Btn onClick={() => { setPanel("menu"); setSelectedStaff(null); setDmMsg(""); setMsgSent(false); }} v="primary">← Back to Menu</Btn>
+            <Btn onClick={() => { setPanel("replies"); setSelectedStaff(null); setDmMsg(""); setMsgSent(false); }} v="primary">📬 View My Messages</Btn>
             <Btn onClick={() => setPanel("dm")} v="green">Send Another</Btn>
+          </div>
+        </div>
+      )}
+
+      {panel === "replies" && (
+        <div style={{ background: "white", borderRadius: 16, boxShadow: "0 4px 20px rgba(0,0,0,.08)", overflow: "hidden" }}>
+          <div style={{ background: "linear-gradient(135deg,#4c1d95,#7c3aed)", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ color: "white", fontWeight: "bold", fontSize: 14 }}>📬 My Sent Messages & Replies</div>
+            <button onClick={() => setPanel("menu")} style={{ background: "rgba(255,255,255,.15)", border: "none", borderRadius: 8, padding: "4px 10px", cursor: "pointer", color: "white", fontSize: 11, fontFamily: F }}>← Back</button>
+          </div>
+          <div style={{ padding: 16, maxHeight: 460, overflowY: "auto" }}>
+            {(() => {
+              const myMsgs = messages.filter(m =>
+                m.from === (user?.id || "parent") ||
+                m.fromName === senderName ||
+                m.fromName === user?.name
+              ).sort((a, b) => (b.id > a.id ? 1 : -1));
+              if (!myMsgs.length) return (
+                <div style={{ textAlign: "center", padding: "30px 20px", color: "#94a3b8" }}>
+                  <div style={{ fontSize: 40, marginBottom: 8 }}>📭</div>
+                  <div style={{ fontSize: 13 }}>No messages sent yet. Use Direct Message to contact staff.</div>
+                  <div style={{ marginTop: 14 }}><Btn onClick={() => setPanel("dm")} v="green">Send a Message</Btn></div>
+                </div>
+              );
+              return myMsgs.map(m => (
+                <div key={m.id} style={{ marginBottom: 14, border: "1.5px solid #e9d5ff", borderRadius: 12, overflow: "hidden" }}>
+                  <div style={{ background: "#fdf4ff", padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ fontWeight: "bold", color: "#4c1d95", fontSize: 13 }}>To: {m.toName}</div>
+                      <div style={{ fontSize: 11, color: "#94a3b8" }}>{m.timestamp}</div>
+                    </div>
+                    {m.reply
+                      ? <span style={{ background: "#15803d", color: "white", borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: "bold" }}>✅ REPLIED</span>
+                      : <span style={{ background: "#f1f5f9", color: "#64748b", borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: "bold" }}>⏳ PENDING</span>
+                    }
+                  </div>
+                  <div style={{ padding: "10px 14px", background: "white" }}>
+                    <div style={{ fontSize: 12, color: "#374151", marginBottom: m.reply ? 10 : 0, fontStyle: "italic" }}>"{m.message}"</div>
+                    {m.reply && (
+                      <div style={{ background: "#f0fdf4", borderRadius: 10, padding: "10px 12px", borderLeft: "3px solid #15803d" }}>
+                        <div style={{ fontSize: 10, color: "#15803d", fontWeight: "bold", marginBottom: 4 }}>REPLY FROM {m.repliedBy?.toUpperCase()} · {m.repliedAt}</div>
+                        <div style={{ fontSize: 13, color: "#1e3a5f", lineHeight: 1.5 }}>{m.reply}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ));
+            })()}
+          </div>
+          <div style={{ padding: "10px 16px", borderTop: "1px solid #f1f5f9", display: "flex", gap: 8 }}>
+            <Btn onClick={() => setPanel("dm")} v="purple" style={{ fontSize: 12 }}>✉️ Send New Message</Btn>
           </div>
         </div>
       )}
@@ -5139,13 +5262,17 @@ function AICommentAssistant({ students, results, comments, setComments, term, ye
     const subs = deduped.map(r => `${r.subject}: ${r.marks}%`).join(", ");
     const prompt = `You are a CBC teacher writing a ${tone.toLowerCase()} report card comment for ${student?.name}, a ${cls} student. ${term} ${year} ${examType}. Average: ${avg.toFixed(1)}%. Subjects: ${subs || "no results entered"}. Focus: ${focus}. Write a concise 2-3 sentence comment (max 60 words) that is professional, personal, and actionable. Do not start with the student's name. Do not use generic filler.`;
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 150, messages: [{ role: "user", content: prompt }] })
+      const aiKey = localStorage.getItem("tnks_ai_key") || "";
+      if (!aiKey) { setDraft("AI key not set. Go to ⚙️ Settings → AI Assistant to add your free Groq key."); setLoading(false); return; }
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${aiKey}` },
+        body: JSON.stringify({ model: "llama-3.3-70b-versatile", max_tokens: 150, messages: [{ role: "user", content: prompt }] })
       });
       const data = await res.json();
-      setDraft(data.content?.map(c => c.text || "").join("") || "Unable to generate comment.");
-    } catch { setDraft("Could not connect to AI. Please try again."); }
+      if (data.error) throw new Error(data.error.message || data.error);
+      setDraft(data.choices?.[0]?.message?.content || "Unable to generate comment.");
+    } catch(e) { setDraft("Could not connect to AI. Check your Groq key in ⚙️ Settings."); }
     setLoading(false);
   }
 
@@ -6226,7 +6353,15 @@ export default function App(){
           load("tnks_parent_comms"),load("tnks_inventory"),
           load("tnks_transport_routes"),load("tnks_bus_monitoring"),
         ]);
-        if(u)setUsers(u);if(s)setStudents(s);if(r)setResults(r);
+        if(u){
+          // Merge with DEFAULT_USERS to restore contactRole for records that predate the field
+          const merged=u.map(loaded=>{
+            const def=DEFAULT_USERS.find(d=>d.id===loaded.id||d.username===loaded.username);
+            return def?{...loaded,contactRole:loaded.contactRole||def.contactRole}:loaded;
+          });
+          setUsers(merged);
+        }
+        if(s)setStudents(s);if(r)setResults(r);
         if(c)setComments(c);if(a)setAnnouncements(a);if(f)setFees(f);
         if(st)setStaff(st);if(lg)setLogo(lg);if(mon)setMonitoring(mon);
         if(tt)setTimetable(tt);if(tts)setTtSetup(prev=>({...prev,...tts}));
@@ -6365,6 +6500,7 @@ export default function App(){
         {view==="bulk"&&<BulkOperationsPage students={students} setStudents={setStudents} results={results} setResults={setResults} fees={fees} setFees={setFees} user={user}/>}
         {view==="ai_comments"&&<AICommentAssistant students={students} results={results} comments={comments} setComments={setComments} term={term} year={year} examType={examType}/>}
         {view==="inventory"&&<InventoryPage user={user} inventory={inventory} setInventory={setInventory}/>}
+        {view==="messages"&&<MessagesPage user={user}/>}
         {view==="settings"&&user.role==="admin"&&<SettingsPage users={users} setUsers={setUsers} logo={logo} setLogo={setLogo}/>}
         {view==="settings"&&user.role!=="admin"&&<div style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Admin access required.</div>}
         {view==="schoolinfo"&&<SchoolInfoPage logo={logo}/>}
