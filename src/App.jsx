@@ -20,6 +20,10 @@ const SCHOOL = {
   philosophy: "Investing in Children for Sustainability",
   website: "nyagakindikischools.sc.ke", founded: "7th January 2015",
 };
+// ── PASTE YOUR FREE GROQ KEY HERE (get one free at console.groq.com) ──────────
+const GROQ_API_KEY = "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";
+// ─────────────────────────────────────────────────────────────────────────────
+
 const ALL_CLASSES = ["PP1","PP2","Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"];
 const TERMS = ["Term 1","Term 2","Term 3"];
 const EXAM_TYPES = ["Opener Exam","Midterm Exam","End Term Exam"];
@@ -3988,10 +3992,10 @@ STAFF YOU CAN CONTACT: ${users.filter(u => u.contactRole && u.contactRole !== "a
 
 INSTRUCTIONS: Answer parents using the LIVE portal data above. Be warm, helpful, and specific. Give actual KES amounts for fees. List actual upcoming events by name and date. For private matters (individual child results, personal data), tell them to use the Direct Message or call the school. Keep answers concise and friendly.`;
 
-      // Load Groq AI key configured by admin in Settings (free at console.groq.com)
-      const aiKey = localStorage.getItem("tnks_ai_key") || "";
-      if (!aiKey) {
-        setChatHistory(h => [...h, { role: "assistant", content: `⚠️ The AI Assistant is not yet configured. Please ask the school admin to add a free Groq API key in ⚙️ Settings → AI Assistant. Or call ${SCHOOL.phone}.` }]);
+      // Groq API key (free — set at top of file)
+      const aiKey = GROQ_API_KEY;
+      if (!aiKey || aiKey === "PASTE_YOUR_GROQ_KEY_HERE") {
+        setChatHistory(h => [...h, { role: "assistant", content: `⚠️ AI Assistant not configured yet. Please ask the school admin to add the Groq API key in the source code. Or call ${SCHOOL.phone}.` }]);
         setChatLoading(false);
         return;
       }
@@ -5262,8 +5266,8 @@ function AICommentAssistant({ students, results, comments, setComments, term, ye
     const subs = deduped.map(r => `${r.subject}: ${r.marks}%`).join(", ");
     const prompt = `You are a CBC teacher writing a ${tone.toLowerCase()} report card comment for ${student?.name}, a ${cls} student. ${term} ${year} ${examType}. Average: ${avg.toFixed(1)}%. Subjects: ${subs || "no results entered"}. Focus: ${focus}. Write a concise 2-3 sentence comment (max 60 words) that is professional, personal, and actionable. Do not start with the student's name. Do not use generic filler.`;
     try {
-      const aiKey = localStorage.getItem("tnks_ai_key") || "";
-      if (!aiKey) { setDraft("AI key not set. Go to ⚙️ Settings → AI Assistant to add your free Groq key."); setLoading(false); return; }
+      const aiKey = GROQ_API_KEY;
+      if (!aiKey || aiKey === "PASTE_YOUR_GROQ_KEY_HERE") { setDraft("AI key not set. Add your free Groq key at the top of App.jsx."); setLoading(false); return; }
       const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${aiKey}` },
