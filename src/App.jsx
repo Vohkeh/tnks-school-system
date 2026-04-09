@@ -243,7 +243,21 @@ const DEFAULT_FEE_STRUCTURE = {
 // ══════════════════════════════════════════════════════════
 // BASE UI
 // ══════════════════════════════════════════════════════════
-const F = "Georgia,serif";
+const FONTS = [
+  {label:"Georgia (Default)", value:"Georgia,serif"},
+  {label:"Roboto", value:"'Roboto',sans-serif"},
+  {label:"Open Sans", value:"'Open Sans',sans-serif"},
+  {label:"Lato", value:"'Lato',sans-serif"},
+  {label:"Montserrat", value:"'Montserrat',sans-serif"},
+  {label:"Poppins", value:"'Poppins',sans-serif"},
+  {label:"Merriweather", value:"'Merriweather',serif"},
+  {label:"Playfair Display", value:"'Playfair Display',serif"},
+  {label:"Nunito", value:"'Nunito',sans-serif"},
+  {label:"Source Sans Pro", value:"'Source Sans Pro',sans-serif"},
+];
+function getAppFont(){return localStorage.getItem("tnks_font")||"Georgia,serif";}
+function getAppTheme(){return localStorage.getItem("tnks_theme")||"light";}
+let F = getAppFont();
 function Card({children,style={}}) { return <div style={{background:"white",borderRadius:14,boxShadow:"0 2px 12px rgba(0,0,0,0.08)",padding:20,...style}}>{children}</div>; }
 function Btn({onClick,v="primary",children,full,style={}}) {
   const S={primary:{background:"linear-gradient(135deg,#1d4ed8,#1e3a5f)",color:"white"},green:{background:"linear-gradient(135deg,#15803d,#065f46)",color:"white"},ghost:{background:"#f1f5f9",color:"#374151"},red:{background:"linear-gradient(135deg,#b91c1c,#7f1d1d)",color:"white"},amber:{background:"linear-gradient(135deg,#b45309,#92400e)",color:"white"},teal:{background:"linear-gradient(135deg,#0e7490,#164e63)",color:"white"},purple:{background:"linear-gradient(135deg,#7c3aed,#4c1d95)",color:"white"}};
@@ -3650,99 +3664,153 @@ function MessagesPage({user}) {
 
 function SettingsPage({users,setUsers,logo,setLogo}) {
   const blank={name:"",username:"",email:"",phone:"",password:"",role:"teacher",staffType:"teaching",subject:"",contactRole:"teacher"};
-  const [form,setForm]=useState(blank); const [msg,setMsg]=useState({t:"",ok:true});
-  const [resetTarget,setResetTarget]=useState(null); const [nPw,setNPw]=useState(""); const [rMsg,setRMsg]=useState("");
+  const [form,setForm]=useState(blank);
+  const [msg,setMsg]=useState({t:"",ok:true});
+  const [resetTarget,setResetTarget]=useState(null);
+  const [nPw,setNPw]=useState(""); const [rMsg,setRMsg]=useState("");
   const [logoMsg,setLogoMsg]=useState("");
   const [aiKey,setAiKey]=useState(()=>localStorage.getItem("tnks_ai_key")||"");
   const [aiKeyMsg,setAiKeyMsg]=useState("");
+  const [appFont,setAppFont]=useState(()=>localStorage.getItem("tnks_font")||"Georgia,serif");
+  const [appTheme,setAppTheme]=useState(()=>localStorage.getItem("tnks_theme")||"light");
+  const [fpTarget,setFpTarget]=useState(null);
+  const [fpNPw,setFpNPw]=useState(""); const [fpMsg,setFpMsg]=useState("");
   const logoRef=useRef();
+
+  const isDark=appTheme==="dark";
+  const bg=isDark?"#1e293b":"white";
+  const cardBg=isDark?"#0f172a":"white";
+  const textCol=isDark?"#e2e8f0":"#1e293b";
+  const subCol=isDark?"#94a3b8":"#64748b";
+  const borderCol=isDark?"#334155":"#e2e8f0";
+
+  function applyFont(font){
+    setAppFont(font);
+    localStorage.setItem("tnks_font",font);
+    F=font;
+    // inject google font link if needed
+    const gFonts={"'Roboto',sans-serif":"Roboto","'Open Sans',sans-serif":"Open+Sans","'Lato',sans-serif":"Lato","'Montserrat',sans-serif":"Montserrat","'Poppins',sans-serif":"Poppins","'Merriweather',serif":"Merriweather","'Playfair Display',serif":"Playfair+Display","'Nunito',sans-serif":"Nunito","'Source Sans Pro',sans-serif":"Source+Sans+Pro"};
+    const gName=gFonts[font];
+    if(gName){
+      const id="tnks-gfont";
+      let el=document.getElementById(id);
+      if(!el){el=document.createElement("link");el.id=id;el.rel="stylesheet";document.head.appendChild(el);}
+      el.href=`https://fonts.googleapis.com/css2?family=${gName}:wght@400;600;700&display=swap`;
+    }
+    document.body.style.fontFamily=font;
+    window.location.reload();
+  }
+  function applyTheme(theme){
+    setAppTheme(theme);
+    localStorage.setItem("tnks_theme",theme);
+    window.location.reload();
+  }
   function saveAiKey(){
     if(!aiKey.trim()){setAiKeyMsg("Please enter an API key.");return;}
     localStorage.setItem("tnks_ai_key",aiKey.trim());
     save("tnks_ai_key",aiKey.trim());
-    setAiKeyMsg("✅ AI key saved! The School AI Assistant is now active.");
-    setTimeout(()=>setAiKeyMsg(""),4000);
+    setAiKeyMsg("✅ AI key saved!");
+    setTimeout(()=>setAiKeyMsg(""),3000);
   }
   function clearAiKey(){
     localStorage.removeItem("tnks_ai_key");
     save("tnks_ai_key","");
     setAiKey("");
-    setAiKeyMsg("AI key removed. Assistant will be disabled.");
-    setTimeout(()=>setAiKeyMsg(""),3000);
+    setAiKeyMsg("AI key removed.");
+    setTimeout(()=>setAiKeyMsg(""),2000);
   }
   const flash=(t,ok=true)=>{setMsg({t,ok});setTimeout(()=>setMsg({t:"",ok:true}),2500);};
   function doAdd(){if(!form.name||!form.username||!form.password) return flash("Name, username and password required.",false); if(users.find(u=>u.username===form.username)) return flash("Username already exists.",false); setUsers(p=>[...p,{...form,id:Date.now().toString()}]); flash("✅ Account created!"); setForm(blank);}
   function doDel(id){if(confirm("Delete this account?")) setUsers(p=>p.filter(u=>u.id!==id));}
   function doReset(){if(nPw.length<6){setRMsg("Min 6 chars.");return;} setUsers(p=>p.map(u=>u.id===resetTarget.id?{...u,password:nPw}:u)); setRMsg("✅ Password reset!"); setTimeout(()=>{setResetTarget(null);setNPw("");setRMsg("");},1500);}
+  function doFpReset(){if(fpNPw.length<6){setFpMsg("Min 6 chars.");return;} setUsers(p=>p.map(u=>u.id===fpTarget.id?{...u,password:fpNPw}:u)); setFpMsg("✅ Password reset successfully!"); setTimeout(()=>{setFpTarget(null);setFpNPw("");setFpMsg("");},1500);}
   function handleLogo(e){const f=e.target.files[0]; if(!f) return; if(!f.type.startsWith("image/")){setLogoMsg("Please select an image file.");return;} const r=new FileReader(); r.onload=ev=>{setLogo(ev.target.result); save("tnks_logo",ev.target.result); setLogoMsg("✅ Logo updated!"); setTimeout(()=>setLogoMsg(""),3000);}; r.readAsDataURL(f);}
-  function removeLogo(){setLogo(null); save("tnks_logo",null); setLogoMsg("Custom logo removed. Using embedded school logo."); setTimeout(()=>setLogoMsg(""),3000);}
+  function removeLogo(){setLogo(null); save("tnks_logo",null); setLogoMsg("Custom logo removed."); setTimeout(()=>setLogoMsg(""),3000);}
   const th={textAlign:"left",padding:"9px 12px",fontWeight:"bold",fontSize:11,color:"#1d4ed8",background:"#eff6ff"};
   const td={padding:"8px 12px",fontSize:12,borderTop:"1px solid #f1f5f9"};
+
   return (
-    <div style={{padding:24}}>
-      <PageH title="⚙️ Settings" sub="Logo editor and staff account management"/>
-      {resetTarget&&<Modal title={`🔑 Reset Password — ${resetTarget.name}`} onClose={()=>{setResetTarget(null);setNPw("");setRMsg("");}}><Inp label="NEW PASSWORD" value={nPw} onChange={setNPw} placeholder="Min 6 characters" type="password"/>{rMsg&&<div style={{marginTop:8,fontSize:13,color:rMsg.startsWith("✅")?"#15803d":"#b91c1c",fontWeight:"bold"}}>{rMsg}</div>}<div style={{display:"flex",gap:8,marginTop:14}}><Btn onClick={doReset} v="primary">Set Password</Btn><Btn onClick={()=>{setResetTarget(null);setNPw("");setRMsg("");}} v="ghost">Cancel</Btn></div></Modal>}
+    <div style={{padding:24,fontFamily:appFont}}>
+      <PageH title="⚙️ Settings" sub="System configuration and staff account management"/>
 
-      {/* LOGO EDITOR */}
-      <Card style={{marginBottom:18,borderLeft:"4px solid #1d4ed8"}}>
-        <div style={{fontWeight:"bold",color:"#1e3a5f",marginBottom:14,fontSize:14}}>🖼️ School Logo</div>
-        <div style={{display:"flex",alignItems:"center",gap:20,flexWrap:"wrap"}}>
-          <div style={{textAlign:"center"}}><Logo size={80} src={logo}/><div style={{fontSize:11,color:"#64748b",marginTop:6}}>Current Logo</div></div>
-          <div><div style={{fontSize:13,color:"#374151",marginBottom:10}}>Upload your school logo (JPG, PNG, GIF). It will appear on all pages, sidebar, dashboards and printed report cards.</div><div style={{display:"flex",gap:8}}><Btn onClick={()=>logoRef.current?.click()} v="primary" style={{fontSize:12}}>📁 Upload New Logo</Btn>{logo&&<Btn onClick={removeLogo} v="red" style={{fontSize:12}}>🗑️ Remove Logo</Btn>}</div>{logoMsg&&<div style={{marginTop:8,fontSize:13,color:logoMsg.startsWith("✅")?"#15803d":"#b91c1c",fontWeight:"bold"}}>{logoMsg}</div>}<input ref={logoRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleLogo}/></div>
-        </div>
-      </Card>
+      {/* RESET PASSWORD MODAL */}
+      {resetTarget&&<Modal title={`🔑 Reset Password — ${resetTarget.name}`} onClose={()=>{setResetTarget(null);setNPw("");setRMsg("");}}>
+        <Inp label="NEW PASSWORD" value={nPw} onChange={setNPw} placeholder="Min 6 characters" type="password"/>
+        {rMsg&&<div style={{marginTop:8,fontSize:13,color:rMsg.startsWith("✅")?"#15803d":"#b91c1c",fontWeight:"bold"}}>{rMsg}</div>}
+        <div style={{display:"flex",gap:8,marginTop:14}}><Btn onClick={doReset} v="primary">Set Password</Btn><Btn onClick={()=>{setResetTarget(null);setNPw("");setRMsg("");}} v="ghost">Cancel</Btn></div>
+      </Modal>}
 
-      {/* SCHOOL INFO POINTER */}
-      <Card style={{marginBottom:18,background:"#f0fdf4",border:"1px solid #bbf7d0",display:"flex",alignItems:"center",gap:14}}>
-        <span style={{fontSize:32}}>🏫</span>
-        <div style={{flex:1}}>
-          <div style={{fontWeight:"bold",color:"#15803d",fontSize:13}}>School Information</div>
-          <div style={{fontSize:12,color:"#374151",marginTop:2}}>View and manage school details, contact info, motto, and class structure.</div>
-        </div>
-        <Btn onClick={()=>window.dispatchEvent(new CustomEvent("tnks-nav",{detail:"schoolinfo"}))} v="green" style={{fontSize:12,flexShrink:0}}>🏫 Go to School Info</Btn>
-      </Card>
+      {/* FORGOT PASSWORD MODAL */}
+      {fpTarget&&<Modal title={`🔐 Forgot Password — ${fpTarget.name}`} onClose={()=>{setFpTarget(null);setFpNPw("");setFpMsg("");}}>
+        <div style={{fontSize:13,color:"#64748b",marginBottom:12}}>Set a new password for <b>{fpTarget.name}</b> ({fpTarget.username})</div>
+        <Inp label="NEW PASSWORD" value={fpNPw} onChange={setFpNPw} placeholder="Min 6 characters" type="password"/>
+        {fpMsg&&<div style={{marginTop:8,fontSize:13,color:fpMsg.startsWith("✅")?"#15803d":"#b91c1c",fontWeight:"bold"}}>{fpMsg}</div>}
+        <div style={{display:"flex",gap:8,marginTop:14}}><Btn onClick={doFpReset} v="primary">Reset Password</Btn><Btn onClick={()=>{setFpTarget(null);setFpNPw("");setFpMsg("");}} v="ghost">Cancel</Btn></div>
+      </Modal>}
 
-      {/* AI ASSISTANT KEY */}
+      {/* TOP ROW: Logo + Theme + Font */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:18,marginBottom:18,flexWrap:"wrap"}}>
+
+        {/* LOGO */}
+        <Card style={{borderLeft:"4px solid #1d4ed8"}}>
+          <div style={{fontWeight:"bold",color:"#1e3a5f",marginBottom:14,fontSize:14}}>🖼️ School Logo</div>
+          <div style={{display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
+            <div style={{textAlign:"center"}}><Logo size={64} src={logo}/><div style={{fontSize:10,color:"#64748b",marginTop:4}}>Current</div></div>
+            <div style={{flex:1}}>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                <Btn onClick={()=>logoRef.current?.click()} v="primary" style={{fontSize:11}}>📁 Upload Logo</Btn>
+                {logo&&<Btn onClick={removeLogo} v="red" style={{fontSize:11}}>🗑️ Remove</Btn>}
+              </div>
+              {logoMsg&&<div style={{marginTop:6,fontSize:12,color:logoMsg.startsWith("✅")?"#15803d":"#b91c1c",fontWeight:"bold"}}>{logoMsg}</div>}
+              <input ref={logoRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleLogo}/>
+            </div>
+          </div>
+        </Card>
+
+        {/* THEME */}
+        <Card style={{borderLeft:"4px solid #f59e0b"}}>
+          <div style={{fontWeight:"bold",color:"#92400e",marginBottom:14,fontSize:14}}>🌗 Appearance</div>
+          <div style={{display:"grid",gap:10}}>
+            {[{val:"light",icon:"☀️",label:"Light Mode"},{val:"dark",icon:"🌙",label:"Dark Mode"}].map(t=>(
+              <button key={t.val} onClick={()=>applyTheme(t.val)} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:10,border:`2px solid ${appTheme===t.val?"#f59e0b":"#e2e8f0"}`,background:appTheme===t.val?"#fffbeb":"white",cursor:"pointer",fontFamily:appFont,fontSize:13,fontWeight:appTheme===t.val?"bold":"normal",color:appTheme===t.val?"#92400e":"#374151",transition:"all .2s"}}>
+                <span style={{fontSize:18}}>{t.icon}</span>
+                <span>{t.label}</span>
+                {appTheme===t.val&&<span style={{marginLeft:"auto",color:"#f59e0b",fontSize:16}}>✓</span>}
+              </button>
+            ))}
+          </div>
+        </Card>
+
+        {/* FONT */}
+        <Card style={{borderLeft:"4px solid #7c3aed"}}>
+          <div style={{fontWeight:"bold",color:"#4c1d95",marginBottom:12,fontSize:14}}>🔤 Font Style</div>
+          <div style={{display:"grid",gap:6,maxHeight:180,overflowY:"auto"}}>
+            {FONTS.map(f=>(
+              <button key={f.value} onClick={()=>applyFont(f.value)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 12px",borderRadius:8,border:`2px solid ${appFont===f.value?"#7c3aed":"#e2e8f0"}`,background:appFont===f.value?"#f3e8ff":"white",cursor:"pointer",fontFamily:f.value,fontSize:12,color:appFont===f.value?"#4c1d95":"#374151",transition:"all .2s"}}>
+                <span>{f.label}</span>
+                {appFont===f.value&&<span style={{color:"#7c3aed",fontSize:14}}>✓</span>}
+              </button>
+            ))}
+          </div>
+        </Card>
+      </div>
+
+      {/* AI KEY */}
       <Card style={{marginBottom:18,borderLeft:"4px solid #7c3aed"}}>
         <div style={{fontWeight:"bold",color:"#4c1d95",marginBottom:10,fontSize:14}}>🤖 AI Assistant Key <span style={{background:"#dcfce7",color:"#15803d",fontSize:10,padding:"2px 8px",borderRadius:20,marginLeft:8,fontWeight:"normal"}}>FREE</span></div>
-        <div style={{fontSize:12,color:"#374151",marginBottom:12,lineHeight:1.8}}>
-          Enter your <b>free Groq API key</b> to enable the School AI Assistant in the parent portal.<br/>
-          1. Go to <a href="https://console.groq.com" target="_blank" rel="noreferrer" style={{color:"#7c3aed",fontWeight:"bold"}}>console.groq.com</a> and sign up free<br/>
-          2. Click <b>API Keys</b> → <b>Create API Key</b> → copy the key<br/>
-          3. Paste it below and click Save. Free tier gives 14,400 requests/day — enough for any school.
-        </div>
         <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-          <input
-            type="password"
-            value={aiKey}
-            onChange={e=>setAiKey(e.target.value)}
-            placeholder="sk-ant-api03-..."
-            style={{flex:1,minWidth:220,border:"1.5px solid #ddd6fe",borderRadius:9,padding:"8px 14px",fontSize:13,fontFamily:F,outline:"none"}}
-          />
+          <input type="password" value={aiKey} onChange={e=>setAiKey(e.target.value)} placeholder="Paste your Groq API key here..." style={{flex:1,minWidth:220,border:"1.5px solid #ddd6fe",borderRadius:9,padding:"8px 14px",fontSize:13,fontFamily:appFont,outline:"none"}}/>
           <Btn onClick={saveAiKey} v="purple" style={{fontSize:12}}>💾 Save Key</Btn>
           {aiKey&&<Btn onClick={clearAiKey} v="red" style={{fontSize:12}}>🗑️ Remove</Btn>}
         </div>
         {aiKeyMsg&&<div style={{marginTop:8,fontSize:13,color:aiKeyMsg.startsWith("✅")?"#15803d":"#b91c1c",fontWeight:"bold"}}>{aiKeyMsg}</div>}
-        <div style={{marginTop:10,fontSize:11,color:"#94a3b8"}}>
-          {aiKey?"✅ AI key is set. Parents can use the AI Assistant.":"⚠️ No key set — AI Assistant will show a configuration message to parents."}
-        </div>
+        <div style={{marginTop:8,fontSize:11,color:"#94a3b8"}}>{aiKey?"✅ AI key is set — AI Assistant active.":"⚠️ No key set — AI Assistant disabled."}</div>
       </Card>
 
-      {/* ACCESS INFO */}
-      <Card style={{marginBottom:18,background:"#f0fdf4",border:"1px solid #bbf7d0"}}>
-        <div style={{fontWeight:"bold",color:"#15803d",marginBottom:10,fontSize:13}}>🔗 How Staff & Parents Access the System</div>
-        <div style={{fontSize:12,color:"#374151",lineHeight:1.8}}>
-          <p style={{margin:"0 0 6px"}}>All users access the same URL. Share the link with staff and parents.</p>
-          <p style={{margin:"0 0 6px"}}>• <b>Staff/Admin:</b> Created in the table below. They use their username &amp; password.</p>
-          <p style={{margin:0}}>• <b>Parents:</b> Set the learner's email and parent password in the Student record. Parents login via the "Parent" tab.</p>
-        </div>
-        <button onClick={()=>navigator.clipboard.writeText(window.location.href.split("?")[0]).then(()=>alert("URL copied!"))} style={{marginTop:10,background:"#15803d",color:"white",border:"none",borderRadius:8,padding:"6px 14px",fontSize:12,cursor:"pointer",fontFamily:F,fontWeight:"bold"}}>📋 Copy System URL</button>
-      </Card>
-
-      {/* ADD ACCOUNT */}
+      {/* STAFF ACCOUNTS */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1.5fr",gap:18,alignItems:"start"}}>
         <Card>
-          <div style={{fontWeight:"bold",color:"#1e293b",marginBottom:14,fontSize:13}}>Add New Staff Account</div>
+          <div style={{fontWeight:"bold",color:"#1e293b",marginBottom:14,fontSize:13}}>➕ Add Staff Account</div>
           <div style={{display:"grid",gap:10}}>
             <Inp label="FULL NAME *" value={form.name} onChange={v=>setForm({...form,name:v})} placeholder="Ms. Purity"/>
             <Inp label="USERNAME *" value={form.username} onChange={v=>setForm({...form,username:v})} placeholder="e.g. purity"/>
@@ -3768,7 +3836,11 @@ function SettingsPage({users,setUsers,logo,setLogo}) {
               <td style={{...td,fontFamily:"monospace",fontSize:11,color:"#7c3aed",fontWeight:"bold"}}>{u.password}</td>
               <td style={td}><span style={{background:u.role==="admin"?"#eff6ff":"#f0fdf4",color:u.role==="admin"?"#1d4ed8":"#15803d",fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:"bold"}}>{u.role}</span></td>
               <td style={{...td,fontSize:11,textTransform:"capitalize"}}>{u.contactRole||"teacher"}</td>
-              <td style={td}><button onClick={()=>{setResetTarget(u);setNPw("");setRMsg("");}} style={{color:"#1d4ed8",background:"none",border:"none",cursor:"pointer",fontSize:11,marginRight:8}}>Reset PW</button><button onClick={()=>doDel(u.id)} style={{color:"#b91c1c",background:"none",border:"none",cursor:"pointer",fontSize:11}}>Delete</button></td>
+              <td style={td}>
+                <button onClick={()=>{setResetTarget(u);setNPw("");setRMsg("");}} style={{color:"#1d4ed8",background:"none",border:"none",cursor:"pointer",fontSize:11,marginRight:8}}>Reset PW</button>
+                <button onClick={()=>{setFpTarget(u);setFpNPw("");setFpMsg("");}} style={{color:"#f59e0b",background:"none",border:"none",cursor:"pointer",fontSize:11,marginRight:8}}>Forgot PW</button>
+                <button onClick={()=>doDel(u.id)} style={{color:"#b91c1c",background:"none",border:"none",cursor:"pointer",fontSize:11}}>Delete</button>
+              </td>
             </tr>)}</tbody>
           </table>
           </div>
@@ -6284,6 +6356,19 @@ STEP 5: Add route handlers in the main <main> block:
 // ── 3. COMPLETE App() FUNCTION — replace yours with this ────────
 export default function App(){
   const [ready,setReady]=useState(false);
+  // Apply saved font + theme on mount
+  useEffect(()=>{
+    const font=localStorage.getItem("tnks_font")||"Georgia,serif";
+    const theme=localStorage.getItem("tnks_theme")||"light";
+    F=font;
+    document.body.style.fontFamily=font;
+    document.body.style.background=theme==="dark"?"#0f172a":"";
+    document.body.style.color=theme==="dark"?"#e2e8f0":"";
+    // Load google font if needed
+    const gFonts={"'Roboto',sans-serif":"Roboto","'Open Sans',sans-serif":"Open+Sans","'Lato',sans-serif":"Lato","'Montserrat',sans-serif":"Montserrat","'Poppins',sans-serif":"Poppins","'Merriweather',serif":"Merriweather","'Playfair Display',serif":"Playfair+Display","'Nunito',sans-serif":"Nunito","'Source Sans Pro',sans-serif":"Source+Sans+Pro"};
+    const gName=gFonts[font];
+    if(gName){const id="tnks-gfont";let el=document.getElementById(id);if(!el){el=document.createElement("link");el.id=id;el.rel="stylesheet";document.head.appendChild(el);}el.href=`https://fonts.googleapis.com/css2?family=${gName}:wght@400;600;700&display=swap`;}
+  },[]);
   const [user,setUser]=useState(null);
   const [view,setView]=useState("dashboard");
   const [users,setUsers]=useState(DEFAULT_USERS);
@@ -6464,8 +6549,10 @@ export default function App(){
 
   const ctx={user,students,setStudents,results,setResults,comments,setComments,announcements,setAnnouncements,users,setUsers,fees,setFees,staff,setStaff,term,setTerm,year,setYear,examType,setExamType,logo,monitoring,setMonitoring};
 
+  const _themeP=localStorage.getItem("tnks_theme")||"light";
+  const _fontP=localStorage.getItem("tnks_font")||"Georgia,serif";
   if(user.role==="parent")return(
-    <div style={{display:"flex",height:"100vh",fontFamily:"Georgia,serif",background:"#f1f5f9",overflow:"hidden"}}>
+    <div style={{display:"flex",height:"100vh",fontFamily:_fontP,background:_themeP==="dark"?"#0f172a":"#f1f5f9",overflow:"hidden"}}>
       <Sidebar view={view} setView={setView} user={user} onLogout={()=>{setUser(null);setView("dashboard");}} logo={logo}/>
       <main style={{flex:1,overflowY:"auto"}}>
         {view==="schoolinfo"&&<SchoolInfoPage logo={logo}/>}
@@ -6475,8 +6562,11 @@ export default function App(){
     </div>
   );
 
+  const _theme2=localStorage.getItem("tnks_theme")||"light";
+  const _appFont2=localStorage.getItem("tnks_font")||"Georgia,serif";
+  const _bg2=_theme2==="dark"?"#0f172a":"#f1f5f9";
   return(
-    <div style={{display:"flex",height:"100vh",fontFamily:"Georgia,serif",background:"#f1f5f9",overflow:"hidden"}}>
+    <div style={{display:"flex",height:"100vh",fontFamily:_appFont2,background:_bg2,overflow:"hidden"}}>
       <Sidebar view={view} setView={setView} user={user} onLogout={()=>{setUser(null);setView("dashboard");}} logo={logo}/>
       <main style={{flex:1,overflowY:"auto"}}>
         {view==="dashboard"&&<Dashboard {...ctx}/>}
