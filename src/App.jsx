@@ -6356,6 +6356,13 @@ STEP 5: Add route handlers in the main <main> block:
 // ── 3. COMPLETE App() FUNCTION — replace yours with this ────────
 export default function App(){
   const [ready,setReady]=useState(false);
+  const [sidebarOpen,setSidebarOpen]=useState(false);
+  const [isMobile,setIsMobile]=useState(()=>window.innerWidth<768);
+  useEffect(()=>{
+    const onResize=()=>setIsMobile(window.innerWidth<768);
+    window.addEventListener("resize",onResize);
+    return()=>window.removeEventListener("resize",onResize);
+  },[]);
   // Apply saved font + theme on mount
   useEffect(()=>{
     const font=localStorage.getItem("tnks_font")||"Georgia,serif";
@@ -6552,9 +6559,16 @@ export default function App(){
   const _themeP=localStorage.getItem("tnks_theme")||"light";
   const _fontP=localStorage.getItem("tnks_font")||"Georgia,serif";
   if(user.role==="parent")return(
-    <div style={{display:"flex",height:"100vh",fontFamily:_fontP,background:_themeP==="dark"?"#0f172a":"#f1f5f9",overflow:"hidden"}}>
-      <Sidebar view={view} setView={setView} user={user} onLogout={()=>{setUser(null);setView("dashboard");}} logo={logo}/>
-      <main style={{flex:1,overflowY:"auto"}}>
+    <div style={{display:"flex",height:"100vh",fontFamily:_fontP,background:_themeP==="dark"?"#0f172a":"#f1f5f9",overflow:"hidden",position:"relative"}}>
+      {/* Mobile overlay */}
+      {isMobile&&sidebarOpen&&<div onClick={()=>setSidebarOpen(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:40}}/>}
+      {/* Sidebar */}
+      <div style={{position:isMobile?"fixed":"relative",left:isMobile?(sidebarOpen?"0":"-230px"):"0",top:0,bottom:0,zIndex:50,height:"100vh",transition:"left .25s ease",flexShrink:0}}>
+        <Sidebar view={view} setView={v=>{setView(v);setSidebarOpen(false);}} user={user} onLogout={()=>{setUser(null);setView("dashboard");setSidebarOpen(false);}} logo={logo}/>
+      </div>
+      {/* Hamburger button — mobile only */}
+      {isMobile&&<button onClick={()=>setSidebarOpen(o=>!o)} style={{position:"fixed",top:12,left:12,zIndex:60,background:"#1e3a5f",color:"white",border:"none",borderRadius:8,width:38,height:38,cursor:"pointer",fontSize:20,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 2px 8px rgba(0,0,0,.3)"}}>☰</button>}
+      <main style={{flex:1,overflowY:"auto",minWidth:0,paddingTop:isMobile?50:0}}>
         {view==="schoolinfo"&&<SchoolInfoPage logo={logo}/>}
         {view==="noticeboard"&&<NoticeBoard {...ctx}/>}
         {(view==="dashboard"||view==="parent_report"||view==="parent_fees")&&<ParentView {...ctx} events={events} feeStructure={feeStructure} users={users}/>}
@@ -6566,9 +6580,16 @@ export default function App(){
   const _appFont2=localStorage.getItem("tnks_font")||"Georgia,serif";
   const _bg2=_theme2==="dark"?"#0f172a":"#f1f5f9";
   return(
-    <div style={{display:"flex",height:"100vh",fontFamily:_appFont2,background:_bg2,overflow:"hidden"}}>
-      <Sidebar view={view} setView={setView} user={user} onLogout={()=>{setUser(null);setView("dashboard");}} logo={logo}/>
-      <main style={{flex:1,overflowY:"auto"}}>
+    <div style={{display:"flex",height:"100vh",fontFamily:_appFont2,background:_bg2,overflow:"hidden",position:"relative"}}>
+      {/* Mobile overlay */}
+      {isMobile&&sidebarOpen&&<div onClick={()=>setSidebarOpen(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:40}}/>}
+      {/* Sidebar */}
+      <div style={{position:isMobile?"fixed":"relative",left:isMobile?(sidebarOpen?"0":"-230px"):"0",top:0,bottom:0,zIndex:50,height:"100vh",transition:"left .25s ease",flexShrink:0}}>
+        <Sidebar view={view} setView={v=>{setView(v);setSidebarOpen(false);}} user={user} onLogout={()=>{setUser(null);setView("dashboard");setSidebarOpen(false);}} logo={logo}/>
+      </div>
+      {/* Hamburger button — mobile only */}
+      {isMobile&&<button onClick={()=>setSidebarOpen(o=>!o)} style={{position:"fixed",top:12,left:12,zIndex:60,background:"#1e3a5f",color:"white",border:"none",borderRadius:8,width:38,height:38,cursor:"pointer",fontSize:20,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 2px 8px rgba(0,0,0,.3)"}}>☰</button>}
+      <main style={{flex:1,overflowY:"auto",minWidth:0,paddingTop:isMobile?50:0}}>
         {view==="dashboard"&&<Dashboard {...ctx}/>}
         {view==="students"&&<StudentsPage students={students} setStudents={setStudents} results={results} setResults={setResults} comments={comments} setComments={setComments} fees={fees} setFees={setFees} monitoring={monitoring} setMonitoring={setMonitoring}/>}
         {view==="admissions"&&<AdmissionsPage students={students} setStudents={setStudents}/>}
