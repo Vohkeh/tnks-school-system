@@ -4882,6 +4882,8 @@ function BulkOperationsPage({ students, setStudents, results, setResults, fees, 
       const vals = line.split(",").map(v => v.trim().replace(/^["']|["']$/g, ""));
       const obj = {};
       headers.forEach((h, i) => { obj[h] = vals[i] || ""; });
+      const rawCls = obj["class"] || obj["grade"] || obj["class name"] || obj["classname"] || obj["form"] || "";
+      obj["class"] = ALL_CLASSES.find(c => c.toLowerCase() === rawCls.toLowerCase()) || rawCls || "Grade 7";
       return obj;
     });
     setPreview(rows);
