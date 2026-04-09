@@ -4901,10 +4901,12 @@ function BulkOperationsPage({ students, setStudents, results, setResults, fees, 
       const name = row["name"] || row["full name"] || row["student name"];
       if (!name || !admno) { skipped++; return; }
       if (newStudents.find(s => s.admNo === admno)) { skipped++; return; }
+      const rawClass = row["class"] || row["grade"] || row["class name"] || row["classname"] || row["form"] || "";
+      const resolvedClass = ALL_CLASSES.find(c => c.toLowerCase() === rawClass.toLowerCase()) || rawClass || "Grade 7";
       newStudents.push({
         id: Date.now().toString() + Math.random(),
         name, admNo: admno,
-        class: row["class"] || "Grade 7",
+        class: resolvedClass,
         gender: row["gender"] || "Male",
         parentName: row["parent"] || row["parentname"] || "",
         parentPhone: row["phone"] || row["parentphone"] || "",
