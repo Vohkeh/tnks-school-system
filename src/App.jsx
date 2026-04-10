@@ -80,9 +80,19 @@ const COMBINED_SUBJECT_PARTS = {
 function getAutoRemark(subject, marks) {
   if(marks===null||marks===undefined) return "—";
   const subLower = subject.toLowerCase();
-  // Use "Swahili" for Kiswahili subject
+  // Use Swahili remarks for Kiswahili subject
   const isSwahili = subLower.includes("kiswahili") || subLower.includes("swahili");
-  const subLabel = isSwahili ? "Swahili" : subject.split(" ")[0];
+  if(isSwahili) {
+    if(marks>=90) return `Umefanya vizuri sana katika Kiswahili. Endelea hivyo!`;
+    if(marks>=75) return `Vizuri sana katika Kiswahili. Juhudi nzuri sana.`;
+    if(marks>=58) return `Umefanya vizuri katika Kiswahili. Endelea kujitahidi.`;
+    if(marks>=41) return `Wastani katika Kiswahili. Jitahidi zaidi.`;
+    if(marks>=31) return `Chini ya wastani katika Kiswahili. Unahitaji kuboresha.`;
+    if(marks>=21) return `Dhaifu katika Kiswahili. Unahitaji msaada zaidi.`;
+    if(marks>=11) return `Matokeo mabaya katika Kiswahili. Msaada wa haraka unahitajika.`;
+    return `Matokeo mabaya sana katika Kiswahili. Hatua za haraka zinahitajika.`;
+  }
+  const subLabel = subject.split(" ")[0];
   if(marks>=90) return `Excellent performance in ${subLabel}. Keep it up!`;
   if(marks>=75) return `Very good in ${subLabel}. Outstanding effort.`;
   if(marks>=58) return `Good performance in ${subLabel}. Keep working hard.`;
@@ -825,9 +835,17 @@ function buildSectionHeader(logo) {
     <div style="font-size:11px;font-style:italic;color:#15803d;font-weight:bold;margin-top:3px;">"${SCHOOL.motto}"</div>
   </div>`;
 }
+function buildStampBox() {
+  return `<div style="display:flex;justify-content:flex-end;margin-top:14px;">
+    <div style="border:2px dashed #1e3a5f;border-radius:8px;width:160px;height:80px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px;">
+      <div style="font-size:9px;font-weight:bold;color:#1e3a5f;letter-spacing:0.5px;">OFFICIAL STAMP</div>
+      <div style="font-size:8px;color:#94a3b8;margin-top:18px;">Date: _______________</div>
+    </div>
+  </div>`;
+}
 function buildHTMLDoc(title, bodyHTML, logo) {
   const logoWm = logo
-    ? `<div style="position:fixed;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:0;overflow:hidden;"><img src="${logo}" style="width:70%;max-width:600px;opacity:0.14;transform:rotate(-15deg);object-fit:contain;"/></div>`
+    ? `<div style="position:fixed;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:0;overflow:hidden;"><img src="${logo}" style="width:70%;max-width:600px;opacity:0.22;transform:rotate(-15deg);object-fit:contain;"/></div>`
     : `<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);opacity:0.04;pointer-events:none;z-index:0;font-size:80px;font-weight:900;color:#1e3a5f;white-space:nowrap;font-family:Georgia,serif;">${SCHOOL.motto}</div>`;
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>${title}</title><style>
     *{box-sizing:border-box;}
@@ -1065,6 +1083,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
         <span style="font-size:8px;font-weight:bold;color:#374151;">CBC Grading: </span>
         ${[{g:"EE1",r:"90-100"},{g:"EE2",r:"75-89"},{g:"ME1",r:"58-74"},{g:"ME2",r:"41-57"},{g:"AE1",r:"31-40"},{g:"AE2",r:"21-30"},{g:"BE1",r:"11-20"},{g:"BE2",r:"0-10"}].map(({g,r})=>{const gd=getGrade(g==="EE1"?95:g==="EE2"?80:g==="ME1"?65:g==="ME2"?50:g==="AE1"?35:g==="AE2"?25:g==="BE1"?15:5);return`<span style="font-size:8px;background:${gd.bg};color:${gd.col};padding:1px 4px;border-radius:6px;font-weight:bold;margin-right:2px;">${g}:${r}</span>`;}).join("")}
       </div>
+      ${buildStampBox()}
     </div>`;
   }
 
@@ -1082,11 +1101,11 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
         <td style="padding:5px 6px;text-align:center;font-weight:bold;background:rgba(254,243,199,0.7);">${s.subs.length?s.total.toFixed(0):"—"}</td>
       </tr>`;
     }).join("");
-    // Subject teacher row
+    // Subject teacher row — full names
     const teacherRow=`<tr style="background:#f0f9ff;border-top:2px solid #1e3a5f;">
       <td colspan="2" style="padding:4px 6px;font-size:9px;font-weight:bold;color:#1e3a5f;">Subject Teacher:</td>
-      ${subs.map(s=>{const ts=getSubjectTeachersForResult(className,s);const ini=ts.length?getCombinedInitials(ts):"—";const title=ts.join(" / ");return`<td style="padding:4px 3px;text-align:center;font-size:8px;color:#1e3a5f;font-weight:bold;" title="${title}">${ini}</td>`;}).join("")}
-      <td style="padding:4px 6px;font-size:9px;color:#64748b;">Init.</td>
+      ${subs.map(s=>{const ts=getSubjectTeachersForResult(className,s);const name=ts.length?ts.join(" / "):"—";return`<td style="padding:4px 3px;text-align:center;font-size:7.5px;color:#1e3a5f;font-weight:bold;white-space:normal;word-break:break-word;max-width:60px;">${name}</td>`;}).join("")}
+      <td style="padding:4px 6px;font-size:9px;color:#64748b;"></td>
     </tr>`;
     return `<div style="margin-bottom:32px;">
       ${buildSectionHeader(logo)}
@@ -1113,8 +1132,8 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
           <tr class="mean-row" style="background:#eff6ff;font-weight:bold;">
             <td style="padding:5px 6px;">MEAN SCORE</td>
             <td style="padding:5px 6px;"></td>
-            ${subs.map(su=>{const allMarks=ranked.map(s=>{const r=s.subs.find(x=>x.subject===su);return r?r.marks:null;}).filter(v=>v!==null);const m=allMarks.length?allMarks.reduce((a,b)=>a+b,0)/allMarks.length:0;const mg=m>0?getGrade(m):null;return`<td style="padding:5px 4px;text-align:center;font-weight:bold;">${mg?`<span style="background:${mg.bg};color:${mg.col};font-size:8px;padding:1px 4px;border-radius:6px;font-weight:bold;" title="${m.toFixed(1)}">${mg.g}</span>`:"—"}</td>`;}).join("")}
-            <td style="padding:5px 6px;"></td>
+            ${subs.map(su=>{const allMarks=ranked.map(s=>{const r=s.subs.find(x=>x.subject===su);return r?r.marks:null;}).filter(v=>v!==null);const m=allMarks.length?allMarks.reduce((a,b)=>a+b,0)/allMarks.length:0;return`<td style="padding:5px 4px;text-align:center;font-weight:bold;">${m>0?m.toFixed(1):"—"}</td>`;}).join("")}
+            <td style="padding:5px 6px;text-align:center;font-weight:bold;">${ranked.length?(ranked.reduce((a,s)=>a+s.avg,0)/ranked.length).toFixed(1):"—"}</td>
           </tr>
           <tr class="rank-row" style="background:#f0f9ff;font-weight:bold;">
             <td style="padding:5px 6px;">RANK</td>
@@ -1125,6 +1144,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
           ${teacherRow}
         </tbody>
       </table></div>
+      ${buildStampBox()}
     </div>`;
   }
 
@@ -1144,8 +1164,8 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
     }).join("");
     const teacherRow=`<tr style="background:#f0fdf4;border-top:2px solid #15803d;">
       <td colspan="2" style="padding:4px 6px;font-size:9px;font-weight:bold;color:#15803d;">Subject Teacher:</td>
-      ${subs.map(s=>{const ts=getSubjectTeachersForResult(className,s);const ini=ts.length?getCombinedInitials(ts):"—";const title=ts.join(" / ");return`<td style="padding:4px 3px;text-align:center;font-size:8px;color:#15803d;font-weight:bold;" title="${title}">${ini}</td>`;}).join("")}
-      <td style="padding:4px 6px;font-size:9px;color:#64748b;">Init.</td>
+      ${subs.map(s=>{const ts=getSubjectTeachersForResult(className,s);const name=ts.length?ts.join(" / "):"—";const title=ts.join(" / ");return`<td style="padding:4px 3px;text-align:center;font-size:7.5px;color:#15803d;font-weight:bold;white-space:normal;word-break:break-word;max-width:60px;" title="${title}">${name}</td>`;}).join("")}
+      <td style="padding:4px 6px;font-size:9px;color:#64748b;"></td>
     </tr>`;
     return `<div style="margin-bottom:32px;">
       ${buildSectionHeader(logo)}
@@ -1172,8 +1192,8 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
           <tr class="mean-row" style="background:#eff6ff;font-weight:bold;">
             <td style="padding:5px 6px;">MEAN SCORE</td>
             <td style="padding:5px 6px;"></td>
-            ${subs.map(su=>{const allMarks=ranked.map(s=>{const r=s.subs.find(x=>x.subject===su);return r?r.marks:null;}).filter(v=>v!==null);const m=allMarks.length?allMarks.reduce((a,b)=>a+b,0)/allMarks.length:0;const mg=m>0?getGrade(m):null;return`<td style="padding:5px 4px;text-align:center;">${mg?`<span style="background:${mg.bg};color:${mg.col};font-size:8px;padding:1px 4px;border-radius:6px;font-weight:bold;" title="${m.toFixed(1)}">${mg.g}</span>`:"—"}</td>`;}).join("")}
-            <td style="padding:5px 6px;"></td>
+            ${subs.map(su=>{const allMarks=ranked.map(s=>{const r=s.subs.find(x=>x.subject===su);return r?r.marks:null;}).filter(v=>v!==null);const m=allMarks.length?allMarks.reduce((a,b)=>a+b,0)/allMarks.length:0;return`<td style="padding:5px 4px;text-align:center;font-weight:bold;">${m>0?m.toFixed(1):"—"}</td>`;}).join("")}
+            <td style="padding:5px 6px;text-align:center;font-weight:bold;">${ranked.length?(ranked.reduce((a,s)=>a+s.avg,0)/ranked.length).toFixed(1):"—"}</td>
           </tr>
           <tr class="rank-row" style="background:#f0f9ff;font-weight:bold;">
             <td style="padding:5px 6px;">RANK</td>
@@ -1184,6 +1204,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
           ${teacherRow}
         </tbody>
       </table></div>
+      ${buildStampBox()}
     </div>`;
   }
 
