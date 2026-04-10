@@ -71,7 +71,12 @@ const SUBJECT_SHORT = {
   "Pre-Technical and Pre-Career Studies":  "PTC",
   "Religious Education (CRE/IRE)":         "CRE",
 };
-// Auto-generate subject remark based on grade and subject name
+// Maps a combined results-entry subject → the timetable subjects that make it up
+const COMBINED_SUBJECT_PARTS = {
+  "Social Studies & CRE":                    ["Social Studies","Religious Education (CRE/IRE)"],
+  "Social Studies (History & Geography)":    ["History","Geography"],
+};
+
 function getAutoRemark(subject, marks) {
   if(marks===null||marks===undefined) return "—";
   const subLower = subject.toLowerCase();
@@ -87,10 +92,14 @@ function getAutoRemark(subject, marks) {
   if(marks>=11) return `Poor performance in ${subLabel}. Urgent support needed.`;
   return `Very poor in ${subLabel}. Immediate intervention required.`;
 }
-// Get teacher initials from full name
+// Get teacher initials: "Mr Gitonga" → "MG", "Ms Faith Wanjiru" → "MFW"
 function getInitials(name) {
   if(!name) return "";
-  return name.split(" ").map(w=>w[0]?.toUpperCase()||"").join(".")+"."
+  return name.split(" ").map(w=>w[0]?.toUpperCase()||"").join("");
+}
+// Combined initials for two teachers on a shared subject: "MG/FW"
+function getCombinedInitials(names) {
+  return names.filter(Boolean).map(n=>getInitials(n)).join("/");
 }
 function getSubShort(subject) {
   return SUBJECT_SHORT[subject] || subject.split(" ").map(w=>w.slice(0,3)).join("").toUpperCase().slice(0,6);
@@ -977,6 +986,15 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
     const cls=(sd.classes||[]).find(c=>c.name===className);
     return cls?.classTeacherName||"";
   }
+  // Returns array of teacher name(s) for a subject — handles combined subjects
+  function getSubjectTeachersForResult(className, subject) {
+    const parts = COMBINED_SUBJECT_PARTS[subject];
+    if(parts) {
+      return parts.map(p=>getSubjectTeacherName(className,p)).filter(Boolean);
+    }
+    const t = getSubjectTeacherName(className, subject);
+    return t ? [t] : [];
+  }
 
   function buildReportHTML(student, allInClass) {
     const subs=getSubs(student.class);
@@ -996,13 +1014,16 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
       const r=sr.find(x=>x.subject===s);
       const g=r?getGrade(r.marks):null;
       const remark=r?getAutoRemark(s,r.marks):"—";
-      const subTeacher=getSubjectTeacherName(student.class,s);
+      const subTeachers=getSubjectTeachersForResult(student.class,s);
+      const subInitials=subTeachers.length?getCombinedInitials(subTeachers):"—";
+      const teacherDisplay=subTeachers.length?subTeachers.join(" / "):"—";
       return `<tr style="background:${idx%2===0?"white":"#f8fafc"}">
         <td style="padding:6px 8px;font-size:10px;">${s}</td>
         <td style="padding:6px 8px;font-weight:bold;text-align:center;">${r?r.marks:"—"}</td>
         <td style="padding:6px 8px;">${g?`<span style="background:${g.bg};color:${g.col};font-size:9px;padding:2px 6px;border-radius:10px;font-weight:bold;">${g.g}</span>`:"—"}</td>
         <td style="padding:6px 8px;text-align:center;font-size:10px;">${g?g.pts:"—"}</td>
         <td style="padding:6px 8px;font-size:9px;color:#374151;">${remark}</td>
+        <td style="padding:6px 8px;font-size:9px;color:#1e3a5f;text-align:center;font-weight:bold;" title="${teacherDisplay}">${subInitials}</td>
       </tr>`;
     }).join("");
     return `<div style="page-break-after:always;padding:16px 20px;max-width:720px;margin:0 auto;position:relative;">
@@ -1015,19 +1036,19 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
         <div><b>Total Marks:</b> <span style="font-weight:bold;">${sr.length?total.toFixed(0):"—"}</span></div>
       </div>
       <table style="width:100%;border-collapse:collapse;font-size:10px;margin-bottom:10px;">
-        <thead><tr style="background:#1e3a5f;color:white;">${["Subject","Marks","Grade","Points","Remarks"].map(h=>`<th style="padding:6px 8px;text-align:left;">${h}</th>`).join("")}</tr></thead>
+        <thead><tr style="background:#1e3a5f;color:white;">${["Subject","Marks","Grade","Points","Remarks","Init."].map(h=>`<th style="padding:6px 8px;text-align:left;">${h}</th>`).join("")}</tr></thead>
         <tbody>${rows}
           <tr style="background:#f0fdf4;font-weight:bold;border-top:2px solid #1e3a5f;">
             <td style="padding:6px 8px;">TOTAL</td>
             <td style="padding:6px 8px;text-align:center;font-size:12px;">${sr.length?total.toFixed(0):"—"}</td>
-            <td colspan="3" style="padding:6px 8px;font-size:9px;color:#64748b;">Sum of all subject marks</td>
+            <td colspan="4" style="padding:6px 8px;font-size:9px;color:#64748b;">Sum of all subject marks</td>
           </tr>
           <tr style="background:#eff6ff;font-weight:bold;">
             <td style="padding:6px 8px;">MEAN SCORE</td>
             <td style="padding:6px 8px;text-align:center;font-size:12px;">${avg>0?avg.toFixed(1):"—"}</td>
             <td style="padding:6px 8px;">${avg>0?`<span style="background:${og.bg};color:${og.col};font-size:9px;padding:2px 6px;border-radius:10px;font-weight:bold;">${og.g}</span>`:"—"}</td>
             <td style="padding:6px 8px;text-align:center;font-size:10px;">${avg>0?og.pts:"—"}</td>
-            <td colspan="1" style="padding:6px 8px;font-size:9px;">${avg>0?og.lbl:"—"}</td>
+            <td colspan="2" style="padding:6px 8px;font-size:9px;">${avg>0?og.lbl:"—"}</td>
           </tr>
         </tbody>
       </table>
@@ -1064,8 +1085,8 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
     // Subject teacher row
     const teacherRow=`<tr style="background:#f0f9ff;border-top:2px solid #1e3a5f;">
       <td colspan="2" style="padding:4px 6px;font-size:9px;font-weight:bold;color:#1e3a5f;">Subject Teacher:</td>
-      ${subs.map(s=>{const t=getSubjectTeacherName(className,s);return`<td style="padding:4px 3px;text-align:center;font-size:8px;color:#1e3a5f;font-weight:bold;">${t||"—"}</td>`;}).join("")}
-      <td style="padding:4px 6px;"></td>
+      ${subs.map(s=>{const ts=getSubjectTeachersForResult(className,s);const ini=ts.length?getCombinedInitials(ts):"—";const title=ts.join(" / ");return`<td style="padding:4px 3px;text-align:center;font-size:8px;color:#1e3a5f;font-weight:bold;" title="${title}">${ini}</td>`;}).join("")}
+      <td style="padding:4px 6px;font-size:9px;color:#64748b;">Init.</td>
     </tr>`;
     return `<div style="margin-bottom:32px;">
       ${buildSectionHeader(logo)}
@@ -1092,7 +1113,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
           <tr class="mean-row" style="background:#eff6ff;font-weight:bold;">
             <td style="padding:5px 6px;">MEAN SCORE</td>
             <td style="padding:5px 6px;"></td>
-            ${subs.map(su=>{const allMarks=ranked.map(s=>{const r=s.subs.find(x=>x.subject===su);return r?r.marks:null;}).filter(v=>v!==null);const m=allMarks.length?allMarks.reduce((a,b)=>a+b,0)/allMarks.length:0;return`<td style="padding:5px 4px;text-align:center;font-weight:bold;">${m>0?m.toFixed(1):"—"}</td>`;}).join("")}
+            ${subs.map(su=>{const allMarks=ranked.map(s=>{const r=s.subs.find(x=>x.subject===su);return r?r.marks:null;}).filter(v=>v!==null);const m=allMarks.length?allMarks.reduce((a,b)=>a+b,0)/allMarks.length:0;const mg=m>0?getGrade(m):null;return`<td style="padding:5px 4px;text-align:center;font-weight:bold;">${mg?`<span style="background:${mg.bg};color:${mg.col};font-size:8px;padding:1px 4px;border-radius:6px;font-weight:bold;" title="${m.toFixed(1)}">${mg.g}</span>`:"—"}</td>`;}).join("")}
             <td style="padding:5px 6px;"></td>
           </tr>
           <tr class="rank-row" style="background:#f0f9ff;font-weight:bold;">
@@ -1123,8 +1144,8 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
     }).join("");
     const teacherRow=`<tr style="background:#f0fdf4;border-top:2px solid #15803d;">
       <td colspan="2" style="padding:4px 6px;font-size:9px;font-weight:bold;color:#15803d;">Subject Teacher:</td>
-      ${subs.map(s=>{const t=getSubjectTeacherName(className,s);return`<td style="padding:4px 3px;text-align:center;font-size:8px;color:#15803d;font-weight:bold;">${t||"—"}</td>`;}).join("")}
-      <td style="padding:4px 6px;"></td>
+      ${subs.map(s=>{const ts=getSubjectTeachersForResult(className,s);const ini=ts.length?getCombinedInitials(ts):"—";const title=ts.join(" / ");return`<td style="padding:4px 3px;text-align:center;font-size:8px;color:#15803d;font-weight:bold;" title="${title}">${ini}</td>`;}).join("")}
+      <td style="padding:4px 6px;font-size:9px;color:#64748b;">Init.</td>
     </tr>`;
     return `<div style="margin-bottom:32px;">
       ${buildSectionHeader(logo)}
@@ -1145,13 +1166,13 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
           <tr class="summary-row" style="background:#fef3c7;font-weight:bold;border-top:2px solid #15803d;">
             <td style="padding:5px 6px;font-weight:bold;">TOTAL SCORES</td>
             <td style="padding:5px 6px;"></td>
-            ${subs.map(su=>{const allMarks=ranked.map(s=>{const r=s.subs.find(x=>x.subject===su);return r?r.marks:null;}).filter(v=>v!==null);return`<td style="padding:5px 4px;text-align:center;font-weight:bold;">${allMarks.reduce((a,b)=>a+b,0)||"—"}</td>`;}).join("")}
+            ${subs.map(su=>{const allMarks=ranked.map(s=>{const r=s.subs.find(x=>x.subject===su);return r?r.marks:null;}).filter(v=>v!==null);const tot=allMarks.reduce((a,b)=>a+b,0);const tg=tot>0?getGrade(tot/allMarks.length):null;return`<td style="padding:5px 4px;text-align:center;">${tg?`<span style="background:${tg.bg};color:${tg.col};font-size:8px;padding:1px 4px;border-radius:6px;font-weight:bold;" title="Total: ${tot}">${tg.g}</span>`:"—"}</td>`;}).join("")}
             <td style="padding:5px 6px;"></td>
           </tr>
           <tr class="mean-row" style="background:#eff6ff;font-weight:bold;">
             <td style="padding:5px 6px;">MEAN SCORE</td>
             <td style="padding:5px 6px;"></td>
-            ${subs.map(su=>{const allMarks=ranked.map(s=>{const r=s.subs.find(x=>x.subject===su);return r?r.marks:null;}).filter(v=>v!==null);const m=allMarks.length?allMarks.reduce((a,b)=>a+b,0)/allMarks.length:0;return`<td style="padding:5px 4px;text-align:center;font-weight:bold;">${m>0?m.toFixed(1):"—"}</td>`;}).join("")}
+            ${subs.map(su=>{const allMarks=ranked.map(s=>{const r=s.subs.find(x=>x.subject===su);return r?r.marks:null;}).filter(v=>v!==null);const m=allMarks.length?allMarks.reduce((a,b)=>a+b,0)/allMarks.length:0;const mg=m>0?getGrade(m):null;return`<td style="padding:5px 4px;text-align:center;">${mg?`<span style="background:${mg.bg};color:${mg.col};font-size:8px;padding:1px 4px;border-radius:6px;font-weight:bold;" title="${m.toFixed(1)}">${mg.g}</span>`:"—"}</td>`;}).join("")}
             <td style="padding:5px 6px;"></td>
           </tr>
           <tr class="rank-row" style="background:#f0f9ff;font-weight:bold;">
@@ -1209,7 +1230,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
     });
     // Teacher row
     const teacherRow = ["","Subject Teacher:","",
-      ...subs.map(s => { const t=getSubjectTeacherName(className,s); return t||""; }),
+      ...subs.map(s => { const t=getSubjectTeacherName(className,s); return t?getInitials(t):""; }),
       "","","",""
     ];
     return { title, colHeaders, rows, teacherRow, subs };
@@ -1376,12 +1397,22 @@ function ReportCard({student,results,comments,term,year,examType,isParent,logo,s
     return cls?.classTeacherName||"";
   }
   function getSubTeacher(subject){
-    const sd=ttSetup?.setupData; if(!sd) return "";
+    const sd=ttSetup?.setupData; if(!sd) return [];
+    const parts=COMBINED_SUBJECT_PARTS[subject];
+    if(parts){
+      return parts.map(p=>{
+        const tid2=(sd.subjectTeachers||{})[`${student.class}::${p}`];
+        if(tid2){const u=(users||[]).find(u=>u.id===tid2);return u?u.name:"";}
+        const cls2=(sd.classes||[]).find(c=>c.name===student.class);
+        if(cls2){const sub2=(cls2.subjects||[]).find(s=>s.subject===p);if(sub2?.teacherName)return sub2.teacherName;}
+        return "";
+      }).filter(Boolean);
+    }
     const tid=(sd.subjectTeachers||{})[`${student.class}::${subject}`];
-    if(tid){const u=(users||[]).find(u=>u.id===tid);return u?u.name:"";}
+    if(tid){const u=(users||[]).find(u=>u.id===tid);return u?[u.name]:[];}
     const cls=(sd.classes||[]).find(c=>c.name===student.class);
-    if(cls){const sub=(cls.subjects||[]).find(s=>s.subject===subject);if(sub?.teacherName)return sub.teacherName;}
-    return "";
+    if(cls){const sub=(cls.subjects||[]).find(s=>s.subject===subject);if(sub?.teacherName)return [sub.teacherName];}
+    return [];
   }
   const clsTeacher=getClsTeacher();
   return (
@@ -1401,18 +1432,22 @@ function ReportCard({student,results,comments,term,year,examType,isParent,logo,s
         <Avatar name={student.name} photo={student.photo} size={72}/>
       </div>
       <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}><table style={{width:"100%",borderCollapse:"collapse",marginBottom:14,minWidth:500}}>
-        <thead><tr style={{background:"#1e3a5f",color:"white"}}>{["Subject","Marks","Grade","Points","Remarks"].map(h=><th key={h} style={{padding:"7px 10px",textAlign:"left",fontSize:11}}>{h}</th>)}</tr></thead>
+        <thead><tr style={{background:"#1e3a5f",color:"white"}}>{["Subject","Marks","Grade","Points","Remarks","Init."].map(h=><th key={h} style={{padding:"7px 10px",textAlign:"left",fontSize:11}}>{h}</th>)}</tr></thead>
         <tbody>
           {subs.map((s,i)=>{
             const r=sr.find(x=>x.subject===s);
             const g=r?getGrade(r.marks):null;
             const remark=r?getAutoRemark(s,r.marks):"—";
+            const subTs=getSubTeacher(s);
+            const initials=subTs.length?getCombinedInitials(subTs):"—";
+            const teacherTitle=subTs.join(" / ");
             return(<tr key={s} style={{background:i%2===0?"white":"#fafafa"}}>
               <td style={{padding:"6px 10px",fontSize:12}}>{s}</td>
               <td style={{padding:"6px 10px",fontSize:13,fontWeight:"bold",textAlign:"center"}}>{r?r.marks:"—"}</td>
               <td style={{padding:"6px 10px"}}>{g?<span style={{background:g.bg,color:g.col,fontSize:11,padding:"2px 8px",borderRadius:20,fontWeight:"bold"}}>{g.g}</span>:<span style={{color:"#94a3b8"}}>—</span>}</td>
               <td style={{padding:"6px 10px",textAlign:"center",fontSize:12}}>{g?g.pts:"—"}</td>
               <td style={{padding:"6px 10px",fontSize:11,color:"#374151"}}>{remark}</td>
+              <td style={{padding:"6px 10px",fontSize:11,color:"#1e3a5f",textAlign:"center",fontWeight:"bold"}} title={teacherTitle}>{initials}</td>
             </tr>);
           })}
         </tbody>
@@ -1420,14 +1455,14 @@ function ReportCard({student,results,comments,term,year,examType,isParent,logo,s
           <tr style={{background:"#fef3c7",fontWeight:"bold"}}>
             <td style={{padding:"8px 10px",fontSize:12}}>TOTAL MARKS</td>
             <td style={{padding:"8px 10px",fontSize:14,fontWeight:"bold",textAlign:"center"}}>{sr.length?total.toFixed(0):"—"}</td>
-            <td colSpan={3} style={{padding:"8px 10px",fontSize:11,color:"#64748b"}}>Sum of all subjects</td>
+            <td colSpan={4} style={{padding:"8px 10px",fontSize:11,color:"#64748b"}}>Sum of all subjects</td>
           </tr>
           <tr style={{background:"#f0fdf4",fontWeight:"bold"}}>
             <td style={{padding:"8px 10px",fontSize:12}}>MEAN SCORE</td>
             <td style={{padding:"8px 10px",fontSize:14,fontWeight:"bold",textAlign:"center"}}>{avg>0?avg.toFixed(1):"—"}</td>
             <td style={{padding:"8px 10px"}}>{avg>0?<span style={{background:og.bg,color:og.col,fontSize:12,padding:"3px 10px",borderRadius:20,fontWeight:"bold"}}>{og.g}</span>:"—"}</td>
             <td style={{padding:"8px 10px",textAlign:"center",fontSize:12}}>{avg>0?og.pts:"—"}</td>
-            <td colSpan={1} style={{padding:"8px 10px",fontSize:11}}>{avg>0?og.lbl:"—"}</td>
+            <td colSpan={2} style={{padding:"8px 10px",fontSize:11}}>{avg>0?og.lbl:"—"}</td>
           </tr>
         </tfoot>
       </table></div>
