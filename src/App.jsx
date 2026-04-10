@@ -3824,7 +3824,6 @@ function SettingsPage({users,setUsers,logo,setLogo}) {
         </Card>
         <Card style={{padding:0}}>
           <div style={{padding:"12px 16px",background:"#eff6ff",fontWeight:"bold",color:"#1e3a5f",fontSize:13,borderBottom:"1px solid #dbeafe"}}>Staff Accounts ({users.length})</div>
-          <div style={{overflowX:"auto"}}>
           <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}>
             <thead><tr>{["Name","Username","Password","Role","Contact As","Actions"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
             <tbody>{users.map((u,i)=><tr key={u.id} style={{background:i%2===0?"white":"#fafafa"}}>
