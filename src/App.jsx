@@ -818,12 +818,22 @@ function buildSectionHeader(logo) {
 }
 function buildHTMLDoc(title, bodyHTML, logo) {
   const logoWm = logo
-    ? `<img src="${logo}" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-20deg);opacity:0.07;pointer-events:none;z-index:0;width:500px;height:500px;object-fit:contain;"/>`
+    ? `<div style="position:fixed;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:0;overflow:hidden;"><img src="${logo}" style="width:70%;max-width:600px;opacity:0.08;transform:rotate(-15deg);object-fit:contain;"/></div>`
     : `<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);opacity:0.04;pointer-events:none;z-index:0;font-size:80px;font-weight:900;color:#1e3a5f;white-space:nowrap;font-family:Georgia,serif;">${SCHOOL.motto}</div>`;
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>${title}</title><style>
     *{box-sizing:border-box;}
     body{margin:0;padding:16px;font-family:Georgia,serif;background:white;}
     @media print{@page{margin:12mm;size:A4;} .no-print{display:none!important;} body{padding:0;}}
+    table{border-collapse:collapse;}
+    table td,table th{border:1px solid #cbd5e1;}
+    table tr:nth-child(even) td{background:#f0f9ff;}
+    table tr:nth-child(odd) td{background:#ffffff;}
+    table thead tr th{background:#1e3a5f!important;color:white!important;border-color:#1e3a5f;}
+    .grade-table thead tr th{background:#15803d!important;border-color:#15803d;}
+    .summary-row td{background:#fef3c7!important;font-weight:bold;}
+    .mean-row td{background:#eff6ff!important;font-weight:bold;}
+    .rank-row td{background:#f0f9ff!important;font-weight:bold;}
+    .teacher-row td{background:#f0fdf4!important;font-weight:bold;color:#15803d;}
   </style></head><body>
   ${logoWm}
   <div style="position:relative;z-index:1;">${bodyHTML}</div>
@@ -1049,7 +1059,6 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
       return `<tr style="background:${i%2===0?"white":"#f8fafc"}">
         <td style="padding:5px 6px;font-weight:bold;color:${i<3?"#b45309":"#374151"};text-align:center;">${i+1}</td>
         <td style="padding:5px 6px;font-weight:bold;">${s.name}</td>
-        <td style="padding:5px 6px;font-size:9px;">${s.admNo||"—"}</td>
         ${subs.map(su=>{const r=sr.find(x=>x.subject===su);return`<td style="padding:5px 4px;text-align:center;font-weight:bold;">${r?r.marks:"—"}</td>`;}).join("")}
         <td style="padding:5px 6px;text-align:center;font-weight:bold;background:#fef3c7;">${s.subs.length?s.total.toFixed(0):"—"}</td>
         <td style="padding:5px 6px;text-align:center;font-weight:bold;background:#eff6ff;">${s.avg>0?s.avg.toFixed(1):"—"}</td>
@@ -1058,25 +1067,50 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
     }).join("");
     // Subject teacher row
     const teacherRow=`<tr style="background:#f0f9ff;border-top:2px solid #1e3a5f;">
-      <td colspan="3" style="padding:4px 6px;font-size:9px;font-weight:bold;color:#1e3a5f;">Subject Teacher:</td>
+      <td colspan="2" style="padding:4px 6px;font-size:9px;font-weight:bold;color:#1e3a5f;">Subject Teacher:</td>
       ${subs.map(s=>{const t=getSubjectTeacherName(className,s);return`<td style="padding:4px 3px;text-align:center;font-size:8px;color:#1e3a5f;font-weight:bold;">${t?getInitials(t):"—"}</td>`;}).join("")}
-      <td colspan="3" style="padding:4px 6px;font-size:9px;color:#64748b;">Initials</td>
+      <td colspan="2" style="padding:4px 6px;font-size:9px;color:#64748b;">Initials</td>
     </tr>`;
     return `<div style="margin-bottom:32px;">
       ${buildSectionHeader(logo)}
       <div style="background:#1e3a5f;color:white;padding:8px 14px;font-weight:bold;font-size:13px;border-radius:8px 8px 0 0;">${className} — ${examType} · ${term} ${year}</div>
       <div style="overflow-x:auto;">
-      <table style="width:100%;border-collapse:collapse;font-size:10px;min-width:600px;">
+      <table class="results-table" style="width:100%;border-collapse:collapse;font-size:10px;min-width:600px;">
         <thead><tr style="background:#eff6ff;">
           <th style="padding:5px 6px;text-align:center;">Pos</th>
           <th style="padding:5px 6px;text-align:left;">Name</th>
-          <th style="padding:5px 6px;text-align:left;">Adm</th>
           ${subs.map(s=>{const short=getSubShort(s);return`<th style="padding:4px 3px;text-align:center;max-width:32px;white-space:nowrap;"><div style="writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);font-size:9px;font-weight:bold;line-height:1.1;max-height:70px;overflow:hidden;" title="${s}">${short}</div></th>`;}).join("")}
           <th style="padding:5px 6px;text-align:center;background:#fef3c7;">Total</th>
           <th style="padding:5px 6px;text-align:center;background:#eff6ff;">Mean</th>
           <th style="padding:5px 6px;text-align:center;">Grade</th>
         </tr></thead>
-        <tbody>${rows}${!ranked.length?`<tr><td colspan="${subs.length+6}" style="padding:20px;text-align:center;color:#94a3b8;">No results entered.</td></tr>`:""}${teacherRow}</tbody>
+        <tbody>
+          ${rows}
+          ${!ranked.length?`<tr><td colspan="${subs.length+4}" style="padding:20px;text-align:center;color:#94a3b8;">No results entered.</td></tr>`:""}
+          <tr><td colspan="${subs.length+4}" style="padding:3px;border:none;background:white;"></td></tr>
+          <tr><td colspan="${subs.length+4}" style="padding:3px;border:none;background:white;"></td></tr>
+          <tr class="summary-row" style="background:#fef3c7;font-weight:bold;border-top:2px solid #1e3a5f;">
+            <td style="padding:5px 6px;font-weight:bold;">TOTAL SCORES</td>
+            <td style="padding:5px 6px;"></td>
+            ${subs.map(su=>{const allMarks=ranked.map(s=>{const r=s.subs.find(x=>x.subject===su);return r?r.marks:null;}).filter(v=>v!==null);return`<td style="padding:5px 4px;text-align:center;font-weight:bold;">${allMarks.reduce((a,b)=>a+b,0)||"—"}</td>`;}).join("")}
+            <td style="padding:5px 6px;text-align:center;font-weight:bold;background:#fef3c7;">${ranked.length?ranked.reduce((a,s)=>a+s.total,0).toFixed(0):"—"}</td>
+            <td colspan="2" style="padding:5px 6px;"></td>
+          </tr>
+          <tr class="mean-row" style="background:#eff6ff;font-weight:bold;">
+            <td style="padding:5px 6px;">MEAN SCORE</td>
+            <td style="padding:5px 6px;"></td>
+            ${subs.map(su=>{const allMarks=ranked.map(s=>{const r=s.subs.find(x=>x.subject===su);return r?r.marks:null;}).filter(v=>v!==null);const m=allMarks.length?allMarks.reduce((a,b)=>a+b,0)/allMarks.length:0;return`<td style="padding:5px 4px;text-align:center;font-weight:bold;">${m>0?m.toFixed(1):"—"}</td>`;}).join("")}
+            <td style="padding:5px 6px;text-align:center;font-weight:bold;background:#eff6ff;">${ranked.length?(ranked.reduce((a,s)=>a+s.avg,0)/ranked.length).toFixed(1):"—"}</td>
+            <td colspan="2" style="padding:5px 6px;"></td>
+          </tr>
+          <tr class="rank-row" style="background:#f0f9ff;font-weight:bold;">
+            <td style="padding:5px 6px;">RANK</td>
+            <td style="padding:5px 6px;"></td>
+            ${subs.map(su=>{const allMarks=ranked.map(s=>{const r=s.subs.find(x=>x.subject===su);return r?r.marks:null;}).filter(v=>v!==null);const m=allMarks.length?allMarks.reduce((a,b)=>a+b,0)/allMarks.length:0;const subMeans=subs.map(s2=>{const am=ranked.map(s=>{const r=s.subs.find(x=>x.subject===s2);return r?r.marks:null;}).filter(v=>v!==null);return am.length?am.reduce((a,b)=>a+b,0)/am.length:0;});const rank=subMeans.filter(v=>v>m).length+1;return`<td style="padding:5px 4px;text-align:center;font-weight:bold;">${m>0?rank:"—"}</td>`;}).join("")}
+            <td colspan="3" style="padding:5px 6px;"></td>
+          </tr>
+          ${teacherRow}
+        </tbody>
       </table></div>
     </div>`;
   }
@@ -1107,7 +1141,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
       ${buildSectionHeader(logo)}
       <div style="background:#15803d;color:white;padding:8px 14px;font-weight:bold;font-size:13px;border-radius:8px 8px 0 0;">${className} — Grades · ${examType} · ${term} ${year}</div>
       <div style="overflow-x:auto;">
-      <table style="width:100%;border-collapse:collapse;font-size:10px;min-width:600px;">
+      <table class="grade-table" style="width:100%;border-collapse:collapse;font-size:10px;min-width:600px;">
         <thead><tr style="background:#f0fdf4;">
           <th style="padding:5px 6px;text-align:center;">Pos</th>
           <th style="padding:5px 6px;text-align:left;">Name</th>
@@ -1117,7 +1151,33 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
           <th style="padding:5px 6px;text-align:center;">Grade</th>
           <th style="padding:5px 6px;text-align:center;">Pts</th>
         </tr></thead>
-        <tbody>${rows}${!ranked.length?`<tr><td colspan="${subs.length+6}" style="padding:20px;text-align:center;color:#94a3b8;">No results entered.</td></tr>`:""}${teacherRow}</tbody>
+        <tbody>
+          ${rows}
+          ${!ranked.length?`<tr><td colspan="${subs.length+6}" style="padding:20px;text-align:center;color:#94a3b8;">No results entered.</td></tr>`:""}
+          <tr><td colspan="${subs.length+6}" style="padding:3px;border:none;background:white;"></td></tr>
+          <tr><td colspan="${subs.length+6}" style="padding:3px;border:none;background:white;"></td></tr>
+          <tr class="summary-row" style="background:#fef3c7;font-weight:bold;border-top:2px solid #15803d;">
+            <td style="padding:5px 6px;font-weight:bold;">TOTAL SCORES</td>
+            <td style="padding:5px 6px;"></td>
+            ${subs.map(su=>{const allMarks=ranked.map(s=>{const r=s.subs.find(x=>x.subject===su);return r?r.marks:null;}).filter(v=>v!==null);return`<td style="padding:5px 4px;text-align:center;font-weight:bold;">${allMarks.reduce((a,b)=>a+b,0)||"—"}</td>`;}).join("")}
+            <td style="padding:5px 6px;text-align:center;font-weight:bold;background:#fef3c7;">${ranked.length?ranked.reduce((a,s)=>a+s.total,0).toFixed(0):"—"}</td>
+            <td colspan="3" style="padding:5px 6px;"></td>
+          </tr>
+          <tr class="mean-row" style="background:#eff6ff;font-weight:bold;">
+            <td style="padding:5px 6px;">MEAN SCORE</td>
+            <td style="padding:5px 6px;"></td>
+            ${subs.map(su=>{const allMarks=ranked.map(s=>{const r=s.subs.find(x=>x.subject===su);return r?r.marks:null;}).filter(v=>v!==null);const m=allMarks.length?allMarks.reduce((a,b)=>a+b,0)/allMarks.length:0;return`<td style="padding:5px 4px;text-align:center;font-weight:bold;">${m>0?m.toFixed(1):"—"}</td>`;}).join("")}
+            <td style="padding:5px 6px;text-align:center;font-weight:bold;background:#eff6ff;">${ranked.length?(ranked.reduce((a,s)=>a+s.avg,0)/ranked.length).toFixed(1):"—"}</td>
+            <td colspan="3" style="padding:5px 6px;"></td>
+          </tr>
+          <tr class="rank-row" style="background:#f0f9ff;font-weight:bold;">
+            <td style="padding:5px 6px;">RANK</td>
+            <td style="padding:5px 6px;"></td>
+            ${subs.map(su=>{const allMarks=ranked.map(s=>{const r=s.subs.find(x=>x.subject===su);return r?r.marks:null;}).filter(v=>v!==null);const m=allMarks.length?allMarks.reduce((a,b)=>a+b,0)/allMarks.length:0;const subMeans=subs.map(s2=>{const am=ranked.map(s=>{const r=s.subs.find(x=>x.subject===s2);return r?r.marks:null;}).filter(v=>v!==null);return am.length?am.reduce((a,b)=>a+b,0)/am.length:0;});const rank=subMeans.filter(v=>v>m).length+1;return`<td style="padding:5px 4px;text-align:center;font-weight:bold;">${m>0?rank:"—"}</td>`;}).join("")}
+            <td colspan="4" style="padding:5px 6px;"></td>
+          </tr>
+          ${teacherRow}
+        </tbody>
       </table></div>
     </div>`;
   }
@@ -1178,11 +1238,16 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
       const { title, colHeaders, rows, teacherRow } = buildExcelData(stu, className, mode);
       const wb = XL.utils.book_new();
       const wsData = [
+        [`${SCHOOL.name}`],
+        [`${SCHOOL.location} | ${SCHOOL.phone} | ${SCHOOL.email}`],
+        [`"${SCHOOL.motto}"`],
+        [],
         [title],
-        [`Generated: ${new Date().toLocaleString("en-KE")}`],
         [],
         colHeaders,
         ...rows,
+        [],
+        [],
         teacherRow
       ];
       const ws = XL.utils.aoa_to_sheet(wsData);
@@ -1192,7 +1257,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
         ...colHeaders.slice(3).map(()=>({wch:10}))
       ];
       // Merge title across all columns
-      ws["!merges"] = [{s:{r:0,c:0},e:{r:0,c:colHeaders.length-1}},{s:{r:1,c:0},e:{r:1,c:colHeaders.length-1}}];
+      ws["!merges"] = [{s:{r:0,c:0},e:{r:0,c:colHeaders.length-1}},{s:{r:1,c:0},e:{r:1,c:colHeaders.length-1}},{s:{r:2,c:0},e:{r:2,c:colHeaders.length-1}},{s:{r:4,c:0},e:{r:4,c:colHeaders.length-1}}];
       // Sheet protection — lock all cells, no editing
       ws["!protect"] = { password:"tnks2025", sheet:true, objects:true, scenarios:true,
         selectLockedCells:true, selectUnlockedCells:true,
@@ -1214,16 +1279,21 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
         if(!stu.length) return;
         const { title, colHeaders, rows, teacherRow } = buildExcelData(stu, className, mode);
         const wsData = [
+          [`${SCHOOL.name}`],
+          [`${SCHOOL.location} | ${SCHOOL.phone} | ${SCHOOL.email}`],
+          [`"${SCHOOL.motto}"`],
+          [],
           [title],
-          [`Generated: ${new Date().toLocaleString("en-KE")}`],
           [],
           colHeaders,
           ...rows,
+          [],
+          [],
           teacherRow
         ];
         const ws = XL.utils.aoa_to_sheet(wsData);
         ws["!cols"] = [{wch:5},{wch:28},{wch:14},...colHeaders.slice(3).map(()=>({wch:10}))];
-        ws["!merges"] = [{s:{r:0,c:0},e:{r:0,c:colHeaders.length-1}},{s:{r:1,c:0},e:{r:1,c:colHeaders.length-1}}];
+        ws["!merges"] = [{s:{r:0,c:0},e:{r:0,c:colHeaders.length-1}},{s:{r:1,c:0},e:{r:1,c:colHeaders.length-1}},{s:{r:2,c:0},e:{r:2,c:colHeaders.length-1}},{s:{r:4,c:0},e:{r:4,c:colHeaders.length-1}}];
         ws["!protect"] = { password:"tnks2025", sheet:true, objects:true, scenarios:true,
           selectLockedCells:true, selectUnlockedCells:true,
           formatCells:false, formatColumns:false, formatRows:false,
