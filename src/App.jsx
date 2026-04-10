@@ -255,6 +255,9 @@ const FONTS = [
   {label:"Nunito", value:"'Nunito',sans-serif"},
   {label:"Source Sans Pro", value:"'Source Sans Pro',sans-serif"},
 ];
+const FONT_SIZES = [11,12,13,14,15,16,17,18,19,20];
+function getAppFontSize(){return parseInt(localStorage.getItem("tnks_font_size")||"13");}
+let FS = getAppFontSize();
 function getAppFont(){return localStorage.getItem("tnks_font")||"Georgia,serif";}
 function getAppTheme(){return localStorage.getItem("tnks_theme")||"light";}
 let F = getAppFont();
@@ -263,16 +266,16 @@ function Card({children,style={}}) { return <div style={{background:"white",bord
 function ScrollTable({children,minWidth=600}) { return <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth}}>{children}</table></div>; }
 function Btn({onClick,v="primary",children,full,style={}}) {
   const S={primary:{background:"linear-gradient(135deg,#1d4ed8,#1e3a5f)",color:"white"},green:{background:"linear-gradient(135deg,#15803d,#065f46)",color:"white"},ghost:{background:"#f1f5f9",color:"#374151"},red:{background:"linear-gradient(135deg,#b91c1c,#7f1d1d)",color:"white"},amber:{background:"linear-gradient(135deg,#b45309,#92400e)",color:"white"},teal:{background:"linear-gradient(135deg,#0e7490,#164e63)",color:"white"},purple:{background:"linear-gradient(135deg,#7c3aed,#4c1d95)",color:"white"}};
-  return <button onClick={onClick} style={{...S[v],border:"none",borderRadius:9,padding:"8px 18px",fontSize:13,fontWeight:"bold",cursor:"pointer",fontFamily:F,width:full?"100%":"auto",...style}}>{children}</button>;
+  return <button onClick={onClick} style={{...S[v],border:"none",borderRadius:9,padding:"8px 18px",fontSize:FS,fontWeight:"bold",cursor:"pointer",fontFamily:F,width:full?"100%":"auto",...style}}>{children}</button>;
 }
 function Inp({label,value,onChange,placeholder,type="text",style={}}) {
-  return <div><label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:3,letterSpacing:.5}}>{label}</label><input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px 12px",fontSize:13,outline:"none",boxSizing:"border-box",fontFamily:F,...style}} /></div>;
+  return <div><label style={{fontSize:Math.max(10,FS-2),fontWeight:"bold",color:"#374151",display:"block",marginBottom:3,letterSpacing:.5}}>{label}</label><input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px 12px",fontSize:FS,outline:"none",boxSizing:"border-box",fontFamily:F,...style}} /></div>;
 }
 function Sel({label,value,onChange,options,style={}}) {
-  return <div>{label&&<label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:3,letterSpacing:.5}}>{label}</label>}<select value={value} onChange={e=>onChange(e.target.value)} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px 10px",fontSize:13,background:"white",cursor:"pointer",fontFamily:F,...style}}>{options.map(o=><option key={o} value={o}>{o}</option>)}</select></div>;
+  return <div>{label&&<label style={{fontSize:Math.max(10,FS-2),fontWeight:"bold",color:"#374151",display:"block",marginBottom:3,letterSpacing:.5}}>{label}</label>}<select value={value} onChange={e=>onChange(e.target.value)} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px 10px",fontSize:FS,background:"white",cursor:"pointer",fontFamily:F,...style}}>{options.map(o=><option key={o} value={o}>{o}</option>)}</select></div>;
 }
 function Textarea({label,value,onChange,placeholder,rows=3}) {
-  return <div>{label&&<label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:3}}>{label}</label>}<textarea value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} rows={rows} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px 12px",fontSize:13,fontFamily:F,resize:"vertical",boxSizing:"border-box",outline:"none"}} /></div>;
+  return <div>{label&&<label style={{fontSize:Math.max(10,FS-2),fontWeight:"bold",color:"#374151",display:"block",marginBottom:3}}>{label}</label>}<textarea value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} rows={rows} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px 12px",fontSize:FS,fontFamily:F,resize:"vertical",boxSizing:"border-box",outline:"none"}} /></div>;
 }
 function Stat({icon,label,value,color,sub}) {
   return <Card style={{textAlign:"center",borderLeft:`4px solid ${color}`}}><div style={{fontSize:26,marginBottom:3}}>{icon}</div><div style={{fontSize:21,fontWeight:"bold",color,fontFamily:F}}>{value}</div><div style={{fontSize:12,color:"#64748b",marginTop:2}}>{label}</div>{sub&&<div style={{fontSize:11,color:"#94a3b8",marginTop:1}}>{sub}</div>}</Card>;
@@ -755,6 +758,10 @@ function isMedian() {
 }
 
 // ── Build full HTML document string ───────────────────────
+function buildSectionHeader(logo) {
+  const logoTag = logo ? `<img src="${logo}" style="height:38px;display:inline-block;vertical-align:middle;margin-right:10px;object-fit:contain;"/>` : "";
+  return `<div class="section-header">${logoTag}<div style="display:inline-block;vertical-align:middle;text-align:left;"><div style="font-size:14px;font-weight:bold;color:#1e3a5f;">${SCHOOL.name}</div><div style="font-size:9px;color:#555;">${SCHOOL.location} &nbsp;|&nbsp; ${SCHOOL.phone} &nbsp;|&nbsp; ${SCHOOL.email}</div><div style="font-size:9px;font-style:italic;color:#15803d;font-weight:bold;">"${SCHOOL.motto}"</div></div></div>`;
+}
 function buildHTMLDoc(title, bodyHTML, logo) {
   const logoTag = logo ? `<img id="school-logo" src="${logo}" style="height:72px;margin-bottom:6px;display:block;margin-left:auto;margin-right:auto;"/>` : "";
   const logoWm = logo
@@ -763,11 +770,12 @@ function buildHTMLDoc(title, bodyHTML, logo) {
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>${title}</title><style>
     *{box-sizing:border-box;}
     body{margin:0;padding:16px;font-family:Georgia,serif;background:white;}
-    @media print{@page{margin:12mm;size:A4;} .no-print{display:none!important;} body{padding:0;}}
+    @media print{@page{margin:14mm 12mm;size:A4;} .no-print{display:none!important;} body{padding:0;}}
     .school-header{text-align:center;border-bottom:3px double #1e3a5f;padding-bottom:12px;margin-bottom:20px;}
     .school-header h1{margin:6px 0 2px;font-size:20px;color:#1e3a5f;letter-spacing:0.5px;}
     .school-header p{margin:2px 0;font-size:10px;color:#555;}
     .motto{font-size:13px;font-style:italic;color:#15803d;font-weight:bold;margin-top:4px;}
+    .section-header{display:flex;align-items:center;border-bottom:2px double #1e3a5f;padding-bottom:8px;margin-bottom:14px;gap:10px;}
   </style></head><body>
   ${logoWm}
   <div class="school-header">
@@ -901,6 +909,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
       </tr>`;
     }).join("");
     return `<div style="page-break-after:always;padding:20px 24px;max-width:700px;margin:0 auto;position:relative;">
+      ${buildSectionHeader(logo)}
       <div style="background:#1e3a5f;color:white;text-align:center;padding:4px 0;font-size:12px;font-weight:bold;border-radius:16px;margin-bottom:12px;letter-spacing:1px;">${examType.toUpperCase()} — ${term.toUpperCase()} ${year}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;margin-bottom:12px;border:1px solid #e2e8f0;border-radius:6px;padding:10px;">
         <div><b>Name:</b> ${student.name}</div><div><b>Adm. No:</b> ${student.admNo||"—"}</div>
@@ -955,6 +964,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
       </tr>`;
     }).join("");
     return `<div style="margin-bottom:32px;">
+      ${buildSectionHeader(logo)}
       <div style="background:#1e3a5f;color:white;padding:8px 14px;font-weight:bold;font-size:13px;border-radius:8px 8px 0 0;">${className} — ${examType} · ${term} ${year}</div>
       <div style="overflow-x:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:10px;min-width:600px;">
@@ -962,7 +972,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
           <th style="padding:6px 8px;text-align:left;">Pos</th>
           <th style="padding:6px 8px;text-align:left;">Name</th>
           <th style="padding:6px 8px;text-align:left;">Adm</th>
-          ${subs.map(s=>`<th style="padding:6px 8px;text-align:center;max-width:60px;">${s.split(" ").slice(0,2).join(" ")}</th>`).join("")}
+          ${subs.map(s=>{const short=s.length>8?s.split(" ").map(w=>w.slice(0,3)).join("").slice(0,6).toUpperCase():s.toUpperCase();return`<th style="padding:4px 3px;text-align:center;max-width:32px;white-space:nowrap;"><div style="writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);font-size:9px;font-weight:bold;line-height:1.1;max-height:60px;overflow:hidden;" title="${s}">${short}</div></th>`;}).join("")}
           <th style="padding:6px 8px;text-align:center;background:#fef3c7;">Total</th>
           <th style="padding:6px 8px;text-align:center;background:#eff6ff;">Avg</th>
         </tr></thead>
@@ -987,13 +997,14 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
       </tr>`;
     }).join("");
     return `<div style="margin-bottom:32px;">
+      ${buildSectionHeader(logo)}
       <div style="background:#15803d;color:white;padding:8px 14px;font-weight:bold;font-size:13px;border-radius:8px 8px 0 0;">${className} — Grades · ${examType} · ${term} ${year}</div>
       <div style="overflow-x:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:10px;min-width:600px;">
         <thead><tr style="background:#f0fdf4;">
           <th style="padding:6px 8px;text-align:left;">Pos</th>
           <th style="padding:6px 8px;text-align:left;">Name</th>
-          ${subs.map(s=>`<th style="padding:6px 8px;text-align:center;max-width:60px;">${s.split(" ").slice(0,2).join(" ")}</th>`).join("")}
+          ${subs.map(s=>{const short=s.length>8?s.split(" ").map(w=>w.slice(0,3)).join("").slice(0,6).toUpperCase():s.toUpperCase();return`<th style="padding:4px 3px;text-align:center;max-width:32px;white-space:nowrap;"><div style="writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);font-size:9px;font-weight:bold;line-height:1.1;max-height:60px;overflow:hidden;" title="${s}">${short}</div></th>`;}).join("")}
           <th style="padding:6px 8px;text-align:center;">Overall</th>
           <th style="padding:6px 8px;text-align:center;">Pts</th>
         </tr></thead>
@@ -1174,6 +1185,7 @@ function FeesPage({students,fees,setFees,user,logo}) {
       </tr>`;
     }).join("");
     return `<div style="page-break-after:always;padding:20px 24px;max-width:700px;margin:0 auto;">
+      ${buildSectionHeader(logo)}
       <div style="background:#1e3a5f;color:white;text-align:center;padding:6px 0;font-size:12px;font-weight:bold;border-radius:16px;margin-bottom:14px;letter-spacing:1px;">FEE STATEMENT</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;margin-bottom:14px;border:1px solid #e2e8f0;border-radius:6px;padding:10px;">
         <div><b>Name:</b> ${student.name}</div><div><b>Adm. No:</b> ${student.admNo||"—"}</div>
@@ -3670,6 +3682,7 @@ function SettingsPage({users,setUsers,logo,setLogo}) {
   const [aiKeyMsg,setAiKeyMsg]=useState("");
   const [appFont,setAppFont]=useState(()=>localStorage.getItem("tnks_font")||"Georgia,serif");
   const [appTheme,setAppTheme]=useState(()=>localStorage.getItem("tnks_theme")||"light");
+  const [appFontSize,setAppFontSize]=useState(()=>parseInt(localStorage.getItem("tnks_font_size")||"13"));
   const [fpTarget,setFpTarget]=useState(null);
   const [fpNPw,setFpNPw]=useState(""); const [fpMsg,setFpMsg]=useState("");
   const logoRef=useRef();
@@ -3700,6 +3713,13 @@ function SettingsPage({users,setUsers,logo,setLogo}) {
   function applyTheme(theme){
     setAppTheme(theme);
     localStorage.setItem("tnks_theme",theme);
+    window.location.reload();
+  }
+  function applyFontSize(size){
+    setAppFontSize(size);
+    localStorage.setItem("tnks_font_size",size);
+    FS=size;
+    document.body.style.fontSize=size+"px";
     window.location.reload();
   }
   function saveAiKey(){
@@ -3745,8 +3765,8 @@ function SettingsPage({users,setUsers,logo,setLogo}) {
         <div style={{display:"flex",gap:8,marginTop:14}}><Btn onClick={doFpReset} v="primary">Reset Password</Btn><Btn onClick={()=>{setFpTarget(null);setFpNPw("");setFpMsg("");}} v="ghost">Cancel</Btn></div>
       </Modal>}
 
-      {/* TOP ROW: Logo + Theme + Font */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:18,marginBottom:18,flexWrap:"wrap"}}>
+      {/* TOP ROW: Logo + Theme + Font + Font Size */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:18,marginBottom:18}}>
 
         {/* LOGO */}
         <Card style={{borderLeft:"4px solid #1d4ed8"}}>
@@ -3778,16 +3798,32 @@ function SettingsPage({users,setUsers,logo,setLogo}) {
           </div>
         </Card>
 
-        {/* FONT */}
+        {/* FONT STYLE */}
         <Card style={{borderLeft:"4px solid #7c3aed"}}>
           <div style={{fontWeight:"bold",color:"#4c1d95",marginBottom:12,fontSize:14}}>🔤 Font Style</div>
-          <div style={{display:"grid",gap:6,maxHeight:180,overflowY:"auto"}}>
+          <div style={{display:"grid",gap:6,maxHeight:200,overflowY:"auto"}}>
             {FONTS.map(f=>(
               <button key={f.value} onClick={()=>applyFont(f.value)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 12px",borderRadius:8,border:`2px solid ${appFont===f.value?"#7c3aed":"#e2e8f0"}`,background:appFont===f.value?"#f3e8ff":"white",cursor:"pointer",fontFamily:f.value,fontSize:12,color:appFont===f.value?"#4c1d95":"#374151",transition:"all .2s"}}>
                 <span>{f.label}</span>
                 {appFont===f.value&&<span style={{color:"#7c3aed",fontSize:14}}>✓</span>}
               </button>
             ))}
+          </div>
+        </Card>
+
+        {/* FONT SIZE */}
+        <Card style={{borderLeft:"4px solid #0e7490"}}>
+          <div style={{fontWeight:"bold",color:"#164e63",marginBottom:12,fontSize:14}}>🔡 Font Size</div>
+          <div style={{fontSize:11,color:"#64748b",marginBottom:10}}>Current: <b style={{color:"#0e7490"}}>{appFontSize}px</b> — choose from 11 to 20</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:6}}>
+            {FONT_SIZES.map(sz=>(
+              <button key={sz} onClick={()=>applyFontSize(sz)} style={{padding:"8px 4px",borderRadius:8,border:`2px solid ${appFontSize===sz?"#0e7490":"#e2e8f0"}`,background:appFontSize===sz?"#cffafe":"white",cursor:"pointer",fontFamily:appFont,fontSize:sz,fontWeight:appFontSize===sz?"bold":"normal",color:appFontSize===sz?"#0e7490":"#374151",transition:"all .2s",textAlign:"center"}}>
+                {sz}
+              </button>
+            ))}
+          </div>
+          <div style={{marginTop:10,padding:"8px 10px",background:"#f0fdff",borderRadius:8,fontSize:11,color:"#0e7490"}}>
+            💡 Tap a size above to preview. The app will reload to apply.
           </div>
         </Card>
       </div>
@@ -4803,6 +4839,7 @@ function ExamManagementPage({ students, staff, user, examSchedules, setExamSched
     });
     const html = Object.entries(byInv).map(([inv, exams]) => `
       <div style="page-break-after:always;padding:16px;">
+        ${buildSectionHeader(logo)}
         <h3 style="color:#1e3a5f;margin:0 0 10px;">Invigilation — ${inv}</h3>
         <table style="width:100%;border-collapse:collapse;font-size:11px;">
           <thead><tr style="background:#1e3a5f;color:white;">
