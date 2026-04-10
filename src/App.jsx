@@ -43,8 +43,8 @@ const TIMETABLE_SUBJECTS_MAP = {
 };
 // Subjects for RESULTS ENTRY (SST+CRE merged for Upper, History+Geography merged for JSS)
 const SUBJECTS_MAP = {
-  PP: ["Literacy Activities","Language Activities","Kiswahili Activities","Mathematical Activities","Environmental Activities","Creative Activities","Religious Education Activities"],
-  Lower: ["English Language Activities","Kiswahili Language Activities","Mathematical Activities","Integrated Science","Environmental Activities","Religious Education Activities","Creative Activities","Indigenous Language Activities"],
+  PP: ["Literacy Activities","Language Activities","Kiswahili Activities","Mathematical Activities","Environmental Activities","Creative Activities"],
+  Lower: ["English Language Activities","Kiswahili Language Activities","Mathematical Activities","Integrated Science"],
   Upper: ["English","Kiswahili","Mathematics","Integrated Science","Social Studies & CRE","Agriculture and Nutrition","Creative Arts and Sports"],
   JSS: ["English","Kiswahili","Mathematics","Integrated Science","Social Studies (History & Geography)","Pre-Technical and Pre-Career Studies","Agriculture and Nutrition","Religious Education (CRE/IRE)","Creative Arts and Sports"],
 };
@@ -816,33 +816,24 @@ function printViaMedianPDF(title, html) {
   const safeTitle = title.replace(/[^a-z0-9\s]/gi,"").replace(/\s+/g,"-").slice(0,50);
   const filename = `${safeTitle}.pdf`;
 
-  // Write content into a temporary full-screen overlay
+  // Outer overlay — full screen white background
   const overlay = document.createElement("div");
   overlay.id = "__tnks_print_overlay__";
-  overlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:white;z-index:99999;overflow:auto;";
+  overlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:#f1f5f9;z-index:99999;display:flex;flex-direction:column;";
 
-  const iframe = document.createElement("iframe");
-  iframe.style.cssText = "width:100%;height:100%;border:none;";
-  overlay.appendChild(iframe);
+  // Top toolbar — buttons live here, never overlap content
+  const toolbar = document.createElement("div");
+  toolbar.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#1e3a5f;flex-shrink:0;gap:10px;";
 
-  // Close button
-  const closeBtn = document.createElement("button");
-  closeBtn.innerText = "✕ Close";
-  closeBtn.style.cssText = "position:fixed;top:12px;right:12px;z-index:100000;background:#1e3a5f;color:white;border:none;border-radius:8px;padding:8px 16px;font-size:14px;cursor:pointer;";
-  closeBtn.onclick = () => document.body.removeChild(overlay);
-  overlay.appendChild(closeBtn);
-
-  // Download as PDF button using Median bridge
   const dlBtn = document.createElement("button");
   dlBtn.innerText = "📥 Save as PDF";
-  dlBtn.style.cssText = "position:fixed;top:12px;left:12px;z-index:100000;background:#15803d;color:white;border:none;border-radius:8px;padding:8px 16px;font-size:14px;cursor:pointer;";
+  dlBtn.style.cssText = "background:#15803d;color:white;border:none;border-radius:8px;padding:9px 18px;font-size:14px;cursor:pointer;font-weight:bold;";
   dlBtn.onclick = () => {
     if (window.median && window.median.screen && window.median.screen.pdf) {
       window.median.screen.pdf({filename, callback: ()=>{}});
     } else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.print) {
       window.webkit.messageHandlers.print.postMessage(filename);
     } else {
-      // Fallback: share/print via native share sheet
       if (navigator.share) {
         const blob = new Blob([html], {type:"text/html"});
         const file = new File([blob], filename.replace(".pdf",".html"), {type:"text/html"});
@@ -852,7 +843,30 @@ function printViaMedianPDF(title, html) {
       }
     }
   };
-  overlay.appendChild(dlBtn);
+
+  const titleEl = document.createElement("span");
+  titleEl.innerText = title;
+  titleEl.style.cssText = "color:white;font-size:13px;font-weight:bold;flex:1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+
+  const closeBtn = document.createElement("button");
+  closeBtn.innerText = "✕ Close";
+  closeBtn.style.cssText = "background:rgba(255,255,255,0.15);color:white;border:1px solid rgba(255,255,255,0.3);border-radius:8px;padding:9px 18px;font-size:14px;cursor:pointer;font-weight:bold;white-space:nowrap;";
+  closeBtn.onclick = () => document.body.removeChild(overlay);
+
+  toolbar.appendChild(dlBtn);
+  toolbar.appendChild(titleEl);
+  toolbar.appendChild(closeBtn);
+  overlay.appendChild(toolbar);
+
+  // Scrollable iframe container — full remaining height, scrolls in ALL directions
+  const iframeWrap = document.createElement("div");
+  iframeWrap.style.cssText = "flex:1;overflow:auto;-webkit-overflow-scrolling:touch;background:white;";
+
+  const iframe = document.createElement("iframe");
+  // Make iframe wide enough for A4 landscape and tall enough to show all content
+  iframe.style.cssText = "width:100%;min-width:900px;height:100%;min-height:100%;border:none;display:block;";
+  iframeWrap.appendChild(iframe);
+  overlay.appendChild(iframeWrap);
 
   document.body.appendChild(overlay);
 
@@ -860,6 +874,14 @@ function printViaMedianPDF(title, html) {
   iframe.contentDocument.open();
   iframe.contentDocument.write(html);
   iframe.contentDocument.close();
+
+  // Resize iframe height to its content after load so scroll works properly
+  iframe.onload = () => {
+    try {
+      const h = iframe.contentDocument.body.scrollHeight;
+      if (h > 0) iframe.style.height = h + "px";
+    } catch(e) {}
+  };
 }
 
 // ── Main print/download function ───────────────────────────
