@@ -43,17 +43,44 @@ const TIMETABLE_SUBJECTS_MAP = {
 };
 // Subjects for RESULTS ENTRY (SST+CRE merged for Upper, History+Geography merged for JSS)
 const SUBJECTS_MAP = {
-  PP: ["Language Activities","Mathematical Activities","Environmental Activities","Creative Activities","Religious Education Activities"],
-  Lower: ["English Language Activities","Kiswahili Language Activities","Mathematical Activities","Environmental Activities","Religious Education Activities","Creative Activities","Indigenous Language Activities"],
+  PP: ["Literacy Activities","Language Activities","Kiswahili Activities","Mathematical Activities","Environmental Activities","Creative Activities","Religious Education Activities"],
+  Lower: ["English Language Activities","Kiswahili Language Activities","Mathematical Activities","Integrated Science","Environmental Activities","Religious Education Activities","Creative Activities","Indigenous Language Activities"],
   Upper: ["English","Kiswahili","Mathematics","Integrated Science","Social Studies & CRE","Agriculture and Nutrition","Creative Arts and Sports"],
   JSS: ["English","Kiswahili","Mathematics","Integrated Science","Social Studies (History & Geography)","Pre-Technical and Pre-Career Studies","Agriculture and Nutrition","Religious Education (CRE/IRE)","Creative Arts and Sports"],
 };
+// Short forms for subject column headers in printed results/grades tables
+const SUBJECT_SHORT = {
+  "Literacy Activities":       "LIT ACT",
+  "Language Activities":       "LANG ACT",
+  "Kiswahili Activities":      "KIS ACT",
+  "Mathematical Activities":   "MAT ACT",
+  "Environmental Activities":  "ENV ACT",
+  "Creative Activities":       "CAS ACT",
+  "Religious Education Activities": "RE ACT",
+  "English Language Activities":    "ENG ACT",
+  "Kiswahili Language Activities":  "KIS ACT",
+  "Integrated Science":             "INT SCI",
+  "Indigenous Language Activities": "INDIG",
+  "English":                   "ENG",
+  "Kiswahili":                 "KIS",
+  "Mathematics":               "MAT",
+  "Social Studies & CRE":      "SST CRE",
+  "Agriculture and Nutrition": "AGRI",
+  "Creative Arts and Sports":  "CAS",
+  "Social Studies (History & Geography)":  "SST",
+  "Pre-Technical and Pre-Career Studies":  "PTC",
+  "Religious Education (CRE/IRE)":         "CRE",
+};
+function getSubShort(subject) {
+  return SUBJECT_SHORT[subject] || subject.split(" ").map(w=>w.slice(0,3)).join("").toUpperCase().slice(0,6);
+}
 function getTimetableSubs(cls) { return TIMETABLE_SUBJECTS_MAP[cg(cls)]||[]; }
 
 // Lessons per week per subject (CBC curriculum guidelines)
 const LESSONS_PER_WEEK = {
   PP: {
-    "Language Activities":5,"Mathematical Activities":5,"Environmental Activities":3,
+    "Literacy Activities":5,"Language Activities":5,"Kiswahili Activities":5,
+    "Mathematical Activities":5,"Environmental Activities":3,
     "Creative Activities":3,"Religious Education Activities":2,
   },
   Lower: {
@@ -759,32 +786,25 @@ function isMedian() {
 
 // ── Build full HTML document string ───────────────────────
 function buildSectionHeader(logo) {
-  const logoTag = logo ? `<img src="${logo}" style="height:38px;display:inline-block;vertical-align:middle;margin-right:10px;object-fit:contain;"/>` : "";
-  return `<div class="section-header">${logoTag}<div style="display:inline-block;vertical-align:middle;text-align:left;"><div style="font-size:14px;font-weight:bold;color:#1e3a5f;">${SCHOOL.name}</div><div style="font-size:9px;color:#555;">${SCHOOL.location} &nbsp;|&nbsp; ${SCHOOL.phone} &nbsp;|&nbsp; ${SCHOOL.email}</div><div style="font-size:9px;font-style:italic;color:#15803d;font-weight:bold;">"${SCHOOL.motto}"</div></div></div>`;
+  const logoTag = logo ? `<img src="${logo}" style="height:64px;margin-bottom:4px;display:block;margin-left:auto;margin-right:auto;object-fit:contain;"/>` : "";
+  return `<div style="text-align:center;border-bottom:3px double #1e3a5f;padding-bottom:10px;margin-bottom:16px;">
+    ${logoTag}
+    <div style="font-size:18px;font-weight:bold;color:#1e3a5f;letter-spacing:0.5px;">${SCHOOL.name}</div>
+    <div style="font-size:10px;color:#555;margin-top:2px;">${SCHOOL.location}</div>
+    <div style="font-size:10px;color:#555;margin-top:1px;">${SCHOOL.phone} &nbsp;|&nbsp; ${SCHOOL.email} &nbsp;|&nbsp; ${SCHOOL.website}</div>
+    <div style="font-size:11px;font-style:italic;color:#15803d;font-weight:bold;margin-top:3px;">"${SCHOOL.motto}"</div>
+  </div>`;
 }
 function buildHTMLDoc(title, bodyHTML, logo) {
-  const logoTag = logo ? `<img id="school-logo" src="${logo}" style="height:72px;margin-bottom:6px;display:block;margin-left:auto;margin-right:auto;"/>` : "";
   const logoWm = logo
     ? `<img src="${logo}" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);opacity:0.06;pointer-events:none;z-index:0;width:300px;height:300px;object-fit:contain;"/>`
     : `<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);opacity:0.04;pointer-events:none;z-index:0;font-size:80px;font-weight:900;color:#1e3a5f;white-space:nowrap;font-family:Georgia,serif;">${SCHOOL.motto}</div>`;
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>${title}</title><style>
     *{box-sizing:border-box;}
     body{margin:0;padding:16px;font-family:Georgia,serif;background:white;}
-    @media print{@page{margin:14mm 12mm;size:A4;} .no-print{display:none!important;} body{padding:0;}}
-    .school-header{text-align:center;border-bottom:3px double #1e3a5f;padding-bottom:12px;margin-bottom:20px;}
-    .school-header h1{margin:6px 0 2px;font-size:20px;color:#1e3a5f;letter-spacing:0.5px;}
-    .school-header p{margin:2px 0;font-size:10px;color:#555;}
-    .motto{font-size:13px;font-style:italic;color:#15803d;font-weight:bold;margin-top:4px;}
-    .section-header{display:flex;align-items:center;border-bottom:2px double #1e3a5f;padding-bottom:8px;margin-bottom:14px;gap:10px;}
+    @media print{@page{margin:12mm;size:A4;} .no-print{display:none!important;} body{padding:0;}}
   </style></head><body>
   ${logoWm}
-  <div class="school-header">
-    ${logoTag}
-    <h1>${SCHOOL.name}</h1>
-    <p>${SCHOOL.location}</p>
-    <p>${SCHOOL.phone} &nbsp;|&nbsp; ${SCHOOL.email} &nbsp;|&nbsp; ${SCHOOL.website}</p>
-    <p class="motto">"${SCHOOL.motto}"</p>
-  </div>
   <div style="position:relative;z-index:1;">${bodyHTML}</div>
   </body></html>`;
 }
@@ -855,7 +875,7 @@ function printWindow(title, bodyHTML, logo) {
     if (!w) { alert("Please allow pop-ups for this site to print documents."); return; }
     w.document.write(html.replace("</body>", `<script>
       function doPrint(){window.print();}
-      ${logo ? `var img=document.getElementById('school-logo');if(img&&!img.complete){img.onload=doPrint;img.onerror=doPrint;}else{setTimeout(doPrint,300);}` : `setTimeout(doPrint,200);`}
+      setTimeout(doPrint,400);
     <\/script></body>`));
     w.document.close();
   }
@@ -972,7 +992,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
           <th style="padding:6px 8px;text-align:left;">Pos</th>
           <th style="padding:6px 8px;text-align:left;">Name</th>
           <th style="padding:6px 8px;text-align:left;">Adm</th>
-          ${subs.map(s=>{const short=s.length>8?s.split(" ").map(w=>w.slice(0,3)).join("").slice(0,6).toUpperCase():s.toUpperCase();return`<th style="padding:4px 3px;text-align:center;max-width:32px;white-space:nowrap;"><div style="writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);font-size:9px;font-weight:bold;line-height:1.1;max-height:60px;overflow:hidden;" title="${s}">${short}</div></th>`;}).join("")}
+          ${subs.map(s=>{const short=getSubShort(s);return`<th style="padding:4px 3px;text-align:center;max-width:32px;white-space:nowrap;"><div style="writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);font-size:9px;font-weight:bold;line-height:1.1;max-height:70px;overflow:hidden;" title="${s}">${short}</div></th>`;}).join("")}
           <th style="padding:6px 8px;text-align:center;background:#fef3c7;">Total</th>
           <th style="padding:6px 8px;text-align:center;background:#eff6ff;">Avg</th>
         </tr></thead>
@@ -1004,7 +1024,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
         <thead><tr style="background:#f0fdf4;">
           <th style="padding:6px 8px;text-align:left;">Pos</th>
           <th style="padding:6px 8px;text-align:left;">Name</th>
-          ${subs.map(s=>{const short=s.length>8?s.split(" ").map(w=>w.slice(0,3)).join("").slice(0,6).toUpperCase():s.toUpperCase();return`<th style="padding:4px 3px;text-align:center;max-width:32px;white-space:nowrap;"><div style="writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);font-size:9px;font-weight:bold;line-height:1.1;max-height:60px;overflow:hidden;" title="${s}">${short}</div></th>`;}).join("")}
+          ${subs.map(s=>{const short=getSubShort(s);return`<th style="padding:4px 3px;text-align:center;max-width:32px;white-space:nowrap;"><div style="writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);font-size:9px;font-weight:bold;line-height:1.1;max-height:70px;overflow:hidden;" title="${s}">${short}</div></th>`;}).join("")}
           <th style="padding:6px 8px;text-align:center;">Overall</th>
           <th style="padding:6px 8px;text-align:center;">Pts</th>
         </tr></thead>
