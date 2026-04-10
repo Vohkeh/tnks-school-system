@@ -71,6 +71,27 @@ const SUBJECT_SHORT = {
   "Pre-Technical and Pre-Career Studies":  "PTC",
   "Religious Education (CRE/IRE)":         "CRE",
 };
+// Auto-generate subject remark based on grade and subject name
+function getAutoRemark(subject, marks) {
+  if(marks===null||marks===undefined) return "—";
+  const subLower = subject.toLowerCase();
+  // Use "Swahili" for Kiswahili subject
+  const isSwahili = subLower.includes("kiswahili") || subLower.includes("swahili");
+  const subLabel = isSwahili ? "Swahili" : subject.split(" ")[0];
+  if(marks>=90) return `Excellent performance in ${subLabel}. Keep it up!`;
+  if(marks>=75) return `Very good in ${subLabel}. Outstanding effort.`;
+  if(marks>=58) return `Good performance in ${subLabel}. Keep working hard.`;
+  if(marks>=41) return `Average in ${subLabel}. More effort needed.`;
+  if(marks>=31) return `Below average in ${subLabel}. Needs improvement.`;
+  if(marks>=21) return `Weak in ${subLabel}. Requires extra attention.`;
+  if(marks>=11) return `Poor performance in ${subLabel}. Urgent support needed.`;
+  return `Very poor in ${subLabel}. Immediate intervention required.`;
+}
+// Get teacher initials from full name
+function getInitials(name) {
+  if(!name) return "";
+  return name.split(" ").map(w=>w[0]?.toUpperCase()||"").join(".")+"."
+}
 function getSubShort(subject) {
   return SUBJECT_SHORT[subject] || subject.split(" ").map(w=>w.slice(0,3)).join("").toUpperCase().slice(0,6);
 }
@@ -797,7 +818,7 @@ function buildSectionHeader(logo) {
 }
 function buildHTMLDoc(title, bodyHTML, logo) {
   const logoWm = logo
-    ? `<img src="${logo}" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);opacity:0.06;pointer-events:none;z-index:0;width:300px;height:300px;object-fit:contain;"/>`
+    ? `<img src="${logo}" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-20deg);opacity:0.07;pointer-events:none;z-index:0;width:500px;height:500px;object-fit:contain;"/>`
     : `<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);opacity:0.04;pointer-events:none;z-index:0;font-size:80px;font-weight:900;color:#1e3a5f;white-space:nowrap;font-family:Georgia,serif;">${SCHOOL.motto}</div>`;
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>${title}</title><style>
     *{box-sizing:border-box;}
@@ -906,7 +927,7 @@ function printWindow(title, bodyHTML, logo) {
 // ══════════════════════════════════════════════════════════
 // REPORT FORMS
 // ══════════════════════════════════════════════════════════
-function ReportsPage({students,results,comments,term,setTerm,year,setYear,examType,setExamType,logo}) {
+function ReportsPage({students,results,comments,term,setTerm,year,setYear,examType,setExamType,logo,users,ttSetup}) {
   const [cls,setCls]=useState("Grade 7");
   const [selId,setSelId]=useState("");
   const [showDl,setShowDl]=useState(false);
@@ -926,11 +947,31 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
     }).sort((a,b)=>b.avg-a.avg).map((s,i)=>({...s,position:i+1}));
   }
 
+  function getSubjectTeacherName(className, subject) {
+    const sd = ttSetup?.setupData;
+    if(!sd) return "";
+    // Try subjectTeachers map first
+    const key = `${className}::${subject}`;
+    const tid = (sd.subjectTeachers||{})[key];
+    if(tid) { const u=(users||[]).find(u=>u.id===tid); return u?u.name:""; }
+    // Try classes.subjects
+    const cls=(sd.classes||[]).find(c=>c.name===className);
+    if(cls) { const sub=(cls.subjects||[]).find(s=>s.subject===subject); if(sub?.teacherName) return sub.teacherName; }
+    return "";
+  }
+  function getClassTeacherName(className) {
+    const sd = ttSetup?.setupData;
+    if(!sd) return "";
+    const tid=(sd.classTeachers||{})[className];
+    if(tid){ const u=(users||[]).find(u=>u.id===tid); return u?u.name:""; }
+    const cls=(sd.classes||[]).find(c=>c.name===className);
+    return cls?.classTeacherName||"";
+  }
+
   function buildReportHTML(student, allInClass) {
     const subs=getSubs(student.class);
-    // Deduplicate: keep only one result per subject (latest by array order)
     const rawSr=results.filter(r=>r.studentId===student.id&&r.term===term&&r.year===year&&r.examType===examType);
-    const srMap={}; rawSr.forEach(r=>{srMap[r.subject]=r;}); // last one per subject wins
+    const srMap={}; rawSr.forEach(r=>{srMap[r.subject]=r;});
     const sr=Object.values(srMap);
     const comment=(comments||[]).find(c=>c.studentId===student.id&&c.term===term&&c.year===year&&c.examType===examType);
     const total=sr.reduce((a,b)=>a+b.marks,0);
@@ -939,53 +980,61 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
     const ranked=allInClass||[];
     const pos=ranked.find(x=>x.id===student.id)?.position||"—";
     const outOf=ranked.length||"—";
+    const clsTeacher=getClassTeacherName(student.class);
+    const clsTeacherInitials=clsTeacher?getInitials(clsTeacher):"";
     const rows=subs.map((s,idx)=>{
       const r=sr.find(x=>x.subject===s);
       const g=r?getGrade(r.marks):null;
+      const remark=r?getAutoRemark(s,r.marks):"—";
+      const subTeacher=getSubjectTeacherName(student.class,s);
+      const subInitials=subTeacher?getInitials(subTeacher):"";
       return `<tr style="background:${idx%2===0?"white":"#f8fafc"}">
-        <td style="padding:7px 10px;font-size:11px;">${s}</td>
-        <td style="padding:7px 10px;font-weight:bold;text-align:center;">${r?r.marks:"—"}</td>
-        <td style="padding:7px 10px;">${g?`<span style="background:${g.bg};color:${g.col};font-size:10px;padding:2px 7px;border-radius:12px;font-weight:bold;">${g.g}</span>`:"—"}</td>
-        <td style="padding:7px 10px;text-align:center;">${g?g.pts:"—"}</td>
-        <td style="padding:7px 10px;font-size:10px;color:#64748b;">${g?g.lbl:"—"}</td>
+        <td style="padding:6px 8px;font-size:10px;">${s}</td>
+        <td style="padding:6px 8px;font-weight:bold;text-align:center;">${r?r.marks:"—"}</td>
+        <td style="padding:6px 8px;">${g?`<span style="background:${g.bg};color:${g.col};font-size:9px;padding:2px 6px;border-radius:10px;font-weight:bold;">${g.g}</span>`:"—"}</td>
+        <td style="padding:6px 8px;text-align:center;font-size:10px;">${g?g.pts:"—"}</td>
+        <td style="padding:6px 8px;font-size:9px;color:#374151;">${remark}</td>
+        <td style="padding:6px 8px;font-size:9px;color:#64748b;text-align:center;">${subInitials||"—"}</td>
       </tr>`;
     }).join("");
-    return `<div style="page-break-after:always;padding:20px 24px;max-width:700px;margin:0 auto;position:relative;">
+    return `<div style="page-break-after:always;padding:16px 20px;max-width:720px;margin:0 auto;position:relative;">
       ${buildSectionHeader(logo)}
-      <div style="background:#1e3a5f;color:white;text-align:center;padding:4px 0;font-size:12px;font-weight:bold;border-radius:16px;margin-bottom:12px;letter-spacing:1px;">${examType.toUpperCase()} — ${term.toUpperCase()} ${year}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;margin-bottom:12px;border:1px solid #e2e8f0;border-radius:6px;padding:10px;">
+      <div style="background:#1e3a5f;color:white;text-align:center;padding:4px 0;font-size:11px;font-weight:bold;border-radius:16px;margin-bottom:10px;letter-spacing:1px;">${examType.toUpperCase()} — ${term.toUpperCase()} ${year}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:10px;margin-bottom:10px;border:1px solid #e2e8f0;border-radius:6px;padding:8px;">
         <div><b>Name:</b> ${student.name}</div><div><b>Adm. No:</b> ${student.admNo||"—"}</div>
         <div><b>Class:</b> ${student.class}</div><div><b>Gender:</b> ${student.gender||"—"}</div>
         <div><b>Position:</b> <span style="font-weight:bold;color:#1e3a5f;">${pos} / ${outOf}</span></div>
         <div><b>Total Marks:</b> <span style="font-weight:bold;">${sr.length?total.toFixed(0):"—"}</span></div>
       </div>
-      <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:12px;">
-        <thead><tr style="background:#1e3a5f;color:white;">${["Subject","Marks","Grade","Points","Remarks"].map(h=>`<th style="padding:7px 10px;text-align:left;">${h}</th>`).join("")}</tr></thead>
+      <table style="width:100%;border-collapse:collapse;font-size:10px;margin-bottom:10px;">
+        <thead><tr style="background:#1e3a5f;color:white;">${["Subject","Marks","Grade","Points","Remarks","Init."].map(h=>`<th style="padding:6px 8px;text-align:left;">${h}</th>`).join("")}</tr></thead>
         <tbody>${rows}
           <tr style="background:#f0fdf4;font-weight:bold;border-top:2px solid #1e3a5f;">
-            <td style="padding:7px 10px;">TOTAL</td>
-            <td style="padding:7px 10px;text-align:center;font-size:13px;">${sr.length?total.toFixed(0):"—"}</td>
-            <td colspan="3" style="padding:7px 10px;font-size:10px;color:#64748b;">Sum of all subject marks</td>
+            <td style="padding:6px 8px;">TOTAL</td>
+            <td style="padding:6px 8px;text-align:center;font-size:12px;">${sr.length?total.toFixed(0):"—"}</td>
+            <td colspan="4" style="padding:6px 8px;font-size:9px;color:#64748b;">Sum of all subject marks</td>
           </tr>
           <tr style="background:#eff6ff;font-weight:bold;">
-            <td style="padding:7px 10px;">AVERAGE</td>
-            <td style="padding:7px 10px;text-align:center;font-size:13px;">${avg>0?avg.toFixed(1):"—"}</td>
-            <td style="padding:7px 10px;">${avg>0?`<span style="background:${og.bg};color:${og.col};font-size:10px;padding:2px 7px;border-radius:12px;font-weight:bold;">${og.g}</span>`:"—"}</td>
-            <td style="padding:7px 10px;text-align:center;">${avg>0?og.pts:"—"}</td>
-            <td style="padding:7px 10px;font-size:10px;">${avg>0?og.lbl:"—"}</td>
+            <td style="padding:6px 8px;">MEAN SCORE</td>
+            <td style="padding:6px 8px;text-align:center;font-size:12px;">${avg>0?avg.toFixed(1):"—"}</td>
+            <td style="padding:6px 8px;">${avg>0?`<span style="background:${og.bg};color:${og.col};font-size:9px;padding:2px 6px;border-radius:10px;font-weight:bold;">${og.g}</span>`:"—"}</td>
+            <td style="padding:6px 8px;text-align:center;font-size:10px;">${avg>0?og.pts:"—"}</td>
+            <td colspan="2" style="padding:6px 8px;font-size:9px;">${avg>0?og.lbl:"—"}</td>
           </tr>
         </tbody>
       </table>
-      <div style="border:1px solid #e2e8f0;border-radius:6px;padding:10px;margin-bottom:12px;font-size:11px;">
-        <b>Teacher's Comment:</b> ${comment?comment.text:"No comment recorded."}
-        ${comment?`<div style="font-size:9px;color:#94a3b8;margin-top:4px;">— ${comment.teacher} (${comment.date})</div>`:""}
+      <div style="border:1px solid #e2e8f0;border-radius:6px;padding:8px;margin-bottom:10px;font-size:10px;">
+        <b>Class Teacher's Comment:</b> ${comment?comment.text:"No comment recorded."}
+        ${comment?`<div style="font-size:9px;color:#94a3b8;margin-top:3px;">— ${comment.teacher} (${comment.date})</div>`:""}
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:14px;">
-        ${["Class Teacher","Head Teacher","Parent/Guardian"].map(l=>`<div style="text-align:center;"><div style="border-top:1px solid #374151;padding-top:4px;font-size:10px;color:#64748b;">${l}</div><div style="font-size:9px;color:#94a3b8;margin-top:12px;">Signature & Date</div></div>`).join("")}
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:12px;">
+        <div style="text-align:center;"><div style="border-top:1px solid #374151;padding-top:4px;font-size:10px;color:#64748b;">Class Teacher</div><div style="font-size:9px;color:#1e3a5f;font-weight:bold;margin-top:2px;">${clsTeacher||"_______________"}</div><div style="font-size:8px;color:#94a3b8;margin-top:10px;">Signature & Date</div></div>
+        <div style="text-align:center;"><div style="border-top:1px solid #374151;padding-top:4px;font-size:10px;color:#64748b;">Head Teacher</div><div style="font-size:9px;color:#94a3b8;margin-top:12px;">Signature & Date</div></div>
+        <div style="text-align:center;"><div style="border-top:1px solid #374151;padding-top:4px;font-size:10px;color:#64748b;">Parent/Guardian</div><div style="font-size:9px;color:#94a3b8;margin-top:12px;">Signature & Date</div></div>
       </div>
-      <div style="margin-top:12px;background:#f8fafc;border-radius:6px;padding:8px 10px;">
-        <span style="font-size:9px;font-weight:bold;color:#374151;">CBC Grading: </span>
-        ${[{g:"EE1",r:"90-100"},{g:"EE2",r:"75-89"},{g:"ME1",r:"58-74"},{g:"ME2",r:"41-57"},{g:"AE1",r:"31-40"},{g:"AE2",r:"21-30"},{g:"BE1",r:"11-20"},{g:"BE2",r:"0-10"}].map(({g,r})=>{const gd=getGrade(g==="EE1"?95:g==="EE2"?80:g==="ME1"?65:g==="ME2"?50:g==="AE1"?35:g==="AE2"?25:g==="BE1"?15:5);return`<span style="font-size:9px;background:${gd.bg};color:${gd.col};padding:1px 5px;border-radius:8px;font-weight:bold;margin-right:3px;">${g}:${r}</span>`;}).join("")}
+      <div style="margin-top:10px;background:#f8fafc;border-radius:6px;padding:6px 10px;">
+        <span style="font-size:8px;font-weight:bold;color:#374151;">CBC Grading: </span>
+        ${[{g:"EE1",r:"90-100"},{g:"EE2",r:"75-89"},{g:"ME1",r:"58-74"},{g:"ME2",r:"41-57"},{g:"AE1",r:"31-40"},{g:"AE2",r:"21-30"},{g:"BE1",r:"11-20"},{g:"BE2",r:"0-10"}].map(({g,r})=>{const gd=getGrade(g==="EE1"?95:g==="EE2"?80:g==="ME1"?65:g==="ME2"?50:g==="AE1"?35:g==="AE2"?25:g==="BE1"?15:5);return`<span style="font-size:8px;background:${gd.bg};color:${gd.col};padding:1px 4px;border-radius:6px;font-weight:bold;margin-right:2px;">${g}:${r}</span>`;}).join("")}
       </div>
     </div>`;
   }
@@ -996,29 +1045,38 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
     const ranked=getClassRankings(classStudents);
     const rows=ranked.map((s,i)=>{
       const sr=s.subs;
+      const g=s.avg>0?getGrade(s.avg):null;
       return `<tr style="background:${i%2===0?"white":"#f8fafc"}">
-        <td style="padding:6px 8px;font-weight:bold;color:${i<3?"#b45309":"#374151"};">${i===0?"🥇":i===1?"🥈":i===2?"🥉":i+1}</td>
-        <td style="padding:6px 8px;font-weight:bold;">${s.name}</td>
-        <td style="padding:6px 8px;font-size:10px;">${s.admNo||"—"}</td>
-        ${subs.map(su=>{const r=sr.find(x=>x.subject===su);return`<td style="padding:6px 8px;text-align:center;font-weight:bold;">${r?r.marks:"—"}</td>`;}).join("")}
-        <td style="padding:6px 8px;text-align:center;font-weight:bold;background:#fef3c7;">${s.subs.length?s.total.toFixed(0):"—"}</td>
-        <td style="padding:6px 8px;text-align:center;font-weight:bold;background:#eff6ff;">${s.avg>0?s.avg.toFixed(1):"—"}</td>
+        <td style="padding:5px 6px;font-weight:bold;color:${i<3?"#b45309":"#374151"};text-align:center;">${i+1}</td>
+        <td style="padding:5px 6px;font-weight:bold;">${s.name}</td>
+        <td style="padding:5px 6px;font-size:9px;">${s.admNo||"—"}</td>
+        ${subs.map(su=>{const r=sr.find(x=>x.subject===su);return`<td style="padding:5px 4px;text-align:center;font-weight:bold;">${r?r.marks:"—"}</td>`;}).join("")}
+        <td style="padding:5px 6px;text-align:center;font-weight:bold;background:#fef3c7;">${s.subs.length?s.total.toFixed(0):"—"}</td>
+        <td style="padding:5px 6px;text-align:center;font-weight:bold;background:#eff6ff;">${s.avg>0?s.avg.toFixed(1):"—"}</td>
+        <td style="padding:5px 6px;text-align:center;">${g?`<span style="background:${g.bg};color:${g.col};font-size:8px;padding:1px 4px;border-radius:6px;font-weight:bold;">${g.g}</span>`:"—"}</td>
       </tr>`;
     }).join("");
+    // Subject teacher row
+    const teacherRow=`<tr style="background:#f0f9ff;border-top:2px solid #1e3a5f;">
+      <td colspan="3" style="padding:4px 6px;font-size:9px;font-weight:bold;color:#1e3a5f;">Subject Teacher:</td>
+      ${subs.map(s=>{const t=getSubjectTeacherName(className,s);return`<td style="padding:4px 3px;text-align:center;font-size:8px;color:#1e3a5f;font-weight:bold;">${t?getInitials(t):"—"}</td>`;}).join("")}
+      <td colspan="3" style="padding:4px 6px;font-size:9px;color:#64748b;">Initials</td>
+    </tr>`;
     return `<div style="margin-bottom:32px;">
       ${buildSectionHeader(logo)}
       <div style="background:#1e3a5f;color:white;padding:8px 14px;font-weight:bold;font-size:13px;border-radius:8px 8px 0 0;">${className} — ${examType} · ${term} ${year}</div>
       <div style="overflow-x:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:10px;min-width:600px;">
         <thead><tr style="background:#eff6ff;">
-          <th style="padding:6px 8px;text-align:left;">Pos</th>
-          <th style="padding:6px 8px;text-align:left;">Name</th>
-          <th style="padding:6px 8px;text-align:left;">Adm</th>
+          <th style="padding:5px 6px;text-align:center;">Pos</th>
+          <th style="padding:5px 6px;text-align:left;">Name</th>
+          <th style="padding:5px 6px;text-align:left;">Adm</th>
           ${subs.map(s=>{const short=getSubShort(s);return`<th style="padding:4px 3px;text-align:center;max-width:32px;white-space:nowrap;"><div style="writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);font-size:9px;font-weight:bold;line-height:1.1;max-height:70px;overflow:hidden;" title="${s}">${short}</div></th>`;}).join("")}
-          <th style="padding:6px 8px;text-align:center;background:#fef3c7;">Total</th>
-          <th style="padding:6px 8px;text-align:center;background:#eff6ff;">Avg</th>
+          <th style="padding:5px 6px;text-align:center;background:#fef3c7;">Total</th>
+          <th style="padding:5px 6px;text-align:center;background:#eff6ff;">Mean</th>
+          <th style="padding:5px 6px;text-align:center;">Grade</th>
         </tr></thead>
-        <tbody>${rows}${!ranked.length?`<tr><td colspan="${subs.length+5}" style="padding:20px;text-align:center;color:#94a3b8;">No results entered.</td></tr>`:""}</tbody>
+        <tbody>${rows}${!ranked.length?`<tr><td colspan="${subs.length+6}" style="padding:20px;text-align:center;color:#94a3b8;">No results entered.</td></tr>`:""}${teacherRow}</tbody>
       </table></div>
     </div>`;
   }
@@ -1031,28 +1089,152 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
       const sr=s.subs;
       const og=s.avg>0?getGrade(s.avg):null;
       return `<tr style="background:${i%2===0?"white":"#f8fafc"}">
-        <td style="padding:6px 8px;font-weight:bold;color:${i<3?"#b45309":"#374151"};">${i===0?"🥇":i===1?"🥈":i===2?"🥉":i+1}</td>
-        <td style="padding:6px 8px;font-weight:bold;">${s.name}</td>
-        ${subs.map(su=>{const r=sr.find(x=>x.subject===su);const g=r?getGrade(r.marks):null;return`<td style="padding:6px 8px;text-align:center;">${g?`<span style="background:${g.bg};color:${g.col};font-size:9px;padding:1px 5px;border-radius:8px;font-weight:bold;">${g.g}</span>`:"—"}</td>`;}).join("")}
-        <td style="padding:6px 8px;text-align:center;">${og?`<span style="background:${og.bg};color:${og.col};font-size:9px;padding:2px 7px;border-radius:8px;font-weight:bold;">${og.g}</span>`:"—"}</td>
-        <td style="padding:6px 8px;text-align:center;font-weight:bold;">${og?og.pts:"—"}</td>
+        <td style="padding:5px 6px;font-weight:bold;color:${i<3?"#b45309":"#374151"};text-align:center;">${i+1}</td>
+        <td style="padding:5px 6px;font-weight:bold;">${s.name}</td>
+        ${subs.map(su=>{const r=sr.find(x=>x.subject===su);const g=r?getGrade(r.marks):null;return`<td style="padding:5px 4px;text-align:center;">${g?`<span style="background:${g.bg};color:${g.col};font-size:8px;padding:1px 4px;border-radius:6px;font-weight:bold;">${g.g}</span>`:"—"}</td>`;}).join("")}
+        <td style="padding:5px 6px;text-align:center;font-weight:bold;background:#fef3c7;">${s.subs.length?s.total.toFixed(0):"—"}</td>
+        <td style="padding:5px 6px;text-align:center;font-weight:bold;background:#eff6ff;">${s.avg>0?s.avg.toFixed(1):"—"}</td>
+        <td style="padding:5px 6px;text-align:center;">${og?`<span style="background:${og.bg};color:${og.col};font-size:8px;padding:2px 6px;border-radius:6px;font-weight:bold;">${og.g}</span>`:"—"}</td>
+        <td style="padding:5px 6px;text-align:center;font-weight:bold;font-size:9px;">${og?og.pts:"—"}</td>
       </tr>`;
     }).join("");
+    const teacherRow=`<tr style="background:#f0fdf4;border-top:2px solid #15803d;">
+      <td colspan="2" style="padding:4px 6px;font-size:9px;font-weight:bold;color:#15803d;">Subject Teacher:</td>
+      ${subs.map(s=>{const t=getSubjectTeacherName(className,s);return`<td style="padding:4px 3px;text-align:center;font-size:8px;color:#15803d;font-weight:bold;">${t?getInitials(t):"—"}</td>`;}).join("")}
+      <td colspan="4" style="padding:4px 6px;font-size:9px;color:#64748b;">Initials</td>
+    </tr>`;
     return `<div style="margin-bottom:32px;">
       ${buildSectionHeader(logo)}
       <div style="background:#15803d;color:white;padding:8px 14px;font-weight:bold;font-size:13px;border-radius:8px 8px 0 0;">${className} — Grades · ${examType} · ${term} ${year}</div>
       <div style="overflow-x:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:10px;min-width:600px;">
         <thead><tr style="background:#f0fdf4;">
-          <th style="padding:6px 8px;text-align:left;">Pos</th>
-          <th style="padding:6px 8px;text-align:left;">Name</th>
+          <th style="padding:5px 6px;text-align:center;">Pos</th>
+          <th style="padding:5px 6px;text-align:left;">Name</th>
           ${subs.map(s=>{const short=getSubShort(s);return`<th style="padding:4px 3px;text-align:center;max-width:32px;white-space:nowrap;"><div style="writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);font-size:9px;font-weight:bold;line-height:1.1;max-height:70px;overflow:hidden;" title="${s}">${short}</div></th>`;}).join("")}
-          <th style="padding:6px 8px;text-align:center;">Overall</th>
-          <th style="padding:6px 8px;text-align:center;">Pts</th>
+          <th style="padding:5px 6px;text-align:center;background:#fef3c7;">Total</th>
+          <th style="padding:5px 6px;text-align:center;background:#eff6ff;">Mean</th>
+          <th style="padding:5px 6px;text-align:center;">Grade</th>
+          <th style="padding:5px 6px;text-align:center;">Pts</th>
         </tr></thead>
-        <tbody>${rows}${!ranked.length?`<tr><td colspan="${subs.length+4}" style="padding:20px;text-align:center;color:#94a3b8;">No results entered.</td></tr>`:""}</tbody>
+        <tbody>${rows}${!ranked.length?`<tr><td colspan="${subs.length+6}" style="padding:20px;text-align:center;color:#94a3b8;">No results entered.</td></tr>`:""}${teacherRow}</tbody>
       </table></div>
     </div>`;
+  }
+
+  // ── Excel download (SheetJS, locked cells) ────────────────
+  function loadSheetJS(cb){
+    if(window.XLSX){cb();return;}
+    const s=document.createElement("script");
+    s.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+    s.onload=cb; s.onerror=()=>alert("Could not load Excel library. Check your internet connection.");
+    document.head.appendChild(s);
+  }
+
+  function buildExcelData(classStudents, className, mode) {
+    const subs = getSubs(className);
+    const ranked = getClassRankings(classStudents);
+    // Header row 1: title
+    const title = `${className} — ${mode==="grades"?"Grades":"Results"} · ${examType} · ${term} ${year}`;
+    // Header row 2: column names
+    const subHeaders = subs.map(s => getSubShort(s));
+    const colHeaders = mode === "grades"
+      ? ["Pos","Name","Adm No", ...subHeaders, "Total","Mean","Overall Grade","Points"]
+      : ["Pos","Name","Adm No", ...subHeaders, "Total","Mean","Grade"];
+    const rows = ranked.map((s,i) => {
+      const sr = s.subs;
+      const og = s.avg > 0 ? getGrade(s.avg) : null;
+      if(mode === "grades") {
+        return [
+          i+1, s.name, s.admNo||"",
+          ...subs.map(su => { const r=sr.find(x=>x.subject===su); const g=r?getGrade(r.marks):null; return g?g.g:""; }),
+          s.subs.length ? parseFloat(s.total.toFixed(0)) : "",
+          s.avg > 0 ? parseFloat(s.avg.toFixed(1)) : "",
+          og ? og.g : "",
+          og ? og.pts : ""
+        ];
+      } else {
+        return [
+          i+1, s.name, s.admNo||"",
+          ...subs.map(su => { const r=sr.find(x=>x.subject===su); return r ? r.marks : ""; }),
+          s.subs.length ? parseFloat(s.total.toFixed(0)) : "",
+          s.avg > 0 ? parseFloat(s.avg.toFixed(1)) : "",
+          og ? og.g : ""
+        ];
+      }
+    });
+    // Teacher row
+    const teacherRow = ["","Subject Teacher:","",
+      ...subs.map(s => { const t=getSubjectTeacherName(className,s); return t?getInitials(t):""; }),
+      "","","",""
+    ];
+    return { title, colHeaders, rows, teacherRow, subs };
+  }
+
+  function downloadClassExcel(className, mode) {
+    loadSheetJS(() => {
+      const XL = window.XLSX;
+      const stu = students.filter(s=>s.class===className).sort((a,b)=>a.name.localeCompare(b.name));
+      const { title, colHeaders, rows, teacherRow } = buildExcelData(stu, className, mode);
+      const wb = XL.utils.book_new();
+      const wsData = [
+        [title],
+        [`Generated: ${new Date().toLocaleString("en-KE")}`],
+        [],
+        colHeaders,
+        ...rows,
+        teacherRow
+      ];
+      const ws = XL.utils.aoa_to_sheet(wsData);
+      // Column widths
+      ws["!cols"] = [
+        {wch:5},{wch:28},{wch:14},
+        ...colHeaders.slice(3).map(()=>({wch:10}))
+      ];
+      // Merge title across all columns
+      ws["!merges"] = [{s:{r:0,c:0},e:{r:0,c:colHeaders.length-1}},{s:{r:1,c:0},e:{r:1,c:colHeaders.length-1}}];
+      // Sheet protection — lock all cells, no editing
+      ws["!protect"] = { password:"tnks2025", sheet:true, objects:true, scenarios:true,
+        selectLockedCells:true, selectUnlockedCells:true,
+        formatCells:false, formatColumns:false, formatRows:false,
+        insertColumns:false, insertRows:false, deleteColumns:false, deleteRows:false,
+        sort:false, autoFilter:false
+      };
+      XL.utils.book_append_sheet(wb, ws, className.replace("/","_").slice(0,31));
+      XL.writeFile(wb, `${className}_${mode}_${term}_${year}.xlsx`);
+    });
+  }
+
+  function downloadSchoolExcel(mode) {
+    loadSheetJS(() => {
+      const XL = window.XLSX;
+      const wb = XL.utils.book_new();
+      ALL_CLASSES.forEach(className => {
+        const stu = students.filter(s=>s.class===className).sort((a,b)=>a.name.localeCompare(b.name));
+        if(!stu.length) return;
+        const { title, colHeaders, rows, teacherRow } = buildExcelData(stu, className, mode);
+        const wsData = [
+          [title],
+          [`Generated: ${new Date().toLocaleString("en-KE")}`],
+          [],
+          colHeaders,
+          ...rows,
+          teacherRow
+        ];
+        const ws = XL.utils.aoa_to_sheet(wsData);
+        ws["!cols"] = [{wch:5},{wch:28},{wch:14},...colHeaders.slice(3).map(()=>({wch:10}))];
+        ws["!merges"] = [{s:{r:0,c:0},e:{r:0,c:colHeaders.length-1}},{s:{r:1,c:0},e:{r:1,c:colHeaders.length-1}}];
+        ws["!protect"] = { password:"tnks2025", sheet:true, objects:true, scenarios:true,
+          selectLockedCells:true, selectUnlockedCells:true,
+          formatCells:false, formatColumns:false, formatRows:false,
+          insertColumns:false, insertRows:false, deleteColumns:false, deleteRows:false,
+          sort:false, autoFilter:false
+        };
+        XL.utils.book_append_sheet(wb, ws, className.replace("/","_").slice(0,31));
+      });
+      if(wb.SheetNames.length === 0){ alert("No data to export."); return; }
+      XL.writeFile(wb, `All_Classes_${mode}_${term}_${year}.xlsx`);
+    });
   }
 
   function printSingle(student){
@@ -1095,7 +1277,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
           {/* Print Reports dropdown */}
           <div style={{position:"relative"}}>
             <Btn onClick={()=>setShowDl(s=>!s)} v="teal" style={{fontSize:12}}>📄 Print Reports ▾</Btn>
-            {showDl&&<div style={{position:"absolute",top:"100%",right:0,zIndex:200,background:"white",border:"1px solid #e2e8f0",borderRadius:12,boxShadow:"0 8px 24px rgba(0,0,0,.12)",padding:8,minWidth:240,marginTop:4}}>
+            {showDl&&<div style={{position:"fixed",top:"auto",left:"50%",transform:"translateX(-50%)",zIndex:1000,background:"white",border:"1px solid #e2e8f0",borderRadius:12,boxShadow:"0 8px 32px rgba(0,0,0,.18)",padding:8,minWidth:260,marginTop:4,maxHeight:"80vh",overflowY:"auto"}}>
               <div style={{fontSize:10,color:"#94a3b8",padding:"4px 10px",fontWeight:"bold",letterSpacing:.5}}>REPORT CARDS</div>
               <button onClick={()=>{printClass();setShowDl(false);}} style={{width:"100%",display:"block",padding:"8px 14px",background:"none",border:"none",cursor:"pointer",textAlign:"left",fontSize:12,fontFamily:F,color:"#374151",borderRadius:8}} onMouseEnter={e=>e.target.style.background="#f1f5f9"} onMouseLeave={e=>e.target.style.background="none"}>🏫 {cls} — All Report Cards</button>
               <button onClick={()=>{printSchool();setShowDl(false);}} style={{width:"100%",display:"block",padding:"8px 14px",background:"none",border:"none",cursor:"pointer",textAlign:"left",fontSize:12,fontFamily:F,color:"#374151",borderRadius:8}} onMouseEnter={e=>e.target.style.background="#f1f5f9"} onMouseLeave={e=>e.target.style.background="none"}>🎓 Whole School Report Cards</button>
@@ -1107,16 +1289,22 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
               <div style={{fontSize:10,color:"#94a3b8",padding:"4px 10px",fontWeight:"bold",letterSpacing:.5}}>GRADES</div>
               <button onClick={()=>{printClassResults(cls,"grades");setShowDl(false);}} style={{width:"100%",display:"block",padding:"8px 14px",background:"none",border:"none",cursor:"pointer",textAlign:"left",fontSize:12,fontFamily:F,color:"#374151",borderRadius:8}} onMouseEnter={e=>e.target.style.background="#f1f5f9"} onMouseLeave={e=>e.target.style.background="none"}>🎯 {cls} — Grades by Position</button>
               <button onClick={()=>{printSchoolResults("grades");setShowDl(false);}} style={{width:"100%",display:"block",padding:"8px 14px",background:"#15803d",border:"none",cursor:"pointer",textAlign:"left",fontSize:12,fontFamily:F,color:"white",borderRadius:8,fontWeight:"bold"}} >🎯 All Classes — Grades</button>
+              <div style={{borderTop:"1px solid #f1f5f9",margin:"6px 0"}}/>
+              <div style={{fontSize:10,color:"#94a3b8",padding:"4px 10px",fontWeight:"bold",letterSpacing:.5}}>📥 DOWNLOAD AS EXCEL (LOCKED)</div>
+              <button onClick={()=>{downloadClassExcel(cls,"results");setShowDl(false);}} style={{width:"100%",display:"block",padding:"8px 14px",background:"none",border:"none",cursor:"pointer",textAlign:"left",fontSize:12,fontFamily:F,color:"#374151",borderRadius:8}} onMouseEnter={e=>e.target.style.background="#f1f5f9"} onMouseLeave={e=>e.target.style.background="none"}>📊 {cls} — Results Excel</button>
+              <button onClick={()=>{downloadClassExcel(cls,"grades");setShowDl(false);}} style={{width:"100%",display:"block",padding:"8px 14px",background:"none",border:"none",cursor:"pointer",textAlign:"left",fontSize:12,fontFamily:F,color:"#374151",borderRadius:8}} onMouseEnter={e=>e.target.style.background="#f1f5f9"} onMouseLeave={e=>e.target.style.background="none"}>🎯 {cls} — Grades Excel</button>
+              <button onClick={()=>{downloadSchoolExcel("results");setShowDl(false);}} style={{width:"100%",display:"block",padding:"8px 14px",background:"none",border:"none",cursor:"pointer",textAlign:"left",fontSize:12,fontFamily:F,color:"#374151",borderRadius:8}} onMouseEnter={e=>e.target.style.background="#f1f5f9"} onMouseLeave={e=>e.target.style.background="none"}>📊 All Classes — Results Excel</button>
+              <button onClick={()=>{downloadSchoolExcel("grades");setShowDl(false);}} style={{width:"100%",display:"block",padding:"8px 14px",background:"#1e3a5f",border:"none",cursor:"pointer",textAlign:"left",fontSize:12,fontFamily:F,color:"white",borderRadius:8,fontWeight:"bold"}} >🎯 All Classes — Grades Excel</button>
             </div>}
           </div>
         </div>
       </PageH>
       <Card style={{marginBottom:18}}><div style={{display:"flex",gap:12,flexWrap:"wrap"}}><Sel label="CLASS" value={cls} onChange={v=>{setCls(v);setSelId("");}} options={ALL_CLASSES}/><div><label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:3}}>STUDENT</label><select value={selId} onChange={e=>setSelId(e.target.value)} style={{border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px 10px",fontSize:13,fontFamily:F,minWidth:200}}><option value="">-- Select student --</option>{clsStu.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div><Sel label="TERM" value={term} onChange={setTerm} options={TERMS}/><Sel label="EXAM TYPE" value={examType} onChange={setExamType} options={EXAM_TYPES}/><Sel label="YEAR" value={year} onChange={setYear} options={YEARS}/></div></Card>
-      {sel?<ReportCard student={sel} results={results} comments={comments} term={term} year={year} examType={examType} logo={logo} students={students}/>:<Empty icon="📋" text="Select a student to view their report"/>}
+      {sel?<ReportCard student={sel} results={results} comments={comments} term={term} year={year} examType={examType} logo={logo} students={students} ttSetup={ttSetup} users={users}/>:<Empty icon="📋" text="Select a student to view their report"/>}
     </div>
   );
 }
-function ReportCard({student,results,comments,term,year,examType,isParent,logo,students}) {
+function ReportCard({student,results,comments,term,year,examType,isParent,logo,students,ttSetup,users}) {
   const subs=getSubs(student.class);
   const rawSr=results.filter(r=>r.studentId===student.id&&r.term===term&&r.year===year&&r.examType===examType);
   const srMap={}; rawSr.forEach(r=>{srMap[r.subject]=r;});
@@ -1125,15 +1313,31 @@ function ReportCard({student,results,comments,term,year,examType,isParent,logo,s
   const total=sr.reduce((a,b)=>a+b.marks,0);
   const avg=sr.length?total/sr.length:0;
   const og=getGrade(avg);
-  // Compute position in class
   const classStudents=(students||[]).filter(s=>s.class===student.class);
   const classRanked=classStudents.map(s=>{
     const r2=results.filter(r=>r.studentId===s.id&&r.term===term&&r.year===year&&r.examType===examType);
     return {...s,avg:r2.length?r2.reduce((a,b)=>a+b.marks,0)/r2.length:0};
   }).sort((a,b)=>b.avg-a.avg);
   const position=classRanked.findIndex(s=>s.id===student.id)+1||"—";
+  // Get class teacher name
+  function getClsTeacher(){
+    const sd=ttSetup?.setupData; if(!sd) return "";
+    const tid=(sd.classTeachers||{})[student.class];
+    if(tid){const u=(users||[]).find(u=>u.id===tid);return u?u.name:"";}
+    const cls=(sd.classes||[]).find(c=>c.name===student.class);
+    return cls?.classTeacherName||"";
+  }
+  function getSubTeacher(subject){
+    const sd=ttSetup?.setupData; if(!sd) return "";
+    const tid=(sd.subjectTeachers||{})[`${student.class}::${subject}`];
+    if(tid){const u=(users||[]).find(u=>u.id===tid);return u?u.name:"";}
+    const cls=(sd.classes||[]).find(c=>c.name===student.class);
+    if(cls){const sub=(cls.subjects||[]).find(s=>s.subject===subject);if(sub?.teacherName)return sub.teacherName;}
+    return "";
+  }
+  const clsTeacher=getClsTeacher();
   return (
-    <Card style={{maxWidth:700,margin:"0 auto",fontFamily:F}}>
+    <Card style={{maxWidth:720,margin:"0 auto",fontFamily:F}}>
       <div style={{textAlign:"center",borderBottom:"2px solid #1e3a5f",paddingBottom:14,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:14,marginBottom:8}}><Logo size={64} src={logo}/><div><div style={{fontSize:18,fontWeight:"bold",color:"#1e3a5f"}}>{SCHOOL.name}</div><div style={{fontSize:11,color:"#64748b"}}>{SCHOOL.location}</div><div style={{fontSize:11,color:"#64748b"}}>{SCHOOL.phone} | {SCHOOL.email}</div><div style={{fontSize:11,fontStyle:"italic",color:"#15803d",fontWeight:"bold"}}>"{SCHOOL.motto}"</div></div></div>
         <div style={{fontSize:13,fontWeight:"bold",background:"#1e3a5f",color:"white",display:"inline-block",padding:"4px 20px",borderRadius:20,letterSpacing:1}}>{examType.toUpperCase()} — {term.toUpperCase()} {year}</div>
@@ -1148,28 +1352,46 @@ function ReportCard({student,results,comments,term,year,examType,isParent,logo,s
         </div>
         <Avatar name={student.name} photo={student.photo} size={72}/>
       </div>
-      <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}><table style={{width:"100%",borderCollapse:"collapse",marginBottom:14,minWidth:400}}>
-        <thead><tr style={{background:"#1e3a5f",color:"white"}}>{["Subject","Marks","Grade","Points","Remarks"].map(h=><th key={h} style={{padding:"8px 12px",textAlign:"left",fontSize:12}}>{h}</th>)}</tr></thead>
+      <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}><table style={{width:"100%",borderCollapse:"collapse",marginBottom:14,minWidth:500}}>
+        <thead><tr style={{background:"#1e3a5f",color:"white"}}>{["Subject","Marks","Grade","Points","Remarks","Init."].map(h=><th key={h} style={{padding:"7px 10px",textAlign:"left",fontSize:11}}>{h}</th>)}</tr></thead>
         <tbody>
-          {subs.map((s,i)=>{const r=sr.find(x=>x.subject===s); const g=r?getGrade(r.marks):null; return(<tr key={s} style={{background:i%2===0?"white":"#fafafa"}}><td style={{padding:"7px 12px",fontSize:12}}>{s}</td><td style={{padding:"7px 12px",fontSize:13,fontWeight:"bold",textAlign:"center"}}>{r?r.marks:"—"}</td><td style={{padding:"7px 12px"}}>{g?<span style={{background:g.bg,color:g.col,fontSize:11,padding:"2px 8px",borderRadius:20,fontWeight:"bold"}}>{g.g}</span>:<span style={{color:"#94a3b8"}}>—</span>}</td><td style={{padding:"7px 12px",textAlign:"center",fontSize:12}}>{g?g.pts:"—"}</td><td style={{padding:"7px 12px",fontSize:11,color:"#64748b"}}>{g?g.lbl:"—"}</td></tr>);})}
+          {subs.map((s,i)=>{
+            const r=sr.find(x=>x.subject===s);
+            const g=r?getGrade(r.marks):null;
+            const remark=r?getAutoRemark(s,r.marks):"—";
+            const subT=getSubTeacher(s);
+            const initials=subT?getInitials(subT):"—";
+            return(<tr key={s} style={{background:i%2===0?"white":"#fafafa"}}>
+              <td style={{padding:"6px 10px",fontSize:12}}>{s}</td>
+              <td style={{padding:"6px 10px",fontSize:13,fontWeight:"bold",textAlign:"center"}}>{r?r.marks:"—"}</td>
+              <td style={{padding:"6px 10px"}}>{g?<span style={{background:g.bg,color:g.col,fontSize:11,padding:"2px 8px",borderRadius:20,fontWeight:"bold"}}>{g.g}</span>:<span style={{color:"#94a3b8"}}>—</span>}</td>
+              <td style={{padding:"6px 10px",textAlign:"center",fontSize:12}}>{g?g.pts:"—"}</td>
+              <td style={{padding:"6px 10px",fontSize:11,color:"#374151"}}>{remark}</td>
+              <td style={{padding:"6px 10px",fontSize:11,color:"#64748b",textAlign:"center",fontWeight:"bold"}}>{initials}</td>
+            </tr>);
+          })}
         </tbody>
         <tfoot>
           <tr style={{background:"#fef3c7",fontWeight:"bold"}}>
-            <td style={{padding:"8px 12px",fontSize:12}}>TOTAL MARKS</td>
-            <td style={{padding:"8px 12px",fontSize:14,fontWeight:"bold",textAlign:"center"}}>{sr.length?total.toFixed(0):"—"}</td>
-            <td colSpan={3} style={{padding:"8px 12px",fontSize:11,color:"#64748b"}}>Sum of all subjects</td>
+            <td style={{padding:"8px 10px",fontSize:12}}>TOTAL MARKS</td>
+            <td style={{padding:"8px 10px",fontSize:14,fontWeight:"bold",textAlign:"center"}}>{sr.length?total.toFixed(0):"—"}</td>
+            <td colSpan={4} style={{padding:"8px 10px",fontSize:11,color:"#64748b"}}>Sum of all subjects</td>
           </tr>
           <tr style={{background:"#f0fdf4",fontWeight:"bold"}}>
-            <td style={{padding:"8px 12px",fontSize:12}}>AVERAGE</td>
-            <td style={{padding:"8px 12px",fontSize:14,fontWeight:"bold",textAlign:"center"}}>{avg>0?avg.toFixed(1):"—"}</td>
-            <td style={{padding:"8px 12px"}}>{avg>0?<span style={{background:og.bg,color:og.col,fontSize:12,padding:"3px 10px",borderRadius:20,fontWeight:"bold"}}>{og.g}</span>:"—"}</td>
-            <td style={{padding:"8px 12px",textAlign:"center",fontSize:12}}>{avg>0?og.pts:"—"}</td>
-            <td style={{padding:"8px 12px",fontSize:11}}>{avg>0?og.lbl:"—"}</td>
+            <td style={{padding:"8px 10px",fontSize:12}}>MEAN SCORE</td>
+            <td style={{padding:"8px 10px",fontSize:14,fontWeight:"bold",textAlign:"center"}}>{avg>0?avg.toFixed(1):"—"}</td>
+            <td style={{padding:"8px 10px"}}>{avg>0?<span style={{background:og.bg,color:og.col,fontSize:12,padding:"3px 10px",borderRadius:20,fontWeight:"bold"}}>{og.g}</span>:"—"}</td>
+            <td style={{padding:"8px 10px",textAlign:"center",fontSize:12}}>{avg>0?og.pts:"—"}</td>
+            <td colSpan={2} style={{padding:"8px 10px",fontSize:11}}>{avg>0?og.lbl:"—"}</td>
           </tr>
         </tfoot>
       </table></div>
-      <div style={{border:"1px solid #e2e8f0",borderRadius:8,padding:12,marginBottom:14}}><div style={{fontSize:12,fontWeight:"bold",color:"#1e3a5f",marginBottom:6}}>Teacher's Comment</div><div style={{fontSize:12,color:"#374151",minHeight:36}}>{comment?comment.text:<i style={{color:"#94a3b8"}}>No comment recorded.</i>}</div>{comment&&<div style={{fontSize:10,color:"#94a3b8",marginTop:6}}>— {comment.teacher} ({comment.date})</div>}</div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16,marginTop:14}}>{["Class Teacher","Head Teacher","Parent/Guardian"].map(l=><div key={l} style={{textAlign:"center"}}><div style={{borderTop:"1px solid #374151",marginBottom:4,paddingTop:4,fontSize:11,color:"#64748b"}}>{l}</div></div>)}</div>
+      <div style={{border:"1px solid #e2e8f0",borderRadius:8,padding:12,marginBottom:14}}><div style={{fontSize:12,fontWeight:"bold",color:"#1e3a5f",marginBottom:6}}>Class Teacher's Comment</div><div style={{fontSize:12,color:"#374151",minHeight:36}}>{comment?comment.text:<i style={{color:"#94a3b8"}}>No comment recorded.</i>}</div>{comment&&<div style={{fontSize:10,color:"#94a3b8",marginTop:6}}>— {comment.teacher} ({comment.date})</div>}</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16,marginTop:14}}>
+        <div style={{textAlign:"center"}}><div style={{borderTop:"1px solid #374151",marginBottom:4,paddingTop:4,fontSize:11,color:"#64748b"}}>Class Teacher</div>{clsTeacher&&<div style={{fontSize:11,color:"#1e3a5f",fontWeight:"bold"}}>{clsTeacher}</div>}<div style={{fontSize:9,color:"#94a3b8",marginTop:8}}>Signature & Date</div></div>
+        <div style={{textAlign:"center"}}><div style={{borderTop:"1px solid #374151",marginBottom:4,paddingTop:4,fontSize:11,color:"#64748b"}}>Head Teacher</div><div style={{fontSize:9,color:"#94a3b8",marginTop:8}}>Signature & Date</div></div>
+        <div style={{textAlign:"center"}}><div style={{borderTop:"1px solid #374151",marginBottom:4,paddingTop:4,fontSize:11,color:"#64748b"}}>Parent/Guardian</div><div style={{fontSize:9,color:"#94a3b8",marginTop:8}}>Signature & Date</div></div>
+      </div>
       <div style={{marginTop:14,background:"#f8fafc",borderRadius:8,padding:"10px 12px"}}><div style={{fontSize:10,fontWeight:"bold",color:"#374151",marginBottom:4}}>CBC Grading Scale:</div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{[{g:"EE1",r:"90-100"},{g:"EE2",r:"75-89"},{g:"ME1",r:"58-74"},{g:"ME2",r:"41-57"},{g:"AE1",r:"31-40"},{g:"AE2",r:"21-30"},{g:"BE1",r:"11-20"},{g:"BE2",r:"0-10"}].map(({g,r})=>{const gd=getGrade(g==="EE1"?95:g==="EE2"?80:g==="ME1"?65:g==="ME2"?50:g==="AE1"?35:g==="AE2"?25:g==="BE1"?15:5); return <span key={g} style={{fontSize:9,background:gd.bg,color:gd.col,padding:"2px 6px",borderRadius:12,fontWeight:"bold"}}>{g}: {r}</span>;})}</div></div>
       {!isParent&&<div style={{marginTop:16,textAlign:"center"}}><Btn onClick={()=>window.print()} v="primary">🖨️ Print Report</Btn></div>}
     </Card>
@@ -6670,7 +6892,7 @@ export default function App(){
         {view==="admissions"&&<AdmissionsPage students={students} setStudents={setStudents}/>}
         {view==="results"&&<ResultsPage {...ctx}/>}
         {view==="analytics"&&<AnalyticsPage {...ctx}/>}
-        {view==="reports"&&<ReportsPage {...ctx}/>}
+        {view==="reports"&&<ReportsPage {...ctx} ttSetup={ttSetup}/>}
         {view==="fees"&&<FeesPage students={students} fees={fees} setFees={setFees} user={user} logo={logo}/>}
         {view==="feestructure"&&<FeeStructurePage user={user} logo={logo} feeStructure={feeStructure} setFeeStructure={setFeeStructure}/>}
         {view==="exams"&&<ExamManagementPage students={students} staff={staff} user={user} examSchedules={examSchedules} setExamSchedules={setExamSchedules} logo={logo}/>}
