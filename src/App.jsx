@@ -2689,7 +2689,6 @@ For LPW=6 non-2P: one day appears twice in the array (non-consecutive placement)
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
-          model:      "claude-sonnet-4-20250514",
           max_tokens: 8000,
           messages:   [{role:"user", content:prompt}]
         })
