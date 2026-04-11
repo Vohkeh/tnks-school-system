@@ -2470,9 +2470,14 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
   }
 
   // ── Core placement engine ─────────────────────────────────────────────────
-  // Places each subject EXACTLY plan[cls][sub].lpw times.
-  // Strictly honours availability — only periods the user enabled are used.
-  // Spreads lessons across days; no same-subject back-to-back.
+  // Rules enforced:
+  //  • Strictly honours availability — only enabled periods used (even in repair).
+  //  • No same-subject on consecutive periods unless it IS the 2P double block.
+  //  • 2P double block → always 2 immediately-consecutive periods, same day.
+  //  • ≤5 LPW (non-double) → exactly 1 lesson per day, spread across different days.
+  //  • 2P subjects → 1 day with the double pair + 1 per day for remaining singles.
+  //  • 6 LPW (non-double) → 1 day gets 2 non-adjacent lessons, 4 other days get 1 each.
+  //  • No teacher teaching two classes at the same time.
   function applyPlan(plan, gen, busyMap) {
     const CONSEC = getConsecPairs();
     const isUpperCls = cls => ["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(cls);
@@ -2491,36 +2496,22 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
       function getTeacher(sub) {
         return upper ? (getSubTeacher(cls,sub)||"TBD") : (clsTeacher||"TBD");
       }
-      function isAdj(day, si, sub) {
-        return Object.entries(subOnSlot[day]).some(([esi,s]) =>
-          s===sub && areConsec(si, parseInt(esi), CONSEC)
-        );
+
+      // True if slot si is CONSEC-adjacent to any existing slot of the same subject on that day
+      function hasAdjSameSub(day, si, sub) {
+        return CONSEC.some(([a,b]) => {
+          if(a===si) return subOnSlot[day][b]===sub;
+          if(b===si) return subOnSlot[day][a]===sub;
+          return false;
+        });
       }
-      function findSlot(day, sub, avail, allowSecond, relaxT) {
-        const teacher = getTeacher(sub);
-        const best = [];
-        for(let si=0; si<numSlots; si++) {
-          if(slotUsed[day].has(si)) continue;
-          const period = LESSON_SLOTS[si].period;
-          if(!avail.includes(period)) continue; // ★ hard availability check
-          const cnt = subDayCnt[day][sub]||0;
-          if(cnt>=1 && !allowSecond) continue;
-          if(cnt>=2) continue;
-          if(isAdj(day, si, sub)) continue;
-          const bk = `${teacher}::${day}::${si}`;
-          const tFree = teacher==="TBD" || !busyMap[bk];
-          if(!tFree && !relaxT) continue;
-          best.push({si, tFree});
-        }
-        const c = best.find(b=>b.tFree) || best[0] || null;
-        return c ? c.si : null;
-      }
-      function findConsec(day, sub, avail, relaxT) {
+
+      // Find a free consecutive pair for a double lesson
+      function findConscPair(day, sub, avail, relaxT) {
         const teacher = getTeacher(sub);
         for(const [si1,si2] of shuffle([...CONSEC])) {
           if(!LESSON_SLOTS[si1]||!LESSON_SLOTS[si2]) continue;
-          const p1=LESSON_SLOTS[si1].period, p2=LESSON_SLOTS[si2].period;
-          if(!avail.includes(p1)||!avail.includes(p2)) continue;
+          if(!avail.includes(LESSON_SLOTS[si1].period)||!avail.includes(LESSON_SLOTS[si2].period)) continue;
           if(slotUsed[day].has(si1)||slotUsed[day].has(si2)) continue;
           if(!relaxT && teacher!=="TBD") {
             if(busyMap[`${teacher}::${day}::${si1}`]||busyMap[`${teacher}::${day}::${si2}`]) continue;
@@ -2529,6 +2520,30 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
         }
         return null;
       }
+
+      // Find a free single slot on a day.
+      // allowSecond: allow placing a 2nd lesson of this sub on this day (for 6-LPW rule).
+      // mustNotAdj: if true, rejects slots CONSEC-adjacent to same sub (always true for non-double singles).
+      function findSingle(day, sub, avail, allowSecond, relaxT) {
+        const teacher = getTeacher(sub);
+        const candidates = [];
+        for(let si=0; si<numSlots; si++) {
+          if(slotUsed[day].has(si)) continue;
+          const period = LESSON_SLOTS[si].period;
+          if(!avail.includes(period)) continue;           // hard availability gate
+          const cnt = subDayCnt[day][sub]||0;
+          if(cnt>=1 && !allowSecond) continue;
+          if(cnt>=2) continue;
+          if(hasAdjSameSub(day, si, sub)) continue;       // no accidental consecutive
+          const bk = `${teacher}::${day}::${si}`;
+          const tFree = teacher==="TBD" || !busyMap[bk];
+          if(!tFree && !relaxT) continue;
+          candidates.push({si, tFree});
+        }
+        const best = candidates.find(c=>c.tFree) || candidates[0] || null;
+        return best ? best.si : null;
+      }
+
       function occupy(day, si, sub, isDbl=false, isPart2=false) {
         const teacher = getTeacher(sub);
         const period  = LESSON_SLOTS[si].period;
@@ -2539,7 +2554,7 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
         if(teacher!=="TBD") busyMap[`${teacher}::${day}::${si}`] = true;
       }
 
-      // Sort: doubles first, then descending LPW (hardest to place first)
+      // Sort: doubles first (hardest to place), then descending LPW
       const entries = Object.entries(plan[cls]||{})
         .sort(([,a],[,b]) => {
           if(a.double && !b.double) return -1;
@@ -2548,48 +2563,66 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
         });
 
       for(const [sub, {lpw, double:isDbl, avail}] of entries) {
-        let remaining = lpw; // user's exact count — never add or remove
-        const daysUsed = new Set();
+        let remaining = lpw;
+        const daysUsed = new Set(); // days that already have a lesson of this sub
 
-        // 1. Double block
+        // ── STEP 1: Place the double block (2 consecutive periods, same day) ──
         if(isDbl && remaining>=2) {
+          let placed = false;
           for(const relaxT of [false, true]) {
-            if(daysUsed.size>0) break;
+            if(placed) break;
             for(const day of shuffle([...DAYS])) {
-              const pair = findConsec(day, sub, avail, relaxT);
+              const pair = findConscPair(day, sub, avail, relaxT);
               if(pair) {
                 occupy(day, pair[0], sub, true, false);
                 occupy(day, pair[1], sub, true, true);
-                daysUsed.add(day); remaining-=2; break;
+                daysUsed.add(day); remaining-=2; placed=true; break;
               }
             }
           }
         }
 
-        // 2. Single lessons — spread across days
-        const allowSameDay = remaining > DAYS.length;
+        // ── STEP 2: Singles — strictly 1 per fresh day ────────────────────────
+        // For 6+ LPW non-double, one day may get 2 (non-adjacent) lessons.
+        // For all others (including 2P singles), each lesson on its own day.
+        const needExtraDay = !isDbl && lpw>=6; // needs 1 day with 2 lessons
+        let extraDayPlaced = false;
+
+        // Pass A: place singles on days not yet used by this subject
         for(const relaxT of [false, true]) {
           if(remaining<=0) break;
-          const fresh = shuffle([...DAYS].filter(d=>!daysUsed.has(d)));
-          const reuse = allowSameDay ? shuffle([...DAYS].filter(d=>daysUsed.has(d))) : [];
-          for(const day of [...fresh, ...reuse]) {
+          for(const day of shuffle([...DAYS].filter(d=>!daysUsed.has(d)))) {
             if(remaining<=0) break;
-            if(daysUsed.has(day) && !allowSameDay) continue;
-            const si = findSlot(day, sub, avail, daysUsed.has(day), relaxT);
+            const si = findSingle(day, sub, avail, false, relaxT);
             if(si!==null) { occupy(day,si,sub); daysUsed.add(day); remaining--; }
           }
         }
 
-        // 3. Last resort — any slot on any day, ignore day-spread
+        // Pass B: for 6-LPW, place 1 extra lesson on an already-used day (non-adjacent)
+        if(needExtraDay && remaining>0 && !extraDayPlaced) {
+          for(const relaxT of [false, true]) {
+            if(extraDayPlaced) break;
+            for(const day of shuffle([...DAYS].filter(d=>daysUsed.has(d)))) {
+              if(remaining<=0) break;
+              const si = findSingle(day, sub, avail, true, relaxT);
+              if(si!==null) {
+                occupy(day,si,sub); remaining--;
+                extraDayPlaced=true; break;
+              }
+            }
+          }
+        }
+
+        // Pass C: last resort — any slot on any day (avail still honoured)
         for(const relaxT of [false, true]) {
           if(remaining<=0) break;
           for(const day of shuffle([...DAYS])) {
             if(remaining<=0) break;
-            const si = findSlot(day, sub, avail, true, relaxT);
+            const si = findSingle(day, sub, avail, true, relaxT);
             if(si!==null) { occupy(day,si,sub); remaining--; }
           }
         }
-        // If remaining > 0 here, availability windows are too narrow for the LPW set.
+        // remaining > 0 only if availability windows are too narrow for the LPW set.
       }
     });
   }
@@ -2668,6 +2701,16 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
         return bm;
       }
 
+      // Is si CONSEC-adjacent to any same-sub slot in the slots array?
+      const _RC = getConsecPairs(); // consecutive pairs for repair scope
+      function adjInSlots(slots, si, sub) {
+        return _RC.some(([a,b]) => {
+          if(a===si) return slots[b]?.subject===sub;
+          if(b===si) return slots[a]?.subject===sub;
+          return false;
+        });
+      }
+
       for(let round = 0; round < REPAIR_ROUNDS; round++) {
         const conflicts = buildConflicts(gen);
         if(Object.keys(conflicts).length === 0) break;
@@ -2699,7 +2742,9 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
             const cell = (gen[cls][day]||[])[si];
             if(!cell || cell.ppi) continue;
 
-            // Try to find a free slot for this subject in this class (different day preferred)
+            // Retrieve this subject's allowed periods for avail checks
+            const subAvail = plan[cls]?.[cell.subject]?.avail || [];
+
             let moved = false;
 
             // Try other days first, then same day (different slot)
@@ -2710,12 +2755,13 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
               for(let tSi = 0; tSi < slots.length; tSi++) {
                 if(slots[tSi] !== null) continue; // slot not empty
                 if(tDay === "Friday" && tSi === 0) continue; // PPI slot
+                // ★ Check availability of target slot period
+                const tPeriod = LESSON_SLOTS[tSi]?.period;
+                if(!subAvail.includes(tPeriod)) continue;
                 const tBk = `${teacher}::${tDay}::${tSi}`;
                 if(bm[tBk]) continue; // teacher busy there
-                // Check no back-to-back same subject on target day
-                const prev = tSi > 0 ? slots[tSi-1]?.subject : null;
-                const next = tSi < slots.length-1 ? slots[tSi+1]?.subject : null;
-                if(prev === cell.subject || next === cell.subject) continue;
+                // ★ Check no CONSEC-adjacent same subject (not just index adjacency)
+                if(adjInSlots(slots, tSi, cell.subject)) continue;
                 // Move: clear old slot, fill new slot
                 gen[cls][day][si] = null;
                 gen[cls][tDay][tSi] = {...cell, period: LESSON_SLOTS[tSi]?.period || (tSi+1)};
@@ -2735,10 +2781,19 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
                   const target = slots[tSi];
                   if(!target || target.ppi) continue;
                   if(tDay === day && tSi === si) continue;
+                  // ★ Both sides must respect availability
+                  const tPeriod = LESSON_SLOTS[tSi]?.period;
+                  const sPeriod = LESSON_SLOTS[si]?.period;
+                  if(!subAvail.includes(tPeriod)) continue;
+                  const targetAvail = plan[cls]?.[target.subject]?.avail || [];
+                  if(!targetAvail.includes(sPeriod)) continue;
                   const targetTeacher = target.teacher || "TBD";
                   const tBk = `${teacher}::${tDay}::${tSi}`;
                   const srcBk2 = `${targetTeacher}::${day}::${si}`;
-                  if(targetTeacher !== "TBD" && bm[srcBk2]) continue; // swap target would clash at source
+                  if(targetTeacher !== "TBD" && bm[srcBk2]) continue;
+                  // ★ Check CONSEC adjacency for both subjects after swap
+                  if(adjInSlots(slots, tSi, cell.subject)) continue;
+                  // Temporarily null both then re-check (swap doesn't create adjacency with each other)
                   // Do the swap
                   gen[cls][day][si]   = {...target, period: LESSON_SLOTS[si]?.period || (si+1)};
                   gen[cls][tDay][tSi] = {...cell,   period: LESSON_SLOTS[tSi]?.period || (tSi+1)};
