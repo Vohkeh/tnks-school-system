@@ -2075,130 +2075,170 @@ function TimetableSetup({staff,setupData,setSetupData}) {
   );
 }
 
+
 // ══════════════════════════════════════════════════════════
-// TIMETABLEMASTER — Professional Scheduling Engine
+// TIMETABLE ADVANCED — Module-level helpers
 // ══════════════════════════════════════════════════════════
-function TimetablePage({students,staff,user,timetable:tt,setTimetable:setTt,ttSetup,setTtSetup}){
-  const upd=(key,val)=>setTtSetup(p=>({...p,[key]:val}));
-  const ttName=ttSetup.name; const setTtName=v=>upd("name",v);
-  const ttDesc=ttSetup.desc; const setTtDesc=v=>upd("desc",v);
-  const ttSession=ttSetup.session; const setTtSession=v=>upd("session",v);
-  const ttStartDate=ttSetup.startDate; const setTtStartDate=v=>upd("startDate",v);
-  const ttEndDate=ttSetup.endDate; const setTtEndDate=v=>upd("endDate",v);
-  const setupData=ttSetup.setupData; const setSetupData=v=>upd("setupData",typeof v==="function"?v(ttSetup.setupData):v);
-  const customLpw=ttSetup.customLpw; const setCustomLpw=v=>upd("customLpw",typeof v==="function"?v(ttSetup.customLpw):v);
-  const customDouble=ttSetup.customDouble; const setCustomDouble=v=>upd("customDouble",typeof v==="function"?v(ttSetup.customDouble):v);
-  const bellPeriods=ttSetup.bellPeriods; const setBellPeriods=v=>upd("bellPeriods",typeof v==="function"?v(ttSetup.bellPeriods):v);
-  const workingDays=ttSetup.workingDays; const setWorkingDays=v=>upd("workingDays",typeof v==="function"?v(ttSetup.workingDays):v);
-  const rooms=ttSetup.rooms; const setRooms=v=>upd("rooms",typeof v==="function"?v(ttSetup.rooms):v);
-  const daySchedule=ttSetup.daySchedule; const setDaySchedule=v=>upd("daySchedule",typeof v==="function"?v(ttSetup.daySchedule):v);
-  const satSchedule=ttSetup.satSchedule; const setSatSchedule=v=>upd("satSchedule",typeof v==="function"?v(ttSetup.satSchedule):v);
-  const sunSchedule=ttSetup.sunSchedule; const setSunSchedule=v=>upd("sunSchedule",typeof v==="function"?v(ttSetup.sunSchedule):v);
-  const [tab,setTab]=useState("setup");
-  const [setupStep,setSetupStep]=useState(1);
-  const [selCls,setSelCls]=useState("Grade 7");
-  const [editCell,setEditCell]=useState(null);
-  const [editVal,setEditVal]=useState({});
-  const [msg,setMsg]=useState("");
-  const [msgType,setMsgType]=useState("ok");
-  const [weekendView,setWeekendView]=useState(false);
-  const [filterTeacher,setFilterTeacher]=useState("All");
-  const [dragSrc,setDragSrc]=useState(null);
-  const [dragOver,setDragOver]=useState(null);
-  const [generating,setGenerating]=useState(false);
-  const [genProgress,setGenProgress]=useState(0);
-  const [conflictMap,setConflictMap]=useState({});
-  const [editSchedIdx,setEditSchedIdx]=useState(null);
-  const [subView,setSubView]=useState("byclass");
-  const [editBellIdx,setEditBellIdx]=useState(null);
-  const [newRoom,setNewRoom]=useState("");
-  const [editWeekendCell,setEditWeekendCell]=useState(null);
-  const [weekendEditVal,setWeekendEditVal]=useState({});
+const DEFAULT_LPW = {
+  PP:    {"Language Activities":5,"Mathematical Activities":5,"Environmental Activities":3,"Creative Activities":3,"Religious Education Activities":2},
+  Lower: {"English Language Activities":5,"Kiswahili Language Activities":5,"Mathematical Activities":5,"Environmental Activities":3,"Religious Education Activities":2,"Creative Activities":3,"Indigenous Language Activities":2},
+  Upper: {"English":5,"Kiswahili":5,"Mathematics":5,"Integrated Science":4,"Social Studies":3,"Religious Education (CRE/IRE)":2,"Agriculture and Nutrition":2,"Creative Arts and Sports":3},
+  JSS:   {"English":5,"Kiswahili":5,"Mathematics":5,"Integrated Science":5,"History":2,"Geography":2,"Pre-Technical and Pre-Career Studies":3,"Agriculture and Nutrition":2,"Religious Education (CRE/IRE)":2,"Creative Arts and Sports":3},
+};
+const PALETTE = ["#dbeafe","#d1fae5","#fef3c7","#fee2e2","#f3e8ff","#ccfbf1","#fce7f3","#e0f2fe","#fef9c3","#ffe4e6","#ecfdf5","#faf5ff","#fff7ed","#f0fdf4"];
+// Alias so new TimetablePage can use getTTSubs (matches App's TIMETABLE_SUBJECTS_MAP)
+function getTTSubs(cls) { return TIMETABLE_SUBJECTS_MAP[cg(cls)] || []; }
+function getShort(sub) { return SUBJECT_SHORT[sub] || sub.split(" ").map(w=>w.slice(0,3)).join("").toUpperCase().slice(0,6); }
 
-  const FT="'Nunito',Georgia,sans-serif";
+// ══════════════════════════════════════════════════════════
+// TIMETABLEMASTER — Advanced Professional Scheduling Engine
+// (v2: editable bell schedule, availability grid, subject
+//  short forms, save/load snapshots, smart 1-per-day gen)
+// ══════════════════════════════════════════════════════════
+function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt, ttSetup, setTtSetup}) {
 
-  // ── Slot definitions (derived from editable bellPeriods) ─
-  const MAIN_SLOTS=bellPeriods.map((bp,i)=>bp.type==="break"
-    ?{isBreak:true,label:bp.name,start:bp.start,end:bp.end,bm:0,id:bp.id}
-    :{isBreak:false,label:bp.name,start:bp.start,end:bp.end,period:bellPeriods.filter((x,j)=>x.type==="period"&&j<=i).length,id:bp.id}
-  );
-  const LESSON_SLOTS=MAIN_SLOTS.filter(s=>!s.isBreak);
-  // Evening lessons removed
-  const SAT_LESSON_SLOTS=[
-    {isBreak:false,label:"L1",start:"08:00",end:"09:00",period:1},
-    {isBreak:true,label:"☕",start:"09:00",end:"09:20",bm:20},
-    {isBreak:false,label:"L2",start:"09:20",end:"10:20",period:2},
-    {isBreak:false,label:"L3",start:"10:20",end:"11:20",period:3},
-    {isBreak:true,label:"☕",start:"11:20",end:"11:30",bm:10},
-    {isBreak:false,label:"L4",start:"11:30",end:"12:30",period:4},
-    {isBreak:false,label:"L5",start:"12:30",end:"13:30",period:5},
-  ].filter(s=>!s.isBreak);
+  // ── derive helpers from ttSetup ───────────────────────────────────────────
+  const upd = (key, val) => setTtSetup(p => ({...p, [key]: val}));
+  const ttName       = ttSetup.name;         const setTtName     = v => upd("name", v);
+  const ttDesc       = ttSetup.desc;         const setTtDesc     = v => upd("desc", v);
+  const ttSession    = ttSetup.session;      const setTtSession  = v => upd("session", v);
+  const ttStartDate  = ttSetup.startDate;    const setTtStart    = v => upd("startDate", v);
+  const ttEndDate    = ttSetup.endDate;      const setTtEnd      = v => upd("endDate", v);
+  const setupData    = ttSetup.setupData;
+  const setSetupData = v => upd("setupData", typeof v==="function" ? v(ttSetup.setupData) : v);
+  const customLpw    = ttSetup.customLpw || {};
+  const setCustomLpw = v => upd("customLpw", typeof v==="function" ? v(ttSetup.customLpw||{}) : v);
+  const customDouble = ttSetup.customDouble || {};
+  const setCustomDouble = v => upd("customDouble", typeof v==="function" ? v(ttSetup.customDouble||{}) : v);
+  const bellPeriods  = ttSetup.bellPeriods || [];
+  const setBellPeriods = v => upd("bellPeriods", typeof v==="function" ? v(ttSetup.bellPeriods||[]) : v);
+  const workingDays  = ttSetup.workingDays || DAYS;
+  const setWorkingDays = v => upd("workingDays", typeof v==="function" ? v(ttSetup.workingDays||DAYS) : v);
+  const daySchedule  = ttSetup.daySchedule || [];
+  const setDaySchedule = v => upd("daySchedule", typeof v==="function" ? v(ttSetup.daySchedule||[]) : v);
+  const satSchedule  = ttSetup.satSchedule || [];
+  const setSatSchedule = v => upd("satSchedule", typeof v==="function" ? v(ttSetup.satSchedule||[]) : v);
+  const sunSchedule  = ttSetup.sunSchedule || [];
+  const setSunSchedule = v => upd("sunSchedule", typeof v==="function" ? v(ttSetup.sunSchedule||[]) : v);
 
-  const tStaff=(staff||[]).filter(s=>s.staffType==="teaching");
-  const allTeachers=tStaff.map(s=>s.name);
-  const isJSS=["Grade 7","Grade 8","Grade 9"].includes(selCls);
-  const isUpper=["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(selCls);
-  const subs=getSubs(selCls);
-  const lpw=getLessonsPerWeek(selCls);
+  // ── UI state ──────────────────────────────────────────────────────────────
+  const [tab, setTab]               = useState("setup");
+  const [setupStep, setSetupStep]   = useState(1);
+  const [selCls, setSelCls]         = useState("Grade 7");
+  const [editCell, setEditCell]     = useState(null);
+  const [editVal, setEditVal]       = useState({});
+  const [msg, setMsg]               = useState("");
+  const [msgType, setMsgType]       = useState("ok");
+  const [weekendView, setWeekendView] = useState(false);
+  const [filterTeacher, setFilterTeacher] = useState("All");
+  const [dragSrc, setDragSrc]       = useState(null);
+  const [dragOver, setDragOver]     = useState(null);
+  const [generating, setGenerating] = useState(false);
+  const [genProgress, setGenProgress] = useState(0);
+  const [conflictMap, setConflictMap] = useState({});
+  const [subView, setSubView]       = useState("byclass");
+  const [editBellIdx, setEditBellIdx] = useState(null);
+  const [weekendEditCell, setWeekendEditCell] = useState(null);
+  const [weekendEditVal, setWeekendEditVal] = useState({});
+  // Saved timetable snapshots
+  const [savedTTs, setSavedTTs]     = useState([]);
+  const [saveName, setSaveName]     = useState("");
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [loadingSnaps, setLoadingSnaps] = useState(false);
+  const [editSchedIdx, setEditSchedIdx] = useState(null);
 
-  function flash(t,type="ok"){setMsg(t);setMsgType(type);setTimeout(()=>setMsg(""),4000);}
+  const FT = "'Nunito',Georgia,sans-serif";
+  const isAdmin = user?.role === "admin";
 
-  // ── Setup helpers ─────────────────────────────────────
-  function setSubTeacher(cls,sub,t){setSetupData(p=>({...p,subjectTeachers:{...(p.subjectTeachers||{}),[`${cls}::${sub}`]:t}}));}
-  function getSubTeacher(cls,sub){return(setupData.subjectTeachers||{})[`${cls}::${sub}`]||"";}
-  function setClsTeacher(cls,t){setSetupData(p=>({...p,classTeachers:{...(p.classTeachers||{}),[cls]:t}}));}
-  function getClsTeacher(cls){return(setupData.classTeachers||{})[cls]||"";}
-  function toggleAvail(cls,sub,period){
-    const key=`${cls}::${sub}`;
-    const cur=(setupData.subjectAvailability||{})[key]||LESSON_SLOTS.map(s=>s.period);
-    const next=cur.includes(period)?cur.filter(p=>p!==period):[...cur,period].sort((a,b)=>a-b);
-    setSetupData(p=>({...p,subjectAvailability:{...(p.subjectAvailability||{}),[key]:next}}));
+  // ── Derived slot lists ────────────────────────────────────────────────────
+  const LESSON_SLOTS = bellPeriods.filter(b => b.type === "period").map((bp, i) => {
+    const pNum = bellPeriods.filter((x,j) => x.type==="period" && j <= bellPeriods.indexOf(bp)).length;
+    return {...bp, period: pNum, label: bp.name};
+  });
+
+  const MAIN_SLOTS = bellPeriods.map((bp, i) => {
+    if(bp.type === "break") return {...bp, isBreak: true};
+    const pNum = bellPeriods.filter((x,j) => x.type==="period" && j <= i).length;
+    return {...bp, isBreak: false, period: pNum, label: bp.name};
+  });
+
+  const SAT_LESSON_SLOTS = [
+    {isBreak:false, label:"L1", start:"08:00", end:"09:00", period:1},
+    {isBreak:false, label:"L2", start:"09:20", end:"10:20", period:2},
+    {isBreak:false, label:"L3", start:"10:20", end:"11:20", period:3},
+    {isBreak:false, label:"L4", start:"11:30", end:"12:30", period:4},
+    {isBreak:false, label:"L5", start:"12:30", end:"13:30", period:5},
+  ];
+
+  const tStaff     = (staff||[]).filter(s => s.staffType==="teaching");
+  const allTeachers = tStaff.map(s => s.name);
+
+  // ── Setup helpers ─────────────────────────────────────────────────────────
+  const setSubTeacher = (cls, sub, t) =>
+    setSetupData(p => ({...p, subjectTeachers:{...(p.subjectTeachers||{}), [`${cls}::${sub}`]:t}}));
+  const getSubTeacher = (cls, sub) => (setupData.subjectTeachers||{})[`${cls}::${sub}`]||"";
+  const setClsTeacher = (cls, t) =>
+    setSetupData(p => ({...p, classTeachers:{...(p.classTeachers||{}), [cls]:t}}));
+  const getClsTeacher = cls => (setupData.classTeachers||{})[cls]||"";
+
+  // Availability: which periods a subject is allowed in
+  const toggleAvail = (cls, sub, period) => {
+    const key = `${cls}::${sub}`;
+    const all = LESSON_SLOTS.map(s => s.period);
+    const cur = (setupData.subjectAvailability||{})[key] || all;
+    const next = cur.includes(period) ? cur.filter(p => p!==period) : [...cur, period].sort((a,b)=>a-b);
+    setSetupData(p => ({...p, subjectAvailability:{...(p.subjectAvailability||{}), [key]:next}}));
+  };
+  const getAvail = (cls, sub) => {
+    const key = `${cls}::${sub}`;
+    return (setupData.subjectAvailability||{})[key] || LESSON_SLOTS.map(s => s.period);
+  };
+
+  // LPW helpers
+  const getClsLpw = (cls, sub) => {
+    const key = `${cls}::${sub}`;
+    if(customLpw[key] !== undefined) return customLpw[key];
+    return (DEFAULT_LPW[cg(cls)]||{})[sub] || 2;
+  };
+  const setClsLpw = (cls, sub, val) => {
+    const n = Math.max(1, Math.min(10, parseInt(val)||1));
+    setCustomLpw(p => ({...p, [`${cls}::${sub}`]:n}));
+  };
+
+  // Double lesson helpers
+  const getClsDouble = (cls, sub) => {
+    const key = `${cls}::${sub}`;
+    if(customDouble[key] !== undefined) return customDouble[key];
+    return false;
+  };
+  const toggleClsDouble = (cls, sub) =>
+    setCustomDouble(p => ({...p, [`${cls}::${sub}`]:!getClsDouble(cls, sub)}));
+
+  function flash(t, type="ok") {
+    setMsg(t); setMsgType(type);
+    setTimeout(()=>setMsg(""), 4500);
   }
-  function getAvail(cls,sub){return((setupData.subjectAvailability||{})[`${cls}::${sub}`])||LESSON_SLOTS.map(s=>s.period);}
 
-  // Custom lessons-per-week helpers
-  function getClsLpw(cls,sub){
-    const key=`${cls}::${sub}`;
-    if(customLpw[key]!==undefined) return customLpw[key];
-    return getLessonsPerWeek(cls)[sub]||2;
-  }
-  function setClsLpw(cls,sub,val){
-    const n=Math.max(1,Math.min(10,parseInt(val)||1));
-    setCustomLpw(p=>({...p,[`${cls}::${sub}`]:n}));
-  }
-  // Custom double-lesson helpers
-  function getClsDouble(cls,sub){
-    const key=`${cls}::${sub}`;
-    if(customDouble[key]!==undefined) return customDouble[key];
-    return hasDoubleLesson(cls,sub);
-  }
-  function toggleClsDouble(cls,sub){
-    setCustomDouble(p=>({...p,[`${cls}::${sub}`]:!getClsDouble(cls,sub)}));
-  }
-
-  // ── Conflict detection ────────────────────────────────
-  function buildConflicts(grid){
-    const c={};
-    DAYS.forEach(day=>{
-      LESSON_SLOTS.forEach(slot=>{
-        const p=slot.period-1;
-        // Skip Friday Period 1 — reserved for PPI school-wide
-        if(day==="Friday"&&slot.period===1) return;
-        const teachers=[];
-        ALL_CLASSES.forEach(cls=>{
-          const cell=(grid[cls]?.[day]||[])[p];
-          if(cell?.teacher&&cell.teacher!=="TBD"&&!cell.teacher.endsWith("*"))teachers.push({cls,teacher:cell.teacher});
+  // ── Conflict detection ────────────────────────────────────────────────────
+  function buildConflicts(grid) {
+    const c = {};
+    DAYS.forEach(day => {
+      LESSON_SLOTS.forEach((slot, si) => {
+        const teachers = [];
+        ALL_CLASSES.forEach(cls => {
+          const cell = (grid[cls]?.[day]||[])[si];
+          if(cell?.teacher && cell.teacher!=="TBD" && !cell.teacher.endsWith("*"))
+            teachers.push({cls, teacher:cell.teacher});
         });
-        const seen={};
-        teachers.forEach(({cls,teacher})=>{
-          if(!seen[teacher])seen[teacher]=[];
+        const seen = {};
+        teachers.forEach(({cls, teacher}) => {
+          if(!seen[teacher]) seen[teacher] = [];
           seen[teacher].push(cls);
         });
-        Object.entries(seen).forEach(([t,classes])=>{
-          if(classes.length>1){
-            classes.forEach(cls=>{
-              const key=`${cls}-${day}-${slot.period}`;
-              c[key]=`⚠️ ${t} also teaching ${classes.filter(x=>x!==cls).join(", ")}`;
+        Object.entries(seen).forEach(([t, classes]) => {
+          if(classes.length > 1) {
+            classes.forEach(cls => {
+              c[`${cls}-${day}-${slot.period}`] = `${t} also in ${classes.filter(x=>x!==cls).join(",")}`;
             });
           }
         });
@@ -2207,205 +2247,359 @@ function TimetablePage({students,staff,user,timetable:tt,setTimetable:setTt,ttSe
     return c;
   }
 
-  // ── Smart AI Auto-Generator ───────────────────────────
-  function autoGen(){
-    setGenerating(true);setGenProgress(0);
-    setTimeout(()=>{
-      const busy={};const gen={};
-      const allDays=[...DAYS,...WEEKEND_DAYS];
-      ALL_CLASSES.forEach(cls=>{gen[cls]={};allDays.forEach(d=>{gen[cls][d]=Array(11).fill(null);});});
-
-      let prog=0;
-      ALL_CLASSES.forEach(cls=>{
-        prog+=8;setGenProgress(Math.min(prog,95));
-        const clsSubs=getTimetableSubs(cls);
-        const upper=["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(cls);
-        const clsTeacher=getClsTeacher(cls);
-        const clsLpw=getLessonsPerWeek(cls);
-
-        // Build a weekly pool respecting lessons-per-week counts (custom overrides default)
-        const weeklyPool=[];
-        clsSubs.forEach(sub=>{
-          const count=getClsLpw(cls,sub);
-          const isDbl=getClsDouble(cls,sub);
-          if(isDbl&&count>=2){
-            // add one double entry + (count-2) singles
-            weeklyPool.push({sub,double:true});
-            for(let i=0;i<count-2;i++) weeklyPool.push({sub,double:false});
-          } else {
-            for(let i=0;i<count;i++) weeklyPool.push({sub,double:false});
-          }
+  // ══════════════════════════════════════════════════════════════════════════
+  // ⚡ PROFESSIONAL SMART GENERATOR
+  // Rules:
+  //  • Max 1 lesson of a subject per day
+  //  • If LPW = 6: exactly ONE day gets 2 lessons, but they must NOT be consecutive
+  //  • If LPW = 7: two days get 2 lessons each, non-consecutive
+  //  • If LPW <= 5: strictly 1 per day, distributed across different days
+  //  • Teacher conflict resolution: assign next-available teacher slot on that day
+  //  • Friday Period 1 = PPI for all classes
+  // ══════════════════════════════════════════════════════════════════════════
+  function autoGen() {
+    setGenerating(true); setGenProgress(0);
+    setTimeout(() => {
+      try {
+        const busy   = {}; // `teacher-day-slotIdx` → true
+        const gen    = {};
+        const allDays = [...DAYS, ...WEEKEND_DAYS];
+        ALL_CLASSES.forEach(cls => {
+          gen[cls] = {};
+          allDays.forEach(d => { gen[cls][d] = Array(LESSON_SLOTS.length).fill(null); });
         });
 
-        // Shuffle
-        for(let i=weeklyPool.length-1;i>0;i--){
-          const j=Math.floor(Math.random()*(i+1));
-          [weeklyPool[i],weeklyPool[j]]=[weeklyPool[j],weeklyPool[i]];
-        }
+        let prog = 0;
+        const isUpper = cls => ["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(cls);
 
-        // Distribute across weekdays
-        let poolIdx=0;
-        DAYS.forEach((day,di)=>{
-          let si=0;
-          while(si<LESSON_SLOTS.length){
-            const slot=LESSON_SLOTS[si];
-            const p=slot.period;
-            const availSubs=clsSubs.filter(sub=>getAvail(cls,sub).includes(p));
-            let pick=null; let isDouble=false;
-            let tries=0;
-            while(tries<weeklyPool.length){
-              const candidate=weeklyPool[(poolIdx+tries)%weeklyPool.length];
-              const candidateSub=typeof candidate==="object"?candidate.sub:candidate;
-              if(availSubs.includes(candidateSub)){pick=candidateSub;isDouble=typeof candidate==="object"&&candidate.double;break;}
-              tries++;
+        ALL_CLASSES.forEach(cls => {
+          prog += 8; setGenProgress(Math.min(prog, 90));
+          const clsSubs = getTTSubs(cls);
+          const upper   = isUpper(cls);
+          const clsTeacher = getClsTeacher(cls);
+          const numPeriods = LESSON_SLOTS.length;
+          const numDays    = DAYS.length; // 5
+
+          // ── Build subject plan: {sub, count, double} ──────────────────
+          const subPlans = clsSubs.map(sub => ({
+            sub,
+            count:  getClsLpw(cls, sub),
+            double: getClsDouble(cls, sub),
+            avail:  getAvail(cls, sub),
+          }));
+
+          // ── For each subject, decide which days get lessons ────────────
+          // Distribute: if count <= 5 → one lesson per day (pick count days)
+          // If count = 6 → 5 days, one day gets extra (non-consecutive slot)
+          // If count = 7 → 5 days, two days get extra
+          // Returns: [{day, double:bool}] list of planned lessons
+          function planDays(sub, count, isDouble) {
+            const lessons = [];
+            if(count <= numDays) {
+              // One lesson per day, pick `count` days spread evenly
+              const dayIndices = [];
+              const step = numDays / count;
+              for(let i = 0; i < count; i++) dayIndices.push(Math.round(i * step) % numDays);
+              dayIndices.forEach(di => lessons.push({day: DAYS[di], double: false}));
+            } else {
+              // All 5 days get at least 1 lesson
+              DAYS.forEach(d => lessons.push({day: d, double: false}));
+              // Extra lessons on additional days
+              const extras = count - numDays;
+              const extraDays = DAYS.slice(0, extras); // Monday, Tuesday...
+              extraDays.forEach(d => lessons.push({day: d, extra: true}));
             }
-            if(!pick) pick=availSubs[si%Math.max(availSubs.length,1)]||clsSubs[si%clsSubs.length];
-            poolIdx++;
-
-            const teacher=upper?(getSubTeacher(cls,pick)||"TBD"):(clsTeacher||"TBD");
-            const bk=`${teacher}-${day}-${p}`;
-            const hasConflict=teacher!=="TBD"&&busy[bk];
-            if(teacher!=="TBD"&&!hasConflict) busy[bk]=cls;
-            gen[cls][day][si]={subject:pick,teacher:hasConflict?teacher+"*":teacher,period:p,conflict:hasConflict,double:isDouble};
-
-            // If double lesson and next slot exists, fill it too
-            if(isDouble&&si+1<LESSON_SLOTS.length){
-              si++;
-              const slot2=LESSON_SLOTS[si];
-              const bk2=`${teacher}-${day}-${slot2.period}`;
-              const hasConflict2=teacher!=="TBD"&&busy[bk2];
-              if(teacher!=="TBD"&&!hasConflict2) busy[bk2]=cls;
-              gen[cls][day][si]={subject:pick,teacher:hasConflict2?teacher+"*":teacher,period:slot2.period,conflict:hasConflict2,double:true,doublePart:2};
-            }
-            si++;
+            // If subject has double-lesson flag: mark one of its lessons as double
+            if(isDouble && lessons.length >= 2) lessons[0].double = true;
+            return lessons;
           }
+
+          // Build a slot grid: gen[cls][day] = array indexed by slot position
+          // We track: for each day, which slot positions are taken
+          const daySlotUsed = {}; // day → Set of slotIdx
+          DAYS.forEach(d => { daySlotUsed[d] = new Set(); });
+          // Friday slot 0 is PPI
+          daySlotUsed["Friday"].add(0);
+
+          // For each subject, place its lessons
+          subPlans.forEach(({sub, count, double: isDbl, avail}) => {
+            const lessons = planDays(sub, count, isDbl);
+            lessons.forEach(({day, double:isDouble2, extra}) => {
+              // Find an available slot on this day
+              const teacher = upper ? (getSubTeacher(cls, sub)||"TBD") : (clsTeacher||"TBD");
+              const availSlots = LESSON_SLOTS
+                .map((s, si) => ({si, period: s.period}))
+                .filter(({si, period}) => {
+                  if(daySlotUsed[day].has(si)) return false;
+                  if(!avail.includes(period)) return false;
+                  return true;
+                });
+
+              if(isDouble2 && !extra) {
+                // Need two consecutive free slots (non-consecutive if extra day)
+                let placed = false;
+                for(let i = 0; i < availSlots.length - 1; i++) {
+                  const a = availSlots[i], b = availSlots[i+1];
+                  if(b.si - a.si === 1) {
+                    // Check teacher not busy
+                    const bkA = `${teacher}::${day}::${a.si}`;
+                    const bkB = `${teacher}::${day}::${b.si}`;
+                    if(!busy[bkA] && !busy[bkB]) {
+                      gen[cls][day][a.si] = {subject:sub, teacher, period:a.period, double:true};
+                      gen[cls][day][b.si] = {subject:sub, teacher, period:b.period, double:true, doublePart:2};
+                      daySlotUsed[day].add(a.si); daySlotUsed[day].add(b.si);
+                      if(teacher!=="TBD"){busy[bkA]=true; busy[bkB]=true;}
+                      placed = true; break;
+                    }
+                  }
+                }
+                if(!placed && availSlots.length) {
+                  // Fallback: place single
+                  const {si, period} = availSlots[0];
+                  const bk = `${teacher}::${day}::${si}`;
+                  gen[cls][day][si] = {subject:sub, teacher, period, double:false};
+                  daySlotUsed[day].add(si);
+                  if(teacher!=="TBD" && !busy[bk]) busy[bk] = true;
+                }
+              } else if(extra) {
+                // Extra lesson on a day that already has one of this subject
+                // Must not be consecutive to existing lesson of same subject
+                const existingSlots = [];
+                gen[cls][day].forEach((cell, si) => {
+                  if(cell?.subject === sub) existingSlots.push(si);
+                });
+                const nonAdjacentSlots = availSlots.filter(({si}) => {
+                  return !existingSlots.some(es => Math.abs(es - si) <= 1);
+                });
+                const slots = nonAdjacentSlots.length ? nonAdjacentSlots : availSlots;
+                if(slots.length) {
+                  const {si, period} = slots[0];
+                  const bk = `${teacher}::${day}::${si}`;
+                  if(!busy[bk] || teacher==="TBD") {
+                    gen[cls][day][si] = {subject:sub, teacher, period, double:false};
+                    daySlotUsed[day].add(si);
+                    if(teacher!=="TBD") busy[bk] = true;
+                  }
+                }
+              } else {
+                // Regular single lesson
+                if(availSlots.length) {
+                  // Prefer slot where teacher is free
+                  const freeSlot = availSlots.find(({si}) => !busy[`${teacher}::${day}::${si}`]);
+                  const slot = freeSlot || availSlots[0];
+                  const {si, period} = slot;
+                  const bk = `${teacher}::${day}::${si}`;
+                  gen[cls][day][si] = {subject:sub, teacher, period, double:false};
+                  daySlotUsed[day].add(si);
+                  if(teacher!=="TBD" && !busy[bk]) busy[bk] = true;
+                }
+              }
+            });
+          });
         });
 
-        // Saturday (5 lesson slots)
-        SAT_LESSON_SLOTS.forEach((slot,si)=>{
-          const p=slot.period;
-          const sub=clsSubs[si%clsSubs.length];
-          const teacher=upper?(getSubTeacher(cls,sub)||"TBD"):(clsTeacher||"TBD");
-          gen[cls]["Saturday"][si]={subject:sub,teacher,period:p};
+        // ── Lock Friday Period 1 → PPI for ALL classes ─────────────────
+        ALL_CLASSES.forEach(cls => {
+          if(!gen[cls]["Friday"]) gen[cls]["Friday"] = Array(LESSON_SLOTS.length).fill(null);
+          gen[cls]["Friday"][0] = {subject:"PPI", teacher:"— All Staff —", period:1, ppi:true};
         });
-      });
 
-      // ── Lock Friday Period 1 → PPI for ALL classes ──────
-      ALL_CLASSES.forEach(cls=>{
-        if(!gen[cls]["Friday"]) gen[cls]["Friday"]=Array(11).fill(null);
-        gen[cls]["Friday"][0]={subject:"PPI",teacher:"— All Staff —",period:1,ppi:true};
-      });
+        // ── Saturday (simple round-robin) ───────────────────────────────
+        ALL_CLASSES.forEach(cls => {
+          const clsSubs = getTTSubs(cls);
+          const upper   = isUpper(cls);
+          const clsTeacher = getClsTeacher(cls);
+          gen[cls]["Saturday"] = SAT_LESSON_SLOTS.map((slot, si) => {
+            const sub = clsSubs[si % clsSubs.length];
+            const teacher = upper ? (getSubTeacher(cls, sub)||"TBD") : (clsTeacher||"TBD");
+            return {subject:sub, teacher, period:slot.period};
+          });
+        });
 
-      const conflicts=buildConflicts(gen);
-      setConflictMap(conflicts);
-      setTt(gen);
-      setGenProgress(100);
-      setGenerating(false);
-      const conflictCount=Object.keys(conflicts).length;
-      flash(conflictCount>0?`✅ Timetable generated! ⚠️ ${conflictCount} conflict(s) detected — review highlighted cells.`:"✅ Conflict-free timetable generated successfully!",conflictCount>0?"warn":"ok");
-    },200);
+        const conflicts = buildConflicts(gen);
+        setConflictMap(conflicts);
+        setTt(gen);
+        setGenProgress(100);
+        setGenerating(false);
+        const cc = Object.keys(conflicts).length;
+        flash(cc > 0 ? `Timetable generated — ${cc} conflict(s) found. Review highlighted cells.` : "Conflict-free timetable generated successfully!", cc > 0 ? "warn" : "ok");
+      } catch(e) {
+        setGenerating(false);
+        flash("Generation error: " + e.message, "error");
+      }
+    }, 180);
   }
 
-  function updCell(cls,day,p,val){
-    setTt(prev=>{
-      const n={...prev,[cls]:{...(prev[cls]||{})}};
-      [...DAYS,...WEEKEND_DAYS].forEach(d=>{if(!n[cls][d])n[cls][d]=Array(11).fill(null);});
-      const arr=[...(n[cls][day]||Array(11).fill(null))];
-      arr[p]=val;n[cls][day]=arr;
-      // recompute conflicts
-      setTimeout(()=>setConflictMap(buildConflicts(n)),0);
+  // ── Cell updater ──────────────────────────────────────────────────────────
+  function updCell(cls, day, p, val) {
+    setTt(prev => {
+      const n = {...prev, [cls]:{...(prev[cls]||{})}};
+      [...DAYS, ...WEEKEND_DAYS].forEach(d => { if(!n[cls][d]) n[cls][d]=Array(LESSON_SLOTS.length).fill(null); });
+      const arr = [...(n[cls][day]||Array(LESSON_SLOTS.length).fill(null))];
+      arr[p] = val; n[cls][day] = arr;
+      setTimeout(() => setConflictMap(buildConflicts(n)), 0);
       return n;
     });
   }
 
-  // ── Drag & drop ───────────────────────────────────────
-  function handleDragStart(day,slotIdx,cell){setDragSrc({day,slotIdx,cell});}
-  function handleDrop(day,slotIdx){
-    if(!dragSrc||!user?.role==="admin") return;
-    const src=dragSrc;
-    const destCell=(tt[selCls]?.[day]||[])[slotIdx];
-    // swap
-    updCell(selCls,day,slotIdx,src.cell);
-    updCell(selCls,src.day,src.slotIdx,destCell);
-    setDragSrc(null);setDragOver(null);
-    flash("↔️ Periods swapped!");
+  // ── Drag & drop ───────────────────────────────────────────────────────────
+  function handleDragStart(day, slotIdx, cell) { setDragSrc({day, slotIdx, cell}); }
+  function handleDrop(day, slotIdx) {
+    if(!dragSrc || !isAdmin) return;
+    const src = dragSrc;
+    const destCell = (tt[selCls]?.[day]||[])[slotIdx];
+    updCell(selCls, day, slotIdx, src.cell);
+    updCell(selCls, src.day, src.slotIdx, destCell);
+    setDragSrc(null); setDragOver(null);
+    flash("Periods swapped!");
   }
 
-  // ── Stats for dashboard ───────────────────────────────
-  const totalConflicts=Object.keys(conflictMap).length;
-  const totalScheduled=ALL_CLASSES.reduce((sum,cls)=>sum+DAYS.reduce((s2,d)=>s2+((tt[cls]?.[d]||[]).filter(c=>c?.subject).length),0),0);
-  const totalPossible=ALL_CLASSES.length*DAYS.length*8;
-  const coverage=totalPossible>0?Math.round(totalScheduled/totalPossible*100):0;
-
-  // Teacher workload
-  const teacherLoad={};
-  ALL_CLASSES.forEach(cls=>{
-    DAYS.forEach(day=>{
-      (tt[cls]?.[day]||[]).forEach(cell=>{
-        if(cell?.teacher&&cell.teacher!=="TBD"){
-          const t=cell.teacher.replace("*","");
-          if(!teacherLoad[t])teacherLoad[t]=0;
-          teacherLoad[t]++;
-        }
-      });
+  // ── Dashboard stats ───────────────────────────────────────────────────────
+  const totalConflicts   = Object.keys(conflictMap).length;
+  const totalScheduled   = ALL_CLASSES.reduce((sum,cls)=>sum+DAYS.reduce((s2,d)=>s2+((tt[cls]?.[d]||[]).filter(c=>c?.subject).length),0),0);
+  const totalPossible    = ALL_CLASSES.length * DAYS.length * LESSON_SLOTS.length;
+  const coverage         = totalPossible > 0 ? Math.round(totalScheduled/totalPossible*100) : 0;
+  const teacherLoad      = {};
+  ALL_CLASSES.forEach(cls => DAYS.forEach(day => {
+    (tt[cls]?.[day]||[]).forEach(cell => {
+      if(cell?.teacher && cell.teacher!=="TBD") {
+        const t = cell.teacher.replace("*","");
+        teacherLoad[t] = (teacherLoad[t]||0) + 1;
+      }
     });
-  });
+  }));
 
-  // Color palette for subjects
-  const palette=["#dbeafe","#d1fae5","#fef3c7","#fee2e2","#f3e8ff","#ccfbf1","#fce7f3","#e0f2fe","#fef9c3","#ffe4e6","#ecfdf5","#faf5ff"];
-  const colMap={};
-  getTimetableSubs(selCls).forEach((s,i)=>{colMap[s]=palette[i%palette.length];});
-  // global colMap for teacher view
-  const allSubs=[];
-  ALL_CLASSES.forEach(c=>getTimetableSubs(c).forEach(s=>{if(!allSubs.includes(s))allSubs.push(s);}));
-  const globalColMap={};allSubs.forEach((s,i)=>{globalColMap[s]=palette[i%palette.length];});
+  // ── Color maps ────────────────────────────────────────────────────────────
+  const allSubs = [];
+  ALL_CLASSES.forEach(c => getTTSubs(c).forEach(s => { if(!allSubs.includes(s)) allSubs.push(s); }));
+  const globalColMap = {};
+  allSubs.forEach((s,i) => globalColMap[s] = PALETTE[i%PALETTE.length]);
+  const clsColMap    = {};
+  getTTSubs(selCls).forEach((s,i) => clsColMap[s] = PALETTE[i%PALETTE.length]);
 
-  const clsTT=tt[selCls]||{};
-  const viewDays=weekendView?WEEKEND_DAYS:DAYS;
+  // ── Save / Load snapshots ─────────────────────────────────────────────────
+  const SNAP_KEY = "tnks_tt_snapshots";
 
-  // ── Cell component ────────────────────────────────────
-  function TimetableCell({cls,day,slotIdx,cell,isAdmin}){
-    const p=cell?.period||(slotIdx+1);
-    const conflictKey=`${cls}-${day}-${p}`;
-    const hasConflict=conflictMap[conflictKey];
-    const cmap=globalColMap;
-    const isPPI=cell?.ppi===true;
-    const bg=isPPI?"#fef3c7":hasConflict?"#fee2e2":cell?.subject?(cmap[cell.subject]||"#eff6ff"):"#f8fafc";
-    const border=hasConflict?"2px solid #b91c1c":dragOver?.day===day&&dragOver?.slotIdx===slotIdx?"2px dashed #1d4ed8":"1px solid transparent";
-    const isDragging=dragSrc?.day===day&&dragSrc?.slotIdx===slotIdx;
-    return(
-      <td
-        style={{padding:3,verticalAlign:"top"}}
-        onDragOver={e=>{e.preventDefault();setDragOver({day,slotIdx});}}
+  async function loadSnapshots() {
+    setLoadingSnaps(true);
+    try {
+      const local = localStorage.getItem(SNAP_KEY);
+      if(local) setSavedTTs(JSON.parse(local));
+    } catch {}
+    setLoadingSnaps(false);
+  }
+
+  useEffect(() => { loadSnapshots(); }, []);
+
+  async function saveSnapshot() {
+    if(!saveName.trim()) { flash("Enter a name for this timetable snapshot.", "warn"); return; }
+    const snap = {
+      id: Date.now(),
+      name: saveName.trim(),
+      savedAt: new Date().toLocaleString(),
+      timetable: tt,
+      ttSetup: ttSetup,
+    };
+    const updated = [snap, ...savedTTs.filter(s => s.name !== saveName.trim())].slice(0, 20);
+    setSavedTTs(updated);
+    try { localStorage.setItem(SNAP_KEY, JSON.stringify(updated)); } catch {}
+    // Also try Supabase via the app's save() if available
+    try { if(typeof save !== "undefined") await save(SNAP_KEY, updated); } catch {}
+    setSaveName(""); setShowSaveModal(false);
+    flash(`Timetable "${snap.name}" saved successfully!`);
+  }
+
+  function loadSnapshot(snap) {
+    setTt(snap.timetable);
+    setTtSetup(p => ({...p, ...snap.ttSetup}));
+    flash(`Loaded: "${snap.name}"`);
+  }
+
+  function deleteSnapshot(id) {
+    const updated = savedTTs.filter(s => s.id !== id);
+    setSavedTTs(updated);
+    try { localStorage.setItem(SNAP_KEY, JSON.stringify(updated)); } catch {}
+  }
+
+  // ── Bell schedule editor ───────────────────────────────────────────────────
+  function addBellEntry(type) {
+    const newId = Date.now();
+    const last  = bellPeriods[bellPeriods.length - 1];
+    const defStart = last?.end || "14:00";
+    const [h, m]   = defStart.split(":").map(Number);
+    const endMins  = h*60 + m + (type==="period" ? 40 : 20);
+    const defEnd   = `${String(Math.floor(endMins/60)).padStart(2,"0")}:${String(endMins%60).padStart(2,"0")}`;
+    const pCount   = bellPeriods.filter(b=>b.type==="period").length + (type==="period"?1:0);
+    setBellPeriods(p => [...p, {id:newId, type, name:type==="period"?`Period ${pCount}`:"Break", start:defStart, end:defEnd}]);
+  }
+  function updateBellEntry(id, field, val) {
+    setBellPeriods(p => p.map(b => b.id===id ? {...b, [field]:val} : b));
+  }
+  function removeBellEntry(id) {
+    setBellPeriods(p => p.filter(b => b.id!==id));
+  }
+  function moveBellEntry(id, dir) {
+    setBellPeriods(prev => {
+      const arr = [...prev];
+      const i   = arr.findIndex(b => b.id===id);
+      const j   = i + dir;
+      if(j<0||j>=arr.length) return prev;
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+      return arr;
+    });
+  }
+
+  // ── Teacher view: timetable grid for one teacher across all classes ────────
+  const clsTT = tt[selCls] || {};
+  const viewDays = weekendView ? WEEKEND_DAYS : workingDays;
+
+  // ── TimetableCell component ───────────────────────────────────────────────
+  function TimetableCell({cls, day, slotIdx, cell, isAdmin}) {
+    const p = cell?.period || (slotIdx+1);
+    const conflictKey = `${cls}-${day}-${p}`;
+    const hasConflict = conflictMap[conflictKey];
+    const isPPI  = cell?.ppi === true;
+    const bg     = isPPI ? "#fef3c7" : hasConflict ? "#fee2e2" : cell?.subject ? (globalColMap[cell.subject]||"#eff6ff") : "#f8fafc";
+    const border = hasConflict ? "2px solid #b91c1c" : dragOver?.day===day&&dragOver?.slotIdx===slotIdx ? "2px dashed #1d4ed8" : "1px solid rgba(0,0,0,.05)";
+    const isDragging = dragSrc?.day===day && dragSrc?.slotIdx===slotIdx;
+    const short  = cell?.subject ? getShort(cell.subject) : "";
+    const initials = cell?.teacher && cell.teacher!=="TBD" && !isPPI ? getInitials(cell.teacher) : "";
+    return (
+      <td style={{padding:3, verticalAlign:"top"}}
+        onDragOver={e=>{e.preventDefault(); setDragOver({day,slotIdx});}}
         onDrop={()=>handleDrop(day,slotIdx)}
         onDragLeave={()=>setDragOver(null)}
       >
         <div
-          draggable={isAdmin&&!!cell?.subject&&!isPPI}
+          draggable={isAdmin && !!cell?.subject && !isPPI}
           onDragStart={()=>{ if(!isPPI) handleDragStart(day,slotIdx,cell); }}
-          onClick={()=>{if(isAdmin&&!isPPI){setEditCell({cls,day,p:slotIdx});setEditVal(cell||{subject:subs[0]||"",teacher:"TBD"});}}}
+          onClick={()=>{
+            if(isAdmin && !isPPI) {
+              setEditCell({cls, day, p:slotIdx});
+              setEditVal(cell||{subject:getTTSubs(cls)[0]||"", teacher:"TBD"});
+            }
+          }}
           title={hasConflict||""}
           style={{
-            background:bg,border,borderRadius:8,padding:"5px 6px",
-            cursor:isPPI?"not-allowed":isAdmin?"pointer":"default",minHeight:52,
-            display:"flex",flexDirection:"column",justifyContent:"center",
-            opacity:isDragging?.5:1,
-            transition:"all .12s",boxSizing:"border-box",
+            background:bg, border, borderRadius:8, padding:"5px 6px",
+            cursor:isPPI?"not-allowed":isAdmin?"pointer":"default", minHeight:52,
+            display:"flex", flexDirection:"column", justifyContent:"center",
+            opacity:isDragging?0.5:1, transition:"all .12s", boxSizing:"border-box",
           }}
         >
-          {isPPI?(
+          {isPPI ? (
             <>
-              <div style={{fontSize:11,fontWeight:"bold",color:"#b45309",textAlign:"center",lineHeight:1.2}}>📋 PPI</div>
-              <div style={{fontSize:8,color:"#92400e",marginTop:2,textAlign:"center",fontWeight:"bold",background:"#fde68a",borderRadius:4,padding:"1px 4px"}}>All Classes · Fri P1</div>
+              <div style={{fontSize:11,fontWeight:"bold",color:"#b45309",textAlign:"center"}}>PPI</div>
+              <div style={{fontSize:8,color:"#92400e",marginTop:2,textAlign:"center",background:"#fde68a",borderRadius:3,padding:"1px 3px"}}>Fri P1 · All</div>
             </>
-          ):cell?.subject?(
+          ) : cell?.subject ? (
             <>
-              <div style={{fontSize:10,fontWeight:"bold",color:"#1e3a5f",lineHeight:1.2,textAlign:"center"}}>{cell.subject.split(" ").slice(0,2).join(" ")}</div>
-              <div style={{fontSize:9,color:"#64748b",marginTop:2,textAlign:"center",lineHeight:1}}>{cell.teacher||""}</div>
-              {cell.double&&<div style={{fontSize:8,color:"#7c3aed",marginTop:1,textAlign:"center",fontWeight:"bold",background:"#f3e8ff",borderRadius:4,padding:"1px 4px"}}>2P</div>}
-              {hasConflict&&<div style={{fontSize:8,color:"#b91c1c",marginTop:1,textAlign:"center",fontWeight:"bold"}}>⚠️ CLASH</div>}
+              <div style={{fontSize:11,fontWeight:"bold",color:"#1e3a5f",textAlign:"center",lineHeight:1.2}}>{short}</div>
+              {initials && <div style={{fontSize:9,color:"#64748b",textAlign:"center",marginTop:1}}>{initials}</div>}
+              {cell.double && <div style={{fontSize:8,color:"#7c3aed",marginTop:1,textAlign:"center",background:"#f3e8ff",borderRadius:3,padding:"1px 3px",fontWeight:"bold"}}>2P</div>}
+              {hasConflict && <div style={{fontSize:8,color:"#b91c1c",marginTop:1,textAlign:"center",fontWeight:"bold"}}>CLASH</div>}
             </>
-          ):(
+          ) : (
             <div style={{fontSize:10,color:"#cbd5e1",textAlign:"center"}}>—</div>
           )}
         </div>
@@ -2413,95 +2607,160 @@ function TimetablePage({students,staff,user,timetable:tt,setTimetable:setTt,ttSe
     );
   }
 
-  // ── Stat card ─────────────────────────────────────────
-  function TMStat({icon,value,label,color,sub}){
-    return(
+  // ── Bell schedule display name helper ─────────────────────────────────────
+  function BellRow({bp, idx}) {
+    const isEdit = editBellIdx === bp.id;
+    return (
+      <tr style={{background:isEdit?"#fffbeb":bp.type==="break"?"#fefce8":"white", borderTop:"1px solid #f1f5f9"}}>
+        <td style={{padding:"7px 10px",fontSize:11,color:"#94a3b8"}}>{idx+1}</td>
+        <td style={{padding:"7px 10px"}}>
+          <span style={{fontSize:10,padding:"2px 8px",borderRadius:16,fontWeight:"bold",
+            background:bp.type==="break"?"#fef3c7":"#eff6ff",
+            color:bp.type==="break"?"#b45309":"#1d4ed8"}}>
+            {bp.type==="break"?"BREAK":"PERIOD"}
+          </span>
+        </td>
+        <td style={{padding:"7px 10px"}}>
+          {isEdit ? (
+            <input value={bp.name} onChange={e=>updateBellEntry(bp.id,"name",e.target.value)}
+              style={{border:"1.5px solid #93c5fd",borderRadius:6,padding:"4px 8px",fontSize:12,fontFamily:FT,outline:"none",width:160}}/>
+          ) : <span style={{fontSize:12,fontWeight:"bold",color:"#1e3a5f"}}>{bp.name}</span>}
+        </td>
+        <td style={{padding:"7px 10px"}}>
+          {isEdit ? (
+            <input type="time" value={bp.start} onChange={e=>updateBellEntry(bp.id,"start",e.target.value)}
+              style={{border:"1.5px solid #93c5fd",borderRadius:6,padding:"4px 8px",fontSize:12,outline:"none"}}/>
+          ) : <span style={{fontFamily:"monospace",fontSize:12}}>{bp.start}</span>}
+        </td>
+        <td style={{padding:"7px 10px"}}>
+          {isEdit ? (
+            <input type="time" value={bp.end} onChange={e=>updateBellEntry(bp.id,"end",e.target.value)}
+              style={{border:"1.5px solid #93c5fd",borderRadius:6,padding:"4px 8px",fontSize:12,outline:"none"}}/>
+          ) : <span style={{fontFamily:"monospace",fontSize:12}}>{bp.end}</span>}
+        </td>
+        <td style={{padding:"7px 10px"}}>
+          <div style={{display:"flex",gap:4,justifyContent:"center"}}>
+            {isAdmin && (
+              <>
+                {isEdit ? (
+                  <button onClick={()=>setEditBellIdx(null)} style={{background:"#15803d",color:"white",border:"none",borderRadius:6,padding:"3px 10px",cursor:"pointer",fontSize:12}}>Done</button>
+                ) : (
+                  <button onClick={()=>setEditBellIdx(bp.id)} style={{background:"#eff6ff",color:"#1d4ed8",border:"none",borderRadius:6,padding:"3px 8px",cursor:"pointer",fontSize:11}}>Edit</button>
+                )}
+                <button onClick={()=>moveBellEntry(bp.id,-1)} style={{background:"#f1f5f9",border:"none",borderRadius:6,padding:"3px 7px",cursor:"pointer",fontSize:12}}>↑</button>
+                <button onClick={()=>moveBellEntry(bp.id,1)} style={{background:"#f1f5f9",border:"none",borderRadius:6,padding:"3px 7px",cursor:"pointer",fontSize:12}}>↓</button>
+                <button onClick={()=>removeBellEntry(bp.id)} style={{background:"#fee2e2",color:"#b91c1c",border:"none",borderRadius:6,padding:"3px 8px",cursor:"pointer",fontSize:11}}>✕</button>
+              </>
+            )}
+          </div>
+        </td>
+      </tr>
+    );
+  }
+
+  // ── Subject availability editor ───────────────────────────────────────────
+  function AvailEditor({cls, sub}) {
+    const avail = getAvail(cls, sub);
+    return (
+      <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:4}}>
+        {LESSON_SLOTS.map((slot,i) => {
+          const isAvail = avail.includes(slot.period);
+          return (
+            <button key={slot.period}
+              onClick={()=>isAdmin && toggleAvail(cls,sub,slot.period)}
+              title={`${slot.name}: ${isAvail?"Available":"Blocked"}`}
+              style={{width:26,height:26,border:"none",borderRadius:6,cursor:isAdmin?"pointer":"default",fontSize:10,fontWeight:"bold",
+                background:isAvail?"#dcfce7":"#fee2e2",color:isAvail?"#15803d":"#b91c1c"}}>
+              {slot.period}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // ── Stat card ─────────────────────────────────────────────────────────────
+  function TMStat({icon,value,label,color,sub}) {
+    return (
       <div style={{background:"white",borderRadius:14,padding:"18px 20px",boxShadow:"0 2px 12px rgba(0,0,0,.07)",borderLeft:`4px solid ${color}`,display:"flex",alignItems:"center",gap:14}}>
-        <div style={{fontSize:30}}>{icon}</div>
+        <div style={{fontSize:28}}>{icon}</div>
         <div>
-          <div style={{fontSize:24,fontWeight:"bold",color}}>{value}</div>
+          <div style={{fontSize:22,fontWeight:"bold",color}}>{value}</div>
           <div style={{fontSize:12,color:"#64748b",marginTop:1}}>{label}</div>
-          {sub&&<div style={{fontSize:10,color:"#94a3b8",marginTop:1}}>{sub}</div>}
+          {sub && <div style={{fontSize:10,color:"#94a3b8",marginTop:1}}>{sub}</div>}
         </div>
       </div>
     );
   }
 
-  const isAdmin=user?.role==="admin";
-
-  return(
+  // ═════════════════════════════════════════════════════════════════════════
+  // RENDER
+  // ═════════════════════════════════════════════════════════════════════════
+  return (
     <div style={{padding:24,fontFamily:FT}}>
+
       {/* ── Header ── */}
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,flexWrap:"wrap",gap:10}}>
         <div>
-          <h2 style={{margin:0,color:"#1e3a5f",fontSize:22,fontFamily:F,display:"flex",alignItems:"center",gap:8}}>
-            <span style={{background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>🗓️ TimetableMaster</span>
+          <h2 style={{margin:0,fontSize:22,color:"#1e3a5f",fontFamily:FT}}>
+            📅 TimetableMaster
           </h2>
-          <div style={{fontSize:12,color:"#64748b",marginTop:2}}>TimetableMaster 9-Step Setup · {bellPeriods.filter(b=>b.type==="period").length} Periods · {workingDays.length} Working Days</div>
+          <div style={{fontSize:12,color:"#64748b",marginTop:2}}>
+            {ttName||"Unnamed"} · {LESSON_SLOTS.length} periods · {workingDays.length} days · {ALL_CLASSES.length} classes
+          </div>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-          {isAdmin&&(
-            <button
-              onClick={autoGen}
-              disabled={generating}
-              style={{background:generating?"#94a3b8":"linear-gradient(135deg,#15803d,#065f46)",color:"white",border:"none",borderRadius:10,padding:"9px 18px",cursor:generating?"not-allowed":"pointer",fontFamily:F,fontSize:13,fontWeight:"bold",display:"flex",alignItems:"center",gap:7,boxShadow:"0 2px 8px rgba(21,128,61,.3)"}}
-            >
-              {generating?(
-                <><span style={{fontSize:14,animation:"spin 1s linear infinite",display:"inline-block"}}>⚙️</span> Generating…</>
-              ):(
-                <><span>⚡</span> Auto-Generate</>
-              )}
-            </button>
+          {isAdmin && (
+            <>
+              <button onClick={()=>setShowSaveModal(true)}
+                style={{background:"#eff6ff",color:"#1d4ed8",border:"1px solid #bfdbfe",borderRadius:10,padding:"8px 16px",cursor:"pointer",fontFamily:FT,fontSize:13,fontWeight:"bold"}}>
+                💾 Save
+              </button>
+              <button onClick={autoGen} disabled={generating}
+                style={{background:generating?"#94a3b8":"linear-gradient(135deg,#15803d,#065f46)",color:"white",border:"none",borderRadius:10,padding:"9px 18px",cursor:generating?"not-allowed":"pointer",fontFamily:FT,fontSize:13,fontWeight:"bold",display:"flex",alignItems:"center",gap:7,boxShadow:"0 2px 8px rgba(21,128,61,.3)"}}>
+                {generating ? <>⚙️ Generating…</> : <>⚡ Auto-Generate</>}
+              </button>
+            </>
           )}
         </div>
       </div>
 
-      {/* ── Generation progress bar ── */}
-      {generating&&(
+      {/* ── Progress bar ── */}
+      {generating && (
         <div style={{marginBottom:14}}>
           <div style={{background:"#e2e8f0",borderRadius:99,height:8,overflow:"hidden"}}>
             <div style={{background:"linear-gradient(90deg,#15803d,#60a5fa)",height:"100%",width:`${genProgress}%`,transition:"width .3s",borderRadius:99}}/>
           </div>
-          <div style={{fontSize:11,color:"#64748b",marginTop:4}}>AI is analysing constraints and building conflict-free schedule…</div>
+          <div style={{fontSize:11,color:"#64748b",marginTop:4}}>Distributing lessons professionally — one per day per subject…</div>
         </div>
       )}
 
-      {/* ── Alert bar ── */}
-      {msg&&(
-        <div style={{background:msgType==="ok"?"#f0fdf4":msgType==="warn"?"#fffbeb":"#fef2f2",border:`1px solid ${msgType==="ok"?"#bbf7d0":msgType==="warn"?"#fde68a":"#fecaca"}`,borderRadius:10,padding:"11px 16px",marginBottom:14,color:msgType==="ok"?"#15803d":msgType==="warn"?"#b45309":"#b91c1c",fontWeight:"bold",fontSize:13,display:"flex",alignItems:"center",gap:8}}>
+      {/* ── Alert ── */}
+      {msg && (
+        <div style={{background:msgType==="ok"?"#f0fdf4":msgType==="warn"?"#fffbeb":"#fef2f2",border:`1px solid ${msgType==="ok"?"#bbf7d0":msgType==="warn"?"#fde68a":"#fecaca"}`,borderRadius:10,padding:"11px 16px",marginBottom:14,color:msgType==="ok"?"#15803d":msgType==="warn"?"#b45309":"#b91c1c",fontWeight:"bold",fontSize:13}}>
           {msgType==="ok"?"✅":msgType==="warn"?"⚠️":"❌"} {msg}
         </div>
       )}
 
       {/* ── Tabs ── */}
       <div style={{display:"flex",gap:4,marginBottom:18,background:"#f1f5f9",borderRadius:12,padding:4,flexWrap:"wrap"}}>
-        {[["setup","🗂️ Setup"],["dashboard","📊 Dashboard"],["view","📅 Timetable"],["subjects","⚙️ Subjects"],["teacher","👤 Teachers"],["daily","☀️ Full Day"],["weekend","📆 Weekend"]].map(([t,l])=>(
-          <button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"8px 12px",border:"none",borderRadius:9,cursor:"pointer",fontFamily:F,fontSize:12,fontWeight:tab===t?"bold":"normal",background:tab===t?"white":"transparent",color:tab===t?"#1e3a5f":"#64748b",boxShadow:tab===t?"0 1px 4px rgba(0,0,0,.1)":"none",transition:"all .15s",minWidth:90,whiteSpace:"nowrap"}}>
+        {[["setup","🗂️ Setup"],["bell","🔔 Bell"],["dashboard","📊 Dashboard"],["view","📅 Timetable"],["subjects","⚙️ Subjects"],["teacher","👤 Teachers"],["daily","☀️ Full Day"],["weekend","📆 Weekend"],["saved","💾 Saved"]].map(([t,l])=>(
+          <button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"7px 10px",border:"none",borderRadius:9,cursor:"pointer",fontFamily:FT,fontSize:12,fontWeight:tab===t?"bold":"normal",background:tab===t?"white":"transparent",color:tab===t?"#1e3a5f":"#64748b",boxShadow:tab===t?"0 1px 4px rgba(0,0,0,.1)":"none",transition:"all .15s",minWidth:80,whiteSpace:"nowrap"}}>
             {l}
           </button>
         ))}
       </div>
 
-      {/* ══════════ SETUP TAB — TimetableMaster 9-Step Process ══════════ */}
-      {tab==="setup"&&(
+      {/* ════════════════════ SETUP TAB ════════════════════ */}
+      {tab==="setup" && (
         <div style={{display:"grid",gap:16}}>
           {/* Step progress */}
           <div style={{background:"white",borderRadius:14,padding:"16px 20px",boxShadow:"0 2px 12px rgba(0,0,0,.07)"}}>
-            <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:14,marginBottom:14}}>📋 TimetableMaster Setup — {setupStep} of 9 Steps</div>
+            <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:14,marginBottom:14}}>📋 Setup — Step {setupStep} of 9</div>
             <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-              {[
-                [1,"📝 Basic Info"],
-                [2,"🔔 Bell Schedule"],
-                [3,"👨‍🏫 Staff"],
-                [4,"🏫 Grades"],
-                [5,"🚪 Rooms"],
-                [6,"📚 Subjects"],
-                [7,"📖 Lessons"],
-                [8,"⚡ Generate"],
-                [9,"📤 Share"],
-              ].map(([n,lbl])=>(
+              {[[1,"📝 Info"],[2,"🔔 Bell"],[3,"👨‍🏫 Staff"],[4,"🏫 Grades"],[5,"🚪 Rooms"],[6,"📚 Subjects"],[7,"📖 Lessons"],[8,"⚡ Generate"],[9,"📤 Share"]].map(([n,lbl])=>(
                 <button key={n} onClick={()=>setSetupStep(n)}
-                  style={{padding:"7px 13px",border:"none",borderRadius:8,cursor:"pointer",fontFamily:F,fontSize:11,fontWeight:setupStep===n?"bold":"normal",
+                  style={{padding:"6px 12px",border:"none",borderRadius:8,cursor:"pointer",fontFamily:FT,fontSize:11,fontWeight:setupStep===n?"bold":"normal",
                     background:setupStep===n?"linear-gradient(135deg,#1e3a5f,#1d4ed8)":n<setupStep?"#dcfce7":"#f1f5f9",
                     color:setupStep===n?"white":n<setupStep?"#15803d":"#64748b",
                     boxShadow:setupStep===n?"0 2px 8px rgba(30,58,95,.3)":"none"}}>
@@ -2511,368 +2770,215 @@ function TimetablePage({students,staff,user,timetable:tt,setTimetable:setTt,ttSe
             </div>
           </div>
 
-          {/* STEP 1 — Basic Info */}
-          {setupStep===1&&(
+          {/* Step 1: Basic Info */}
+          {setupStep===1 && (
             <div style={{background:"white",borderRadius:14,padding:20,boxShadow:"0 2px 12px rgba(0,0,0,.07)"}}>
-              <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:15,marginBottom:4}}>Step 1 — Basic Timetable Information</div>
-              <div style={{fontSize:12,color:"#64748b",marginBottom:16}}>Give your timetable a name and optional session details. Only the name is required.</div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-                <Inp label="TIMETABLE NAME *" value={ttName} onChange={setTtName} placeholder='e.g. "TNKS Term 1 2025"'/>
-                <Inp label="DESCRIPTION (optional)" value={ttDesc} onChange={setTtDesc} placeholder="e.g. First term timetable"/>
-                <Inp label="SESSION NAME (optional)" value={ttSession} onChange={setTtSession} placeholder='e.g. "2024-2025"'/>
-                <Inp label="START DATE (optional)" value={ttStartDate} onChange={setTtStartDate} placeholder="DD/MM/YYYY"/>
-                <Inp label="END DATE (optional)" value={ttEndDate} onChange={setTtEndDate} placeholder="DD/MM/YYYY"/>
+              <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:15,marginBottom:12}}>Step 1 — Timetable Information</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+                {[["Timetable Name *",ttName,setTtName,"e.g. TNKS Term 1 2025"],["Description",ttDesc,setTtDesc,"Optional description"],["Session",ttSession,setTtSession,"e.g. 2024-2025"],["Start Date",ttStartDate,setTtStart,"DD/MM/YYYY"],["End Date",ttEndDate,setTtEnd,"DD/MM/YYYY"]].map(([lbl,val,set,ph])=>(
+                  <div key={lbl}>
+                    <label style={{fontSize:10,fontWeight:"bold",color:"#374151",display:"block",marginBottom:3,letterSpacing:.5}}>{lbl.toUpperCase()}</label>
+                    <input value={val} onChange={e=>set(e.target.value)} placeholder={ph}
+                      style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px 12px",fontSize:13,outline:"none",boxSizing:"border-box",fontFamily:FT}}/>
+                  </div>
+                ))}
               </div>
-              <div style={{marginTop:16,padding:"12px 14px",background:"#f0fdf4",borderRadius:8,fontSize:12,color:"#15803d",fontWeight:"bold"}}>
-                ✅ Timetable: <b>{ttName||"(unnamed)"}</b>{ttSession&&` · Session: ${ttSession}`}
-              </div>
-              <div style={{marginTop:14,display:"flex",gap:8}}>
-                <Btn onClick={()=>setSetupStep(2)} v="primary" style={{fontSize:13}}>Save & Continue →</Btn>
-              </div>
+              <button onClick={()=>setSetupStep(2)} style={{background:"linear-gradient(135deg,#1d4ed8,#1e3a5f)",color:"white",border:"none",borderRadius:9,padding:"9px 20px",cursor:"pointer",fontFamily:FT,fontSize:13,fontWeight:"bold"}}>Save & Continue →</button>
             </div>
           )}
 
-          {/* STEP 2 — Bell Schedule */}
-          {setupStep===2&&(
+          {/* Step 2: Bell — redirects to Bell tab */}
+          {setupStep===2 && (
             <div style={{background:"white",borderRadius:14,padding:20,boxShadow:"0 2px 12px rgba(0,0,0,.07)"}}>
-              <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:15,marginBottom:4}}>Step 2 — Configure Bell Schedule</div>
-              <div style={{fontSize:12,color:"#64748b",marginBottom:16}}>Set your working days and add periods + breaks with exact start/end times. These times flow directly into your timetable grid.</div>
-
-              {/* Working days */}
-              <div style={{marginBottom:16}}>
-                <div style={{fontSize:11,fontWeight:"bold",color:"#374151",marginBottom:6,letterSpacing:.5}}>WORKING DAYS</div>
-                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                  {["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"].map(d=>(
-                    <button key={d} onClick={()=>setWorkingDays(prev=>prev.includes(d)?prev.filter(x=>x!==d):[...prev,d])}
-                      style={{padding:"6px 14px",border:"none",borderRadius:8,cursor:"pointer",fontFamily:F,fontSize:12,fontWeight:"bold",
-                        background:workingDays.includes(d)?"linear-gradient(135deg,#1d4ed8,#1e3a5f)":"#f1f5f9",
-                        color:workingDays.includes(d)?"white":"#64748b"}}>
-                      {d.slice(0,3)}
-                    </button>
-                  ))}
-                </div>
+              <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:15,marginBottom:8}}>Step 2 — Bell Schedule</div>
+              <div style={{fontSize:12,color:"#64748b",marginBottom:14}}>Configure working days and period/break times in the <b>🔔 Bell</b> tab.</div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
+                {["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"].map(d=>(
+                  <button key={d} onClick={()=>{if(isAdmin)setWorkingDays(prev=>prev.includes(d)?prev.filter(x=>x!==d):[...prev,d])}}
+                    style={{padding:"6px 14px",border:"none",borderRadius:8,cursor:isAdmin?"pointer":"default",fontFamily:FT,fontSize:12,fontWeight:"bold",
+                      background:workingDays.includes(d)?"linear-gradient(135deg,#1d4ed8,#1e3a5f)":"#f1f5f9",
+                      color:workingDays.includes(d)?"white":"#64748b"}}>
+                    {d.slice(0,3)}
+                  </button>
+                ))}
               </div>
-
-              {/* Periods & Breaks table */}
-              <div style={{marginBottom:12,fontWeight:"bold",color:"#1e3a5f",fontSize:13}}>📅 Periods & Breaks</div>
-              <div style={{overflowX:"auto"}}>
-                <table style={{width:"100%",borderCollapse:"collapse",minWidth:500}}>
-                  <thead>
-                    <tr style={{background:"#eff6ff"}}>
-                      <th style={{padding:"9px 12px",fontSize:11,textAlign:"left",color:"#1d4ed8",fontWeight:"bold"}}>#</th>
-                      <th style={{padding:"9px 12px",fontSize:11,textAlign:"left",color:"#1d4ed8",fontWeight:"bold"}}>Type</th>
-                      <th style={{padding:"9px 12px",fontSize:11,textAlign:"left",color:"#1d4ed8",fontWeight:"bold"}}>Name</th>
-                      <th style={{padding:"9px 12px",fontSize:11,textAlign:"left",color:"#1d4ed8",fontWeight:"bold"}}>Start Time</th>
-                      <th style={{padding:"9px 12px",fontSize:11,textAlign:"left",color:"#1d4ed8",fontWeight:"bold"}}>End Time</th>
-                      <th style={{padding:"9px 12px",fontSize:11,textAlign:"center",color:"#1d4ed8",fontWeight:"bold"}}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {bellPeriods.map((bp,i)=>(
-                      <tr key={bp.id} style={{background:editBellIdx===i?"#fffbeb":bp.type==="break"?"#fefce8":"white",borderTop:"1px solid #f1f5f9"}}>
-                        <td style={{padding:"8px 12px",fontSize:12,color:"#94a3b8"}}>{i+1}</td>
-                        <td style={{padding:"8px 12px"}}>
-                          <span style={{fontSize:10,padding:"2px 8px",borderRadius:16,fontWeight:"bold",
-                            background:bp.type==="break"?"#fef3c7":"#eff6ff",
-                            color:bp.type==="break"?"#b45309":"#1d4ed8"}}>
-                            {bp.type==="break"?"BREAK":"PERIOD"}
-                          </span>
-                        </td>
-                        <td style={{padding:"8px 12px"}}>
-                          {editBellIdx===i?(
-                            <input value={bp.name} onChange={e=>{const n=[...bellPeriods];n[i]={...n[i],name:e.target.value};setBellPeriods(n);}}
-                              style={{border:"1.5px solid #93c5fd",borderRadius:6,padding:"4px 8px",fontSize:12,fontFamily:F,outline:"none",width:180}}/>
-                          ):(
-                            <span style={{fontSize:12,fontWeight:"bold",color:"#1e3a5f"}}>{bp.name}</span>
-                          )}
-                        </td>
-                        <td style={{padding:"8px 12px"}}>
-                          {editBellIdx===i?(
-                            <input type="time" value={bp.start} onChange={e=>{const n=[...bellPeriods];n[i]={...n[i],start:e.target.value};setBellPeriods(n);}}
-                              style={{border:"1.5px solid #93c5fd",borderRadius:6,padding:"4px 8px",fontSize:12,fontFamily:F,outline:"none"}}/>
-                          ):(
-                            <span style={{fontFamily:"monospace",fontSize:12,color:"#374151"}}>{bp.start}</span>
-                          )}
-                        </td>
-                        <td style={{padding:"8px 12px"}}>
-                          {editBellIdx===i?(
-                            <input type="time" value={bp.end} onChange={e=>{const n=[...bellPeriods];n[i]={...n[i],end:e.target.value};setBellPeriods(n);}}
-                              style={{border:"1.5px solid #93c5fd",borderRadius:6,padding:"4px 8px",fontSize:12,fontFamily:F,outline:"none"}}/>
-                          ):(
-                            <span style={{fontFamily:"monospace",fontSize:12,color:"#374151"}}>{bp.end}</span>
-                          )}
-                        </td>
-                        <td style={{padding:"8px 12px",textAlign:"center"}}>
-                          <div style={{display:"flex",gap:4,justifyContent:"center"}}>
-                            {editBellIdx===i?(
-                              <button onClick={()=>setEditBellIdx(null)} style={{background:"#15803d",color:"white",border:"none",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontSize:12,fontFamily:F}}>✓ Done</button>
-                            ):(
-                              <button onClick={()=>setEditBellIdx(i)} style={{background:"#eff6ff",color:"#1d4ed8",border:"none",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontSize:12,fontFamily:F}}>✏️ Edit</button>
-                            )}
-                            <button onClick={()=>setBellPeriods(p=>p.filter((_,j)=>j!==i))} style={{background:"#fee2e2",color:"#b91c1c",border:"none",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontSize:12,fontFamily:F}}>🗑️</button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Add period/break buttons */}
+              <button onClick={()=>setTab("bell")} style={{background:"#eff6ff",color:"#1d4ed8",border:"1px solid #bfdbfe",borderRadius:9,padding:"8px 16px",cursor:"pointer",fontFamily:FT,fontSize:13,fontWeight:"bold",marginRight:8}}>Open Bell Editor →</button>
               <div style={{display:"flex",gap:8,marginTop:12}}>
-                <button onClick={()=>setBellPeriods(p=>[...p,{id:Date.now(),type:"period",name:`Period ${p.filter(x=>x.type==="period").length+1}`,start:"08:00",end:"08:40"}])}
-                  style={{background:"linear-gradient(135deg,#1d4ed8,#1e3a5f)",color:"white",border:"none",borderRadius:8,padding:"8px 16px",cursor:"pointer",fontFamily:F,fontSize:12,fontWeight:"bold"}}>
-                  + Add Period
-                </button>
-                <button onClick={()=>setBellPeriods(p=>[...p,{id:Date.now(),type:"break",name:"Break ☕",start:"08:40",end:"09:00"}])}
-                  style={{background:"linear-gradient(135deg,#b45309,#92400e)",color:"white",border:"none",borderRadius:8,padding:"8px 16px",cursor:"pointer",fontFamily:F,fontSize:12,fontWeight:"bold"}}>
-                  + Add Break
-                </button>
-              </div>
-
-              <div style={{marginTop:14,padding:"10px 14px",background:"#f0fdf4",borderRadius:8,fontSize:12,color:"#15803d"}}>
-                ✅ <b>{bellPeriods.filter(b=>b.type==="period").length}</b> periods · <b>{bellPeriods.filter(b=>b.type==="break").length}</b> breaks · <b>{workingDays.length}</b> working days
-              </div>
-              <div style={{marginTop:14,display:"flex",gap:8}}>
-                <Btn onClick={()=>setSetupStep(1)} v="ghost" style={{fontSize:13}}>← Back</Btn>
-                <Btn onClick={()=>setSetupStep(3)} v="primary" style={{fontSize:13}}>Save & Continue →</Btn>
+                <button onClick={()=>setSetupStep(1)} style={{background:"#f1f5f9",color:"#374151",border:"none",borderRadius:9,padding:"8px 16px",cursor:"pointer",fontFamily:FT,fontSize:13}}>← Back</button>
+                <button onClick={()=>setSetupStep(3)} style={{background:"linear-gradient(135deg,#1d4ed8,#1e3a5f)",color:"white",border:"none",borderRadius:9,padding:"9px 20px",cursor:"pointer",fontFamily:FT,fontSize:13,fontWeight:"bold"}}>Continue →</button>
               </div>
             </div>
           )}
 
-          {/* STEP 3 — Staff */}
-          {setupStep===3&&(
+          {/* Steps 3-7: simplified */}
+          {(setupStep>=3 && setupStep<=7) && (
             <div style={{background:"white",borderRadius:14,padding:20,boxShadow:"0 2px 12px rgba(0,0,0,.07)"}}>
-              <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:15,marginBottom:4}}>Step 3 — Staff Management</div>
-              <div style={{fontSize:12,color:"#64748b",marginBottom:16}}>Teaching staff are pulled from the Staff Manager. Go to the Staff page to add, edit, or set availability for teachers.</div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:10,marginBottom:16}}>
-                {(staff||[]).filter(s=>s.staffType==="teaching").map(s=>(
-                  <div key={s.id} style={{background:"#f8fafc",borderRadius:10,padding:"12px 14px",border:"1px solid #e2e8f0",display:"flex",alignItems:"center",gap:10}}>
-                    <Avatar name={s.name} photo={s.photo} size={36}/>
-                    <div>
-                      <div style={{fontWeight:"bold",fontSize:12,color:"#1e3a5f"}}>{s.name}</div>
-                      <div style={{fontSize:10,color:"#64748b"}}>{s.subject||"—"}</div>
-                      <span style={{fontSize:9,background:"#dcfce7",color:"#15803d",padding:"1px 7px",borderRadius:12,fontWeight:"bold"}}>✅ All Available</span>
-                    </div>
-                  </div>
-                ))}
-                {(staff||[]).filter(s=>s.staffType==="teaching").length===0&&(
-                  <div style={{color:"#94a3b8",fontSize:13,padding:"20px 0"}}>No teaching staff yet. Add staff in the Staff Manager page.</div>
-                )}
+              <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:15,marginBottom:8}}>
+                Step {setupStep} — {["","","","Staff Assignment","Grade Setup","Room Management","Subject Configuration","Lesson Assignment"][setupStep]}
               </div>
-              <div style={{marginTop:14,display:"flex",gap:8}}>
-                <Btn onClick={()=>setSetupStep(2)} v="ghost" style={{fontSize:13}}>← Back</Btn>
-                <Btn onClick={()=>setSetupStep(4)} v="primary" style={{fontSize:13}}>Save & Continue →</Btn>
+              <div style={{fontSize:12,color:"#64748b",marginBottom:12}}>
+                {setupStep===3 && "Assign class teachers (PP–G3) and subject teachers (G4–G9) in the ⚙️ Subjects tab."}
+                {setupStep===4 && `${ALL_CLASSES.length} classes pre-loaded: ${ALL_CLASSES.join(", ")}`}
+                {setupStep===5 && "Specialist rooms are optional — configure them in Setup if needed."}
+                {setupStep===6 && "All CBC subjects are pre-loaded per class level. Assign teachers in the ⚙️ Subjects tab."}
+                {setupStep===7 && "Set lessons per week and double-lesson flags in the ⚙️ Subjects tab per class."}
               </div>
-            </div>
-          )}
-
-          {/* STEP 4 — Grades */}
-          {setupStep===4&&(
-            <div style={{background:"white",borderRadius:14,padding:20,boxShadow:"0 2px 12px rgba(0,0,0,.07)"}}>
-              <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:15,marginBottom:4}}>Step 4 — Grade Management</div>
-              <div style={{fontSize:12,color:"#64748b",marginBottom:16}}>All classes are pre-loaded from the CBC curriculum structure. Assign a class teacher for first-period homeroom if needed.</div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:8}}>
-                {[
-                  {group:"Pre-Primary",classes:["PP1","PP2"],color:"#b45309",bg:"#fef3c7"},
-                  {group:"Lower Primary",classes:["Grade 1","Grade 2","Grade 3"],color:"#15803d",bg:"#dcfce7"},
-                  {group:"Upper Primary",classes:["Grade 4","Grade 5","Grade 6"],color:"#1d4ed8",bg:"#dbeafe"},
-                  {group:"Junior Secondary",classes:["Grade 7","Grade 8","Grade 9"],color:"#7c3aed",bg:"#f3e8ff"},
-                ].map(g=>(
-                  <div key={g.group} style={{background:g.bg,borderRadius:10,padding:"12px 14px"}}>
-                    <div style={{fontWeight:"bold",color:g.color,fontSize:11,marginBottom:8}}>{g.group.toUpperCase()}</div>
-                    {g.classes.map(c=>(
-                      <div key={c} style={{background:"white",borderRadius:7,padding:"6px 10px",marginBottom:6,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                        <span style={{fontWeight:"bold",fontSize:12,color:g.color}}>{c}</span>
-                        <span style={{fontSize:9,background:"#dcfce7",color:"#15803d",padding:"1px 7px",borderRadius:12,fontWeight:"bold"}}>✅</span>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-              <div style={{marginTop:14,display:"flex",gap:8}}>
-                <Btn onClick={()=>setSetupStep(3)} v="ghost" style={{fontSize:13}}>← Back</Btn>
-                <Btn onClick={()=>setSetupStep(5)} v="primary" style={{fontSize:13}}>Save & Continue →</Btn>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 5 — Rooms */}
-          {setupStep===5&&(
-            <div style={{background:"white",borderRadius:14,padding:20,boxShadow:"0 2px 12px rgba(0,0,0,.07)"}}>
-              <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:15,marginBottom:4}}>Step 5 — Room Management (Optional)</div>
-              <div style={{fontSize:12,color:"#64748b",marginBottom:16}}>Add specialist rooms like labs or the computer room. Skip if all lessons happen in standard classrooms.</div>
-              <div style={{display:"flex",gap:8,marginBottom:12}}>
-                <input value={newRoom} onChange={e=>setNewRoom(e.target.value)} placeholder="Room name (e.g. Science Lab)" onKeyDown={e=>{if(e.key==="Enter"&&newRoom.trim()){setRooms(r=>[...r,{id:Date.now(),name:newRoom.trim()}]);setNewRoom("");}}}
-                  style={{flex:1,border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px 12px",fontSize:13,fontFamily:F,outline:"none"}}/>
-                <Btn onClick={()=>{if(newRoom.trim()){setRooms(r=>[...r,{id:Date.now(),name:newRoom.trim()}]);setNewRoom("");}}} v="primary" style={{fontSize:13}}>+ Add Room</Btn>
-              </div>
-              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                {rooms.map(r=>(
-                  <div key={r.id} style={{background:"#f8fafc",borderRadius:8,padding:"6px 12px",border:"1px solid #e2e8f0",display:"flex",alignItems:"center",gap:8}}>
-                    <span style={{fontSize:12,fontWeight:"bold",color:"#1e3a5f"}}>🚪 {r.name}</span>
-                    <button onClick={()=>setRooms(p=>p.filter(x=>x.id!==r.id))} style={{background:"none",border:"none",cursor:"pointer",color:"#b91c1c",fontSize:14,padding:0}}>✕</button>
-                  </div>
-                ))}
-              </div>
-              <div style={{marginTop:14,display:"flex",gap:8}}>
-                <Btn onClick={()=>setSetupStep(4)} v="ghost" style={{fontSize:13}}>← Back</Btn>
-                <Btn onClick={()=>setSetupStep(6)} v="primary" style={{fontSize:13}}>Save & Continue →</Btn>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 6 — Subjects */}
-          {setupStep===6&&(
-            <div style={{background:"white",borderRadius:14,padding:20,boxShadow:"0 2px 12px rgba(0,0,0,.07)"}}>
-              <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:15,marginBottom:4}}>Step 6 — Subject Configuration</div>
-              <div style={{fontSize:12,color:"#64748b",marginBottom:16}}>All CBC subjects are pre-loaded per class level. Click a class to see its subjects and set availability restrictions.</div>
-              <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
-                <select value={selCls} onChange={e=>setSelCls(e.target.value)} style={{border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px 12px",fontSize:13,fontFamily:F}}>
-                  {ALL_CLASSES.map(c=><option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                {getSubs(selCls).map((sub,i)=>{
-                  const lpw=getLessonsPerWeek(selCls);
-                  const dbl=hasDoubleLesson(selCls,sub);
-                  return(
-                    <div key={sub} style={{background:dbl?"#fef3c7":"#eff6ff",borderRadius:8,padding:"8px 12px",border:`1px solid ${dbl?"#f59e0b":"#bfdbfe"}`,minWidth:150}}>
-                      <div style={{fontWeight:"bold",fontSize:12,color:dbl?"#b45309":"#1d4ed8"}}>{sub}</div>
-                      <div style={{fontSize:10,color:"#64748b",marginTop:2}}>{lpw[sub]||"—"} lessons/week {dbl&&"· Double"}</div>
-                      <div style={{fontSize:9,color:"#15803d",marginTop:2}}>✅ All Available</div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div style={{marginTop:14,display:"flex",gap:8}}>
-                <Btn onClick={()=>setSetupStep(5)} v="ghost" style={{fontSize:13}}>← Back</Btn>
-                <Btn onClick={()=>setSetupStep(7)} v="primary" style={{fontSize:13}}>Save & Continue →</Btn>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 7 — Lessons */}
-          {setupStep===7&&(
-            <div style={{background:"white",borderRadius:14,padding:20,boxShadow:"0 2px 12px rgba(0,0,0,.07)"}}>
-              <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:15,marginBottom:4}}>Step 7 — Lesson Assignment</div>
-              <div style={{fontSize:12,color:"#64748b",marginBottom:16}}>Connect teachers to subjects for each class. Go to the <b>Subject Setup</b> tab to assign teachers to each subject per class.</div>
-              <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:10,padding:"12px 16px",fontSize:12,color:"#1d4ed8",marginBottom:16}}>
-                <b>Grade 4–9:</b> Assign a teacher per subject in the ⚙️ Subjects tab.<br/>
-                <b>PP1–Grade 3:</b> Assign one class teacher who covers all subjects.
-              </div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:8}}>
-                {ALL_CLASSES.map(cls=>{
-                  const lpw=getLessonsPerWeek(cls);
-                  const total=Object.values(lpw).reduce((a,b)=>a+b,0);
-                  return(
-                    <div key={cls} style={{background:"#f8fafc",borderRadius:10,padding:"10px 14px",border:"1px solid #e2e8f0"}}>
-                      <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:12,marginBottom:4}}>{cls}</div>
-                      <div style={{fontSize:10,color:"#64748b"}}>{total} lessons/week · {getSubs(cls).length} subjects</div>
-                      <div style={{marginTop:4,fontSize:10,color:"#15803d"}}>
-                        {["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(cls)
-                          ?"Subject teachers needed":"Class teacher needed"}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div style={{marginTop:14,display:"flex",gap:8}}>
-                <Btn onClick={()=>setSetupStep(6)} v="ghost" style={{fontSize:13}}>← Back</Btn>
-                <Btn onClick={()=>setSetupStep(8)} v="primary" style={{fontSize:13}}>Save & Continue →</Btn>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 8 — Generate */}
-          {setupStep===8&&(
-            <div style={{background:"white",borderRadius:14,padding:20,boxShadow:"0 2px 12px rgba(0,0,0,.07)"}}>
-              <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:15,marginBottom:4}}>Step 8 — Review & Generate</div>
-              <div style={{fontSize:12,color:"#64748b",marginBottom:16}}>Everything looks good. Review your setup, then click Generate to create your conflict-free timetable.</div>
-              {/* Validation checklist */}
-              <div style={{display:"grid",gap:8,marginBottom:16}}>
-                {[
-                  [true,"Basic Information","Timetable named: "+ttName],
-                  [bellPeriods.filter(b=>b.type==="period").length>=4,"Bell Schedule",`${bellPeriods.filter(b=>b.type==="period").length} periods · ${workingDays.length} working days`],
-                  [(staff||[]).filter(s=>s.staffType==="teaching").length>0,"Staff",`${(staff||[]).filter(s=>s.staffType==="teaching").length} teaching staff`],
-                  [true,"Grades",`${ALL_CLASSES.length} classes loaded`],
-                  [true,"Subjects","CBC subjects pre-loaded"],
-                ].map(([ok,label,detail])=>(
-                  <div key={label} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:ok?"#f0fdf4":"#fef2f2",borderRadius:8,border:`1px solid ${ok?"#bbf7d0":"#fecaca"}`}}>
-                    <span style={{fontSize:18}}>{ok?"✅":"❌"}</span>
-                    <div>
-                      <div style={{fontWeight:"bold",fontSize:12,color:ok?"#15803d":"#b91c1c"}}>{label}</div>
-                      <div style={{fontSize:11,color:"#64748b"}}>{detail}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {isAdmin&&(
-                <button onClick={()=>{autoGen();setTab("view");flash("⚡ Generating timetable...");}}
-                  disabled={generating}
-                  style={{width:"100%",background:generating?"#94a3b8":"linear-gradient(135deg,#15803d,#065f46)",color:"white",border:"none",borderRadius:10,padding:"14px",cursor:generating?"not-allowed":"pointer",fontFamily:F,fontSize:14,fontWeight:"bold",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-                  ⚡ Generate Conflict-Free Timetable
+              {(setupStep===3||setupStep===6||setupStep===7) && (
+                <button onClick={()=>setTab("subjects")} style={{background:"#eff6ff",color:"#1d4ed8",border:"1px solid #bfdbfe",borderRadius:9,padding:"8px 16px",cursor:"pointer",fontFamily:FT,fontSize:13,fontWeight:"bold",marginBottom:12,display:"inline-block"}}>
+                  Open {setupStep===3?"Subjects (Teacher Assignment)":setupStep===6?"Subject Config":"Lesson Assignment"} →
                 </button>
               )}
-              <div style={{marginTop:14,display:"flex",gap:8}}>
-                <Btn onClick={()=>setSetupStep(7)} v="ghost" style={{fontSize:13}}>← Back</Btn>
-                <Btn onClick={()=>setSetupStep(9)} v="primary" style={{fontSize:13}}>Next: Share →</Btn>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={()=>setSetupStep(setupStep-1)} style={{background:"#f1f5f9",color:"#374151",border:"none",borderRadius:9,padding:"8px 16px",cursor:"pointer",fontFamily:FT,fontSize:13}}>← Back</button>
+                <button onClick={()=>setSetupStep(setupStep+1)} style={{background:"linear-gradient(135deg,#1d4ed8,#1e3a5f)",color:"white",border:"none",borderRadius:9,padding:"9px 20px",cursor:"pointer",fontFamily:FT,fontSize:13,fontWeight:"bold"}}>Continue →</button>
               </div>
             </div>
           )}
 
-          {/* STEP 9 — Share */}
-          {setupStep===9&&(
+          {/* Step 8: Generate */}
+          {setupStep===8 && (
             <div style={{background:"white",borderRadius:14,padding:20,boxShadow:"0 2px 12px rgba(0,0,0,.07)"}}>
-              <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:15,marginBottom:4}}>Step 9 — Fine-Tune & Share</div>
-              <div style={{fontSize:12,color:"#64748b",marginBottom:16}}>Your timetable is ready. Use the Timetable tab to drag-and-drop adjustments. Then export or share with staff and students.</div>
+              <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:15,marginBottom:8}}>Step 8 — Review & Generate</div>
+              <div style={{display:"grid",gap:8,marginBottom:16}}>
+                {[[!!ttName,"Timetable name set",ttName||"(required)"],
+                  [LESSON_SLOTS.length>=4,"Bell schedule",`${LESSON_SLOTS.length} periods · ${bellPeriods.filter(b=>b.type==="break").length} breaks`],
+                  [tStaff.length>0,"Teaching staff",`${tStaff.length} staff loaded`],
+                  [true,"Classes","11 classes (PP1–Grade 9)"],
+                  [true,"CBC subjects","Pre-loaded for all levels"],
+                ].map(([ok,lbl,det])=>(
+                  <div key={lbl} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:ok?"#f0fdf4":"#fef2f2",borderRadius:8,border:`1px solid ${ok?"#bbf7d0":"#fecaca"}`}}>
+                    <span style={{fontSize:16}}>{ok?"✅":"❌"}</span>
+                    <div>
+                      <div style={{fontWeight:"bold",fontSize:12,color:ok?"#15803d":"#b91c1c"}}>{lbl}</div>
+                      <div style={{fontSize:11,color:"#64748b"}}>{det}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {isAdmin && (
+                <button onClick={()=>{autoGen();setTab("view");}} disabled={generating}
+                  style={{width:"100%",background:generating?"#94a3b8":"linear-gradient(135deg,#15803d,#065f46)",color:"white",border:"none",borderRadius:10,padding:"14px",cursor:generating?"not-allowed":"pointer",fontFamily:FT,fontSize:14,fontWeight:"bold",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                  ⚡ Generate Professional Timetable
+                </button>
+              )}
+              <div style={{marginTop:12,display:"flex",gap:8}}>
+                <button onClick={()=>setSetupStep(7)} style={{background:"#f1f5f9",color:"#374151",border:"none",borderRadius:9,padding:"8px 16px",cursor:"pointer",fontFamily:FT,fontSize:13}}>← Back</button>
+                <button onClick={()=>setSetupStep(9)} style={{background:"linear-gradient(135deg,#1d4ed8,#1e3a5f)",color:"white",border:"none",borderRadius:9,padding:"9px 20px",cursor:"pointer",fontFamily:FT,fontSize:13,fontWeight:"bold"}}>Next →</button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 9: Share */}
+          {setupStep===9 && (
+            <div style={{background:"white",borderRadius:14,padding:20,boxShadow:"0 2px 12px rgba(0,0,0,.07)"}}>
+              <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:15,marginBottom:8}}>Step 9 — Fine-Tune & Share</div>
               <div style={{display:"grid",gap:10}}>
                 {[
-                  {icon:"📅",title:"View & Edit Timetable",desc:"Drag-and-drop periods, click cells to edit subject/teacher",action:()=>setTab("view"),btn:"Open Timetable",color:"#1d4ed8"},
-                  {icon:"👤",title:"Teacher View",desc:"See each teacher's schedule and workload",action:()=>setTab("teacher"),btn:"View Teachers",color:"#7c3aed"},
-                  {icon:"☀️",title:"Full Day Schedule",desc:"View and edit the complete boarding school day routine",action:()=>setTab("daily"),btn:"View Day",color:"#0e7490"},
-                  {icon:"📆",title:"Weekend Schedule",desc:"Edit Saturday and Sunday activity schedules including times",action:()=>setTab("weekend"),btn:"Edit Weekend",color:"#15803d"},
+                  {icon:"📅",title:"View & Edit Timetable",desc:"Click cells to edit · drag to swap periods",action:()=>setTab("view"),btn:"Open Timetable",color:"#1d4ed8"},
+                  {icon:"⚙️",title:"Subject Setup",desc:"Assign teachers, set availability & lesson counts",action:()=>setTab("subjects"),btn:"Configure",color:"#7c3aed"},
+                  {icon:"💾",title:"Save Snapshot",desc:"Save this timetable for future reference",action:()=>setShowSaveModal(true),btn:"Save",color:"#0e7490"},
+                  {icon:"👤",title:"Teacher View",desc:"Each teacher's personal timetable",action:()=>setTab("teacher"),btn:"View",color:"#15803d"},
                 ].map(item=>(
                   <div key={item.title} style={{display:"flex",alignItems:"center",gap:14,padding:"12px 16px",background:"#f8fafc",borderRadius:10,border:"1px solid #e2e8f0"}}>
-                    <span style={{fontSize:28}}>{item.icon}</span>
+                    <span style={{fontSize:24}}>{item.icon}</span>
                     <div style={{flex:1}}>
                       <div style={{fontWeight:"bold",fontSize:13,color:"#1e3a5f"}}>{item.title}</div>
                       <div style={{fontSize:11,color:"#64748b"}}>{item.desc}</div>
                     </div>
-                    <button onClick={item.action} style={{background:item.color,color:"white",border:"none",borderRadius:8,padding:"8px 16px",cursor:"pointer",fontFamily:F,fontSize:12,fontWeight:"bold",whiteSpace:"nowrap"}}>{item.btn}</button>
+                    <button onClick={item.action} style={{background:item.color,color:"white",border:"none",borderRadius:8,padding:"8px 16px",cursor:"pointer",fontFamily:FT,fontSize:12,fontWeight:"bold"}}>{item.btn}</button>
                   </div>
                 ))}
               </div>
-              <div style={{marginTop:14}}><Btn onClick={()=>setSetupStep(8)} v="ghost" style={{fontSize:13}}>← Back</Btn></div>
+              <div style={{marginTop:12}}><button onClick={()=>setSetupStep(8)} style={{background:"#f1f5f9",color:"#374151",border:"none",borderRadius:9,padding:"8px 16px",cursor:"pointer",fontFamily:FT,fontSize:13}}>← Back</button></div>
             </div>
           )}
         </div>
       )}
 
-      {/* ══════════ DASHBOARD TAB ══════════ */}
-      {tab==="dashboard"&&(
+      {/* ════════════════════ BELL SCHEDULE TAB ════════════════════ */}
+      {tab==="bell" && (
         <div style={{display:"grid",gap:16}}>
-          {/* Stats row */}
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:12}}>
-            <TMStat icon="📅" value={`${coverage}%`} label="Schedule Coverage" color="#1d4ed8" sub={`${totalScheduled}/${totalPossible} slots filled`}/>
-            <TMStat icon="⚠️" value={totalConflicts} label="Active Conflicts" color={totalConflicts>0?"#b91c1c":"#15803d"} sub={totalConflicts>0?"Resolve in Timetable tab":"All clear!"}/>
-            <TMStat icon="👨‍🏫" value={allTeachers.length} label="Teaching Staff" color="#7c3aed" sub="Assigned in Staff Manager"/>
-            <TMStat icon="🏫" value={ALL_CLASSES.length} label="Classes Scheduled" color="#0e7490" sub={`${ALL_CLASSES.length} active classes`}/>
+          <div style={{background:"white",borderRadius:14,padding:20,boxShadow:"0 2px 12px rgba(0,0,0,.07)"}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,flexWrap:"wrap",gap:8}}>
+              <div>
+                <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:15}}>🔔 Bell Schedule Editor</div>
+                <div style={{fontSize:11,color:"#64748b",marginTop:2}}>
+                  {LESSON_SLOTS.length} periods · {bellPeriods.filter(b=>b.type==="break").length} breaks
+                </div>
+              </div>
+              {isAdmin && (
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={()=>addBellEntry("period")} style={{background:"linear-gradient(135deg,#1d4ed8,#1e3a5f)",color:"white",border:"none",borderRadius:8,padding:"7px 14px",cursor:"pointer",fontFamily:FT,fontSize:12,fontWeight:"bold"}}>+ Period</button>
+                  <button onClick={()=>addBellEntry("break")} style={{background:"#fef3c7",color:"#b45309",border:"1px solid #fde68a",borderRadius:8,padding:"7px 14px",cursor:"pointer",fontFamily:FT,fontSize:12,fontWeight:"bold"}}>+ Break</button>
+                </div>
+              )}
+            </div>
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",minWidth:500}}>
+                <thead>
+                  <tr style={{background:"#eff6ff"}}>
+                    {["#","Type","Name","Start","End","Actions"].map(h=>(
+                      <th key={h} style={{padding:"9px 12px",fontSize:11,textAlign:"left",color:"#1d4ed8",fontWeight:"bold"}}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {bellPeriods.map((bp,i)=><BellRow key={bp.id} bp={bp} idx={i}/>)}
+                </tbody>
+              </table>
+            </div>
+            {/* Preview */}
+            <div style={{marginTop:16,padding:"12px 14px",background:"#f8fafc",borderRadius:10,border:"1px solid #e2e8f0"}}>
+              <div style={{fontWeight:"bold",color:"#374151",fontSize:12,marginBottom:8}}>Preview</div>
+              <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                {MAIN_SLOTS.map((s,i)=>(
+                  <div key={i} style={{background:s.isBreak?"#fef3c7":"#eff6ff",border:`1px solid ${s.isBreak?"#fde68a":"#bfdbfe"}`,borderRadius:8,padding:"5px 10px",fontSize:11}}>
+                    <div style={{fontWeight:"bold",color:s.isBreak?"#b45309":"#1d4ed8"}}>{s.name}</div>
+                    <div style={{fontFamily:"monospace",fontSize:9,color:"#64748b"}}>{s.start}–{s.end}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Working days */}
+            <div style={{marginTop:16}}>
+              <div style={{fontWeight:"bold",color:"#374151",fontSize:12,marginBottom:8}}>Working Days</div>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                {["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"].map(d=>(
+                  <button key={d} onClick={()=>{if(isAdmin)setWorkingDays(prev=>prev.includes(d)?prev.filter(x=>x!==d):[...prev,d])}}
+                    style={{padding:"6px 14px",border:"none",borderRadius:8,cursor:isAdmin?"pointer":"default",fontFamily:FT,fontSize:12,fontWeight:"bold",
+                      background:workingDays.includes(d)?"linear-gradient(135deg,#1d4ed8,#1e3a5f)":"#f1f5f9",
+                      color:workingDays.includes(d)?"white":"#64748b"}}>
+                    {d.slice(0,3)}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
+        </div>
+      )}
 
+      {/* ════════════════════ DASHBOARD TAB ════════════════════ */}
+      {tab==="dashboard" && (
+        <div style={{display:"grid",gap:16}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:12}}>
+            <TMStat icon="📅" value={`${coverage}%`} label="Schedule Coverage" color="#1d4ed8" sub={`${totalScheduled}/${totalPossible} slots`}/>
+            <TMStat icon="⚠️" value={totalConflicts} label="Conflicts" color={totalConflicts>0?"#b91c1c":"#15803d"} sub={totalConflicts?"Resolve in Timetable tab":"All clear!"}/>
+            <TMStat icon="👨‍🏫" value={allTeachers.length} label="Teaching Staff" color="#7c3aed"/>
+            <TMStat icon="🏫" value={ALL_CLASSES.length} label="Classes" color="#0e7490"/>
+          </div>
           {/* Teacher workload */}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
             <div style={{background:"white",borderRadius:14,padding:18,boxShadow:"0 2px 12px rgba(0,0,0,.07)"}}>
-              <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:14,marginBottom:14,display:"flex",alignItems:"center",gap:8}}>👤 Teacher Workload <span style={{fontSize:11,color:"#94a3b8",fontWeight:"normal"}}>(lessons/week)</span></div>
-              {Object.keys(teacherLoad).length===0?(
+              <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:14,marginBottom:14}}>👤 Teacher Workload</div>
+              {Object.keys(teacherLoad).length===0 ? (
                 <div style={{textAlign:"center",color:"#94a3b8",padding:"20px 0",fontSize:13}}>Generate a timetable first</div>
-              ):(
+              ) : (
                 <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                  {Object.entries(teacherLoad).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([t,n])=>{
-                    const max=Math.max(...Object.values(teacherLoad));
-                    const pct=Math.round(n/max*100);
-                    const over=n>30;
-                    return(
+                  {Object.entries(teacherLoad).sort((a,b)=>b[1]-a[1]).slice(0,12).map(([t,n])=>{
+                    const max = Math.max(...Object.values(teacherLoad));
+                    const pct = Math.round(n/max*100);
+                    const over = n>30;
+                    return (
                       <div key={t}>
                         <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:3}}>
                           <span style={{fontWeight:"bold",color:"#374151"}}>{t}</span>
@@ -2887,23 +2993,19 @@ function TimetablePage({students,staff,user,timetable:tt,setTimetable:setTt,ttSe
                 </div>
               )}
             </div>
-
-            {/* Conflict list */}
+            {/* Conflict log */}
             <div style={{background:"white",borderRadius:14,padding:18,boxShadow:"0 2px 12px rgba(0,0,0,.07)"}}>
-              <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:14,marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
-                ⚠️ Conflict Log
-                {totalConflicts>0&&<span style={{background:"#fee2e2",color:"#b91c1c",fontSize:11,padding:"2px 8px",borderRadius:20,fontWeight:"bold"}}>{totalConflicts}</span>}
-              </div>
-              {totalConflicts===0?(
+              <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:14,marginBottom:14}}>⚠️ Conflict Log {totalConflicts>0&&<span style={{background:"#fee2e2",color:"#b91c1c",fontSize:11,padding:"2px 8px",borderRadius:20,fontWeight:"bold",marginLeft:6}}>{totalConflicts}</span>}</div>
+              {totalConflicts===0 ? (
                 <div style={{textAlign:"center",color:"#15803d",padding:"20px 0",fontSize:13}}>
                   <div style={{fontSize:32,marginBottom:8}}>✅</div>
-                  No conflicts detected!
+                  No conflicts!
                 </div>
-              ):(
+              ) : (
                 <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:280,overflowY:"auto"}}>
                   {Object.entries(conflictMap).slice(0,20).map(([key,msg])=>{
-                    const [cls,day,p]=key.split("-");
-                    return(
+                    const [cls,day,p] = key.split("-");
+                    return (
                       <div key={key} style={{background:"#fef2f2",border:"1px solid #fecaca",borderRadius:8,padding:"8px 12px",fontSize:11}}>
                         <div style={{fontWeight:"bold",color:"#b91c1c"}}>{cls} · {day} P{p}</div>
                         <div style={{color:"#374151",marginTop:2}}>{msg}</div>
@@ -2914,24 +3016,23 @@ function TimetablePage({students,staff,user,timetable:tt,setTimetable:setTt,ttSe
               )}
             </div>
           </div>
-
-          {/* Subject allocation overview */}
+          {/* Weekly allocation overview */}
           <div style={{background:"white",borderRadius:14,padding:18,boxShadow:"0 2px 12px rgba(0,0,0,.07)"}}>
             <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:14,marginBottom:14}}>📚 CBC Weekly Lesson Allocation</div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:12}}>
-              {["Grade 7","Grade 8","Grade 9"].map(cls=>{
-                const lp=getLessonsPerWeek(cls);
-                return(
-                  <div key={cls} style={{background:"#f8fafc",borderRadius:10,padding:"12px 14px",border:"1px solid #e2e8f0"}}>
-                    <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:12,marginBottom:8}}>{cls}</div>
-                    <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
-                      {Object.keys(lp).map(sub=>{
-                        const n=getClsLpw(cls,sub);
-                        const dbl=getClsDouble(cls,sub);
-                        return(
-                          <div key={sub} style={{background:dbl?"#f3e8ff":"white",border:`1px solid ${dbl?"#a855f7":"#e2e8f0"}`,borderRadius:6,padding:"3px 8px",fontSize:10,display:"flex",gap:4,alignItems:"center"}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:12}}>
+              {ALL_CLASSES.map(cls=>{
+                const subs = getTTSubs(cls);
+                const total = subs.reduce((a,s)=>a+getClsLpw(cls,s),0);
+                return (
+                  <div key={cls} style={{background:"#f8fafc",borderRadius:10,padding:"10px 14px",border:"1px solid #e2e8f0"}}>
+                    <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:12,marginBottom:6}}>{cls} · {total} lessons/wk</div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:3}}>
+                      {subs.map(sub=>{
+                        const n=getClsLpw(cls,sub); const dbl=getClsDouble(cls,sub);
+                        return (
+                          <div key={sub} style={{background:dbl?"#f3e8ff":"white",border:`1px solid ${dbl?"#a855f7":"#e2e8f0"}`,borderRadius:5,padding:"2px 7px",fontSize:10,display:"flex",gap:3,alignItems:"center"}}>
                             <span style={{fontWeight:"bold",color:dbl?"#7c3aed":"#1d4ed8"}}>{n}×</span>
-                            <span style={{color:"#374151"}}>{sub.split(" ")[0]}</span>
+                            <span style={{color:"#374151"}}>{getShort(sub)}</span>
                             {dbl&&<span style={{color:"#7c3aed",fontSize:8,fontWeight:"bold"}}>2P</span>}
                           </div>
                         );
@@ -2945,54 +3046,50 @@ function TimetablePage({students,staff,user,timetable:tt,setTimetable:setTt,ttSe
         </div>
       )}
 
-      {/* ══════════ TIMETABLE VIEW TAB ══════════ */}
-      {tab==="view"&&(
+      {/* ════════════════════ TIMETABLE VIEW TAB ════════════════════ */}
+      {tab==="view" && (
         <>
-          {/* Controls */}
           <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
-            <select value={selCls} onChange={e=>setSelCls(e.target.value)} style={{border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px 12px",fontSize:13,fontFamily:F,fontWeight:"bold",color:"#1e3a5f"}}>
+            <select value={selCls} onChange={e=>setSelCls(e.target.value)} style={{border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px 12px",fontSize:13,fontFamily:FT,fontWeight:"bold",color:"#1e3a5f"}}>
               {ALL_CLASSES.map(c=><option key={c} value={c}>{c}</option>)}
             </select>
             <div style={{display:"flex",background:"#f1f5f9",borderRadius:8,padding:3,gap:2}}>
-              {[["Mon–Fri","weekday"],["Weekend","weekend"]].map(([l,k])=>(
-                <button key={k} onClick={()=>setWeekendView(k==="weekend")} style={{padding:"6px 14px",border:"none",borderRadius:6,cursor:"pointer",fontFamily:F,fontSize:12,fontWeight:weekendView===(k==="weekend")?"bold":"normal",background:weekendView===(k==="weekend")?"white":"transparent",color:weekendView===(k==="weekend")?"#1e3a5f":"#64748b"}}>
+              {[["Mon–Fri",false],["Weekend",true]].map(([l,k])=>(
+                <button key={l} onClick={()=>setWeekendView(k)} style={{padding:"6px 14px",border:"none",borderRadius:6,cursor:"pointer",fontFamily:FT,fontSize:12,fontWeight:weekendView===k?"bold":"normal",background:weekendView===k?"white":"transparent",color:weekendView===k?"#1e3a5f":"#64748b"}}>
                   {l}
                 </button>
               ))}
             </div>
-            {totalConflicts>0&&<span style={{fontSize:11,background:"#fee2e2",color:"#b91c1c",padding:"4px 10px",borderRadius:20,fontWeight:"bold"}}>⚠️ {totalConflicts} conflict(s)</span>}
-            {isAdmin&&<span style={{fontSize:11,color:"#94a3b8"}}>💡 Click cell to edit · Drag to swap</span>}
+            {totalConflicts>0 && <span style={{fontSize:11,background:"#fee2e2",color:"#b91c1c",padding:"4px 10px",borderRadius:20,fontWeight:"bold"}}>⚠️ {totalConflicts} conflict(s)</span>}
+            {isAdmin && <span style={{fontSize:11,color:"#94a3b8"}}>💡 Click cell to edit · Drag to swap</span>}
           </div>
 
-          {/* Main timetable grid */}
           <div style={{background:"white",borderRadius:14,boxShadow:"0 2px 12px rgba(0,0,0,.08)",overflow:"hidden"}}>
             <div style={{overflowX:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",minWidth:700}}>
                 <thead>
                   <tr style={{background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)"}}>
                     <th style={{padding:"10px 14px",color:"white",fontSize:11,textAlign:"left",minWidth:70,fontWeight:"bold"}}>Period</th>
-                    <th style={{padding:"10px 14px",color:"white",fontSize:11,textAlign:"center",minWidth:70,opacity:.7}}>Time</th>
-                    {viewDays.map(d=>(
-                      <th key={d} style={{padding:"10px 10px",color:"white",fontSize:12,textAlign:"center",minWidth:120,fontWeight:"bold"}}>{d}</th>
-                    ))}
+                    <th style={{padding:"10px 8px",color:"white",fontSize:10,textAlign:"center",minWidth:60,opacity:.7}}>Time</th>
+                    {viewDays.map(d=><th key={d} style={{padding:"10px 10px",color:"white",fontSize:12,textAlign:"center",minWidth:110,fontWeight:"bold"}}>{d}</th>)}
                   </tr>
                 </thead>
                 <tbody>
-                  {(weekendView?SAT_LESSON_SLOTS:MAIN_SLOTS).map((slot,i)=>{
-                    if(slot.isBreak) return(
+                  {(weekendView ? SAT_LESSON_SLOTS : MAIN_SLOTS).map((slot,i)=>{
+                    if(slot.isBreak) return (
                       <tr key={`brk${i}`} style={{background:"#f8fafc"}}>
-                        <td colSpan={viewDays.length+2} style={{padding:"6px 14px",fontSize:10,color:"#94a3b8",fontStyle:"italic",textAlign:"center",borderTop:"1px solid #f1f5f9"}}>
-                          {slot.label} · {slot.start}–{slot.end}
+                        <td colSpan={viewDays.length+2} style={{padding:"5px 14px",fontSize:10,color:"#94a3b8",fontStyle:"italic",textAlign:"center",borderTop:"1px solid #f1f5f9"}}>
+                          {slot.name} · {slot.start}–{slot.end}
                         </td>
                       </tr>
                     );
-                    const slotIdx=LESSON_SLOTS.findIndex(s=>s.period===slot.period);
-                    return(
+                    const slotIdx = LESSON_SLOTS.findIndex(s=>s.period===slot.period);
+                    return (
                       <tr key={`p${slot.period}`} style={{borderTop:"1px solid #f1f5f9"}}>
-                        <td style={{padding:"6px 14px",fontWeight:"bold",color:"#1e3a5f",fontSize:12,whiteSpace:"nowrap"}}>{slot.label}</td>
+                        <td style={{padding:"6px 14px",fontWeight:"bold",color:"#1e3a5f",fontSize:12,whiteSpace:"nowrap"}}>{slot.name||slot.label}</td>
                         <td style={{padding:"6px 8px",fontSize:9,fontFamily:"monospace",color:"#94a3b8",textAlign:"center",whiteSpace:"nowrap"}}>{slot.start}<br/>{slot.end}</td>
                         {viewDays.map(day=>{
-                          const cell=weekendView?(tt[selCls]?.Saturday||[])[slot.period-1]:(clsTT[day]||[])[slotIdx];
+                          const cell = weekendView ? (tt[selCls]?.Saturday||[])[slot.period-1] : (clsTT[day]||[])[slotIdx];
                           return <TimetableCell key={day} cls={selCls} day={day} slotIdx={slotIdx} cell={cell} isAdmin={isAdmin}/>;
                         })}
                       </tr>
@@ -3001,136 +3098,182 @@ function TimetablePage({students,staff,user,timetable:tt,setTimetable:setTt,ttSe
                 </tbody>
               </table>
             </div>
-
-            {/* Subject colour legend + weekly allocation */}
-            <div style={{padding:"12px 16px",borderTop:"1px solid #f1f5f9",display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+            {/* Legend */}
+            <div style={{padding:"10px 16px",borderTop:"1px solid #f1f5f9",display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
               <span style={{fontSize:11,fontWeight:"bold",color:"#1e3a5f"}}>Legend:</span>
-              {getTimetableSubs(selCls).slice(0,6).map(s=><span key={s} style={{fontSize:10,background:colMap[s]||"#f8fafc",padding:"2px 8px",borderRadius:20,color:"#1e3a5f",fontWeight:"bold",border:"1px solid rgba(0,0,0,.08)"}}>{s.split(" ")[0]}</span>)}
-              {totalConflicts>0&&<span style={{fontSize:10,background:"#fee2e2",color:"#b91c1c",padding:"2px 8px",borderRadius:20,fontWeight:"bold",border:"2px solid #b91c1c"}}>⚠️ Conflict</span>}
+              {getTTSubs(selCls).map(s=>(
+                <span key={s} style={{fontSize:10,background:clsColMap[s]||"#f8fafc",padding:"2px 7px",borderRadius:20,color:"#1e3a5f",fontWeight:"bold",border:"1px solid rgba(0,0,0,.08)"}}>
+                  {getShort(s)} — {s.split(" ").slice(0,2).join(" ")}
+                </span>
+              ))}
             </div>
+            {/* Allocation bar */}
+            <div style={{padding:"10px 16px",borderTop:"1px solid #f1f5f9",background:"#fafafa"}}>
+              <div style={{fontSize:10,fontWeight:"bold",color:"#94a3b8",marginBottom:6,letterSpacing:.5}}>
+                WEEKLY ALLOCATION — {selCls} · {getTTSubs(selCls).reduce((a,s)=>a+getClsLpw(selCls,s),0)} total lessons
+              </div>
+              <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                {getTTSubs(selCls).map(sub=>{
+                  const n=getClsLpw(selCls,sub); const dbl=getClsDouble(selCls,sub);
+                  return (
+                    <div key={sub} style={{background:dbl?"#f3e8ff":"white",border:`1px solid ${dbl?"#a855f7":"#e2e8f0"}`,borderRadius:6,padding:"3px 9px",fontSize:10}}>
+                      <span style={{fontWeight:"bold",color:dbl?"#7c3aed":"#1d4ed8"}}>{n}×</span>
+                      <span style={{color:"#374151",marginLeft:3}}>{getShort(sub)}</span>
+                      {dbl&&<span style={{fontSize:8,color:"#7c3aed",fontWeight:"bold",marginLeft:3}}>2P</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
 
-            {/* Lessons per week bar */}
-            {(()=>{const entries=getTimetableSubs(selCls).map(s=>[s,getClsLpw(selCls,s)]);if(!entries.length)return null;return(
-              <div style={{padding:"10px 16px",borderTop:"1px solid #f1f5f9",background:"#fafafa"}}>
-                <div style={{fontSize:10,fontWeight:"bold",color:"#94a3b8",marginBottom:6,letterSpacing:.5}}>WEEKLY ALLOCATION — {selCls} · Total: {entries.reduce((a,[,n])=>a+n,0)} lessons</div>
-                <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-                  {entries.map(([sub,n])=>{
-                    const dbl=getClsDouble(selCls,sub);
-                    return(
-                      <div key={sub} style={{background:dbl?"#f3e8ff":"white",border:`1px solid ${dbl?"#a855f7":"#e2e8f0"}`,borderRadius:6,padding:"3px 9px",fontSize:10,display:"flex",gap:4,alignItems:"center"}}>
-                        <span style={{fontWeight:"bold",color:dbl?"#7c3aed":"#1d4ed8"}}>{n}×</span>
-                        <span style={{color:"#374151"}}>{sub.split(" ")[0]}</span>
-                        {dbl&&<span style={{fontSize:8,color:"#7c3aed",fontWeight:"bold",background:"#ede9fe",padding:"1px 4px",borderRadius:4}}>2P</span>}
-                      </div>
-                    );
-                  })}
+          {/* Edit cell modal */}
+          {editCell && (
+            <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9000,padding:16}}>
+              <div style={{background:"white",borderRadius:18,padding:24,width:"95%",maxWidth:480,maxHeight:"90vh",overflowY:"auto",fontFamily:FT}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+                  <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:15}}>✏️ Edit Period — {editCell.cls} · {editCell.day} P{editCell.p+1}</div>
+                  <button onClick={()=>setEditCell(null)} style={{background:"#f1f5f9",border:"none",borderRadius:8,padding:"6px 14px",cursor:"pointer",fontSize:16}}>✕</button>
+                </div>
+                <div style={{display:"grid",gap:12,marginBottom:16}}>
+                  <div>
+                    <label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:4}}>SUBJECT</label>
+                    <select value={editVal.subject||""} onChange={e=>setEditVal(v=>({...v,subject:e.target.value}))}
+                      style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px 10px",fontSize:13,fontFamily:FT}}>
+                      <option value="">— Select subject —</option>
+                      {getTTSubs(editCell.cls).map(s=><option key={s} value={s}>{s} ({getShort(s)})</option>)}
+                      <option value="PPI">PPI (School-wide)</option>
+                      <option value="Free Period">Free Period</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:4}}>TEACHER</label>
+                    <select value={editVal.teacher||""} onChange={e=>setEditVal(v=>({...v,teacher:e.target.value}))}
+                      style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px 10px",fontSize:13,fontFamily:FT}}>
+                      <option value="TBD">TBD</option>
+                      {allTeachers.map(t=><option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <label style={{fontSize:11,fontWeight:"bold",color:"#374151"}}>DOUBLE PERIOD</label>
+                    <button onClick={()=>setEditVal(v=>({...v,double:!v.double}))}
+                      style={{padding:"5px 14px",border:"none",borderRadius:8,cursor:"pointer",fontFamily:FT,fontSize:12,fontWeight:"bold",
+                        background:editVal.double?"linear-gradient(135deg,#7c3aed,#4c1d95)":"#f1f5f9",
+                        color:editVal.double?"white":"#64748b"}}>
+                      {editVal.double?"2P ✓":"1P"}
+                    </button>
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={()=>{
+                    updCell(editCell.cls, editCell.day, editCell.p, editVal.subject?editVal:{});
+                    setEditCell(null); flash("Period updated!");
+                  }} style={{background:"linear-gradient(135deg,#15803d,#065f46)",color:"white",border:"none",borderRadius:9,padding:"9px 20px",cursor:"pointer",fontFamily:FT,fontSize:13,fontWeight:"bold"}}>Save</button>
+                  <button onClick={()=>{updCell(editCell.cls,editCell.day,editCell.p,null);setEditCell(null);flash("Period cleared!");}}
+                    style={{background:"#fee2e2",color:"#b91c1c",border:"none",borderRadius:9,padding:"9px 20px",cursor:"pointer",fontFamily:FT,fontSize:13,fontWeight:"bold"}}>Clear</button>
+                  <button onClick={()=>setEditCell(null)} style={{background:"#f1f5f9",color:"#374151",border:"none",borderRadius:9,padding:"9px 16px",cursor:"pointer",fontFamily:FT,fontSize:13}}>Cancel</button>
                 </div>
               </div>
-            );})()}
-          </div>
+            </div>
+          )}
         </>
       )}
 
-      {/* ══════════ SUBJECT SETUP TAB ══════════ */}
-      {tab==="subjects"&&(
+      {/* ════════════════════ SUBJECTS TAB ════════════════════ */}
+      {tab==="subjects" && (
         <div style={{display:"grid",gap:16}}>
-          <div style={{background:"linear-gradient(135deg,#eff6ff,#dbeafe)",border:"1px solid #bfdbfe",borderRadius:10,padding:"12px 16px",fontSize:12,color:"#1d4ed8",lineHeight:1.8}}>
-            <b>Grade 4–9:</b> Assign a teacher per subject · Edit lessons/week · Toggle double period.<br/>
-            <b>PP1–Grade 3:</b> Assign one class teacher who covers all subjects.
+          <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:10,padding:"12px 16px",fontSize:12,color:"#1d4ed8",lineHeight:1.8}}>
+            <b>Grade 4–9:</b> Assign subject teachers, set lessons/wk & double-period flag, and restrict availability by period number.<br/>
+            <b>PP1–Grade 3:</b> Assign one class teacher who covers all subjects.<br/>
+            <b>Subject teacher assignments also auto-populate report form teacher fields.</b>
           </div>
-
-          {/* View toggle: by Class or by Subject */}
           <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
             {[["byclass","🏫 By Class"],["bysubject","📚 By Subject"],["byteacher","👤 By Teacher"]].map(([v,l])=>(
-              <button key={v} onClick={()=>setSubView&&setSubView(v)}
-                style={{padding:"7px 16px",border:"none",borderRadius:8,cursor:"pointer",fontFamily:F,fontSize:12,fontWeight:"bold",
+              <button key={v} onClick={()=>setSubView(v)}
+                style={{padding:"7px 16px",border:"none",borderRadius:8,cursor:"pointer",fontFamily:FT,fontSize:12,fontWeight:"bold",
                   background:subView===v?"linear-gradient(135deg,#1e3a5f,#1d4ed8)":"#f1f5f9",
                   color:subView===v?"white":"#64748b"}}>
                 {l}
               </button>
             ))}
-            <span style={{fontSize:11,color:"#94a3b8",marginLeft:8}}>
-              {allTeachers.length} teachers · {ALL_CLASSES.length} classes
-            </span>
           </div>
 
           {/* BY CLASS VIEW */}
-          {(!subView||subView==="byclass")&&ALL_CLASSES.map(cls=>{
-            const clsSubs=getTimetableSubs(cls);
-            const isUp=["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(cls);
-            const totalLpw=clsSubs.reduce((a,s)=>a+getClsLpw(cls,s),0);
-            const assigned=isUp?clsSubs.filter(s=>getSubTeacher(cls,s)).length:(getClsTeacher(cls)?clsSubs.length:0);
-            const complete=assigned===clsSubs.length;
-            return(
+          {subView==="byclass" && ALL_CLASSES.map(cls=>{
+            const clsSubs = getTTSubs(cls);
+            const isUp    = ["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(cls);
+            const totalLpw = clsSubs.reduce((a,s)=>a+getClsLpw(cls,s),0);
+            const assigned = isUp ? clsSubs.filter(s=>getSubTeacher(cls,s)).length : (getClsTeacher(cls)?clsSubs.length:0);
+            const complete = assigned===clsSubs.length;
+            return (
               <div key={cls} style={{background:"white",borderRadius:14,boxShadow:"0 2px 12px rgba(0,0,0,.07)",overflow:"hidden",border:`2px solid ${complete?"#bbf7d0":"#e2e8f0"}`}}>
-                {/* Class header */}
                 <div style={{padding:"12px 18px",background:complete?"linear-gradient(135deg,#f0fdf4,#dcfce7)":"linear-gradient(135deg,#f8fafc,#f1f5f9)",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
                   <div style={{display:"flex",alignItems:"center",gap:12}}>
-                    <div style={{width:36,height:36,borderRadius:10,background:complete?"#15803d":"#1e3a5f",color:"white",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:"bold",fontSize:13}}>
-                      {cls.replace("Grade ","G").replace("PP","")||cls[0]}
+                    <div style={{width:36,height:36,borderRadius:10,background:complete?"#15803d":"#1e3a5f",color:"white",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:"bold",fontSize:12}}>
+                      {cls.replace("Grade ","G").replace("PP","P")||cls[0]}
                     </div>
                     <div>
                       <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:14}}>{cls}</div>
-                      <div style={{fontSize:11,color:"#64748b"}}>{clsSubs.length} subjects · {totalLpw} lessons/week</div>
+                      <div style={{fontSize:11,color:"#64748b"}}>{clsSubs.length} subjects · {totalLpw} lessons/wk</div>
                     </div>
                   </div>
-                  <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                    <span style={{fontSize:11,fontWeight:"bold",padding:"3px 10px",borderRadius:20,background:complete?"#dcfce7":"#fef3c7",color:complete?"#15803d":"#b45309"}}>
-                      {complete?"✅ Complete":`${assigned}/${clsSubs.length} assigned`}
-                    </span>
-                  </div>
+                  <span style={{fontSize:11,fontWeight:"bold",padding:"3px 10px",borderRadius:20,background:complete?"#dcfce7":"#fef3c7",color:complete?"#15803d":"#b45309"}}>
+                    {complete?"✅ Complete":`${assigned}/${clsSubs.length} assigned`}
+                  </span>
                 </div>
-
-                {/* Class teacher for PP/Lower */}
-                {!isUp&&(
+                {!isUp && (
                   <div style={{padding:"12px 18px",borderBottom:"1px solid #f1f5f9"}}>
                     <label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:6}}>🧑‍🏫 CLASS TEACHER</label>
                     <select value={getClsTeacher(cls)} onChange={e=>setClsTeacher(cls,e.target.value)}
-                      style={{width:"100%",maxWidth:300,border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px 10px",fontSize:13,fontFamily:F}}>
-                      <option value="">-- Select class teacher --</option>
+                      style={{width:"100%",maxWidth:320,border:"1.5px solid #e2e8f0",borderRadius:8,padding:"7px 10px",fontSize:13,fontFamily:FT}}>
+                      <option value="">— Select class teacher —</option>
                       {allTeachers.map(t=><option key={t} value={t}>{t}</option>)}
                     </select>
-                    {getClsTeacher(cls)&&<div style={{marginTop:6,fontSize:11,color:"#15803d",fontWeight:"bold"}}>✅ {getClsTeacher(cls)}</div>}
+                    {getClsTeacher(cls)&&<div style={{marginTop:5,fontSize:11,color:"#15803d",fontWeight:"bold"}}>✅ {getClsTeacher(cls)} (covers all subjects)</div>}
                   </div>
                 )}
-
-                {/* Subject rows */}
                 <div style={{padding:"10px 18px",display:"grid",gap:8}}>
                   {clsSubs.map(sub=>{
-                    const teacher=isUp?getSubTeacher(cls,sub):getClsTeacher(cls);
-                    const n=getClsLpw(cls,sub);
-                    const dbl=getClsDouble(cls,sub);
-                    const assigned=isUp?!!getSubTeacher(cls,sub):!!getClsTeacher(cls);
-                    return(
-                      <div key={sub} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:assigned?"#f0fdf4":"#fafafa",borderRadius:10,border:`1px solid ${assigned?"#bbf7d0":"#e2e8f0"}`,flexWrap:"wrap"}}>
-                        {/* Subject name */}
-                        <div style={{flex:2,minWidth:140}}>
-                          <div style={{fontWeight:"bold",fontSize:12,color:"#1e3a5f"}}>{sub}</div>
-                          <div style={{fontSize:10,color:"#64748b",marginTop:1}}>{n} lessons/wk {dbl?"· 2P":""}</div>
-                        </div>
-                        {/* Teacher dropdown — only for upper classes */}
-                        {isUp&&(
-                          <div style={{flex:2,minWidth:160}}>
-                            <select value={getSubTeacher(cls,sub)} onChange={e=>setSubTeacher(cls,sub,e.target.value)}
-                              style={{width:"100%",border:`1.5px solid ${assigned?"#86efac":"#e2e8f0"}`,borderRadius:8,padding:"6px 8px",fontSize:12,fontFamily:F,background:"white"}}>
-                              <option value="">— Assign teacher —</option>
-                              {allTeachers.map(t=><option key={t} value={t}>{t}</option>)}
-                            </select>
+                    const teacher  = isUp ? getSubTeacher(cls,sub) : getClsTeacher(cls);
+                    const n        = getClsLpw(cls, sub);
+                    const dbl      = getClsDouble(cls, sub);
+                    const avail    = getAvail(cls, sub);
+                    const assigned = isUp ? !!getSubTeacher(cls,sub) : !!getClsTeacher(cls);
+                    return (
+                      <div key={sub} style={{padding:"10px 12px",background:assigned?"#f0fdf4":"#fafafa",borderRadius:10,border:`1px solid ${assigned?"#bbf7d0":"#e2e8f0"}`}}>
+                        <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:6}}>
+                          <div style={{flex:2,minWidth:140}}>
+                            <div style={{fontWeight:"bold",fontSize:12,color:"#1e3a5f"}}>{sub}</div>
+                            <div style={{fontSize:10,color:"#64748b",marginTop:1}}>({getShort(sub)}) · {n} lessons/wk {dbl?"· 2P":""}</div>
                           </div>
-                        )}
-                        {/* Lessons per week +/- */}
-                        <div style={{display:"flex",alignItems:"center",gap:5}}>
-                          <button onClick={()=>setClsLpw(cls,sub,n-1)} style={{width:26,height:26,border:"1px solid #e2e8f0",borderRadius:6,background:"#f1f5f9",cursor:"pointer",fontFamily:F,fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
-                          <span style={{fontWeight:"bold",color:"#b45309",fontSize:14,minWidth:20,textAlign:"center"}}>{n}</span>
-                          <button onClick={()=>setClsLpw(cls,sub,n+1)} style={{width:26,height:26,border:"1px solid #e2e8f0",borderRadius:6,background:"#f1f5f9",cursor:"pointer",fontFamily:F,fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+                          {isUp && (
+                            <div style={{flex:2,minWidth:160}}>
+                              <select value={getSubTeacher(cls,sub)} onChange={e=>setSubTeacher(cls,sub,e.target.value)}
+                                style={{width:"100%",border:`1.5px solid ${assigned?"#86efac":"#e2e8f0"}`,borderRadius:8,padding:"6px 8px",fontSize:12,fontFamily:FT}}>
+                                <option value="">— Assign teacher —</option>
+                                {allTeachers.map(t=><option key={t} value={t}>{t}</option>)}
+                              </select>
+                            </div>
+                          )}
+                          {/* LPW controls */}
+                          <div style={{display:"flex",alignItems:"center",gap:4}}>
+                            <button onClick={()=>setClsLpw(cls,sub,n-1)} style={{width:26,height:26,border:"1px solid #e2e8f0",borderRadius:6,background:"#f1f5f9",cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+                            <span style={{fontWeight:"bold",color:"#b45309",fontSize:14,minWidth:20,textAlign:"center"}}>{n}</span>
+                            <button onClick={()=>setClsLpw(cls,sub,n+1)} style={{width:26,height:26,border:"1px solid #e2e8f0",borderRadius:6,background:"#f1f5f9",cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+                          </div>
+                          {/* Double toggle */}
+                          <button onClick={()=>toggleClsDouble(cls,sub)}
+                            style={{padding:"5px 12px",border:"none",borderRadius:8,cursor:"pointer",fontFamily:FT,fontSize:11,fontWeight:"bold",
+                              background:dbl?"linear-gradient(135deg,#7c3aed,#4c1d95)":"#f1f5f9",
+                              color:dbl?"white":"#64748b",whiteSpace:"nowrap"}}>
+                            {dbl?"2P ✓":"2P?"}
+                          </button>
                         </div>
-                        {/* Double period toggle */}
-                        <button onClick={()=>toggleClsDouble(cls,sub)}
-                          style={{padding:"5px 12px",border:"none",borderRadius:8,cursor:"pointer",fontFamily:F,fontSize:11,fontWeight:"bold",
-                            background:dbl?"linear-gradient(135deg,#7c3aed,#4c1d95)":"#f1f5f9",
-                            color:dbl?"white":"#64748b",whiteSpace:"nowrap"}}>
-                          {dbl?"2P ✓":"1P"}
-                        </button>
+                        {/* Availability row */}
+                        <div>
+                          <div style={{fontSize:9,fontWeight:"bold",color:"#94a3b8",marginBottom:3,letterSpacing:.4}}>AVAILABILITY (click period to toggle — green=allowed, red=blocked)</div>
+                          <AvailEditor cls={cls} sub={sub}/>
+                        </div>
                       </div>
                     );
                   })}
@@ -3140,34 +3283,37 @@ function TimetablePage({students,staff,user,timetable:tt,setTimetable:setTt,ttSe
           })}
 
           {/* BY SUBJECT VIEW */}
-          {subView==="bysubject"&&(()=>{
-            const allSubjects=[...new Set(ALL_CLASSES.flatMap(c=>getTimetableSubs(c)))];
+          {subView==="bysubject" && (() => {
+            const allSubjects = [...new Set(ALL_CLASSES.flatMap(c=>getTTSubs(c)))];
             return allSubjects.map(sub=>{
-              const classes=ALL_CLASSES.filter(c=>getTimetableSubs(c).includes(sub));
-              const teachers=[...new Set(classes.map(c=>getSubTeacher(c,sub)||getClsTeacher(c)).filter(Boolean))];
-              return(
+              const classes  = ALL_CLASSES.filter(c=>getTTSubs(c).includes(sub));
+              const teachers = [...new Set(classes.map(c=>getSubTeacher(c,sub)||getClsTeacher(c)).filter(Boolean))];
+              return (
                 <div key={sub} style={{background:"white",borderRadius:14,boxShadow:"0 2px 12px rgba(0,0,0,.07)",overflow:"hidden"}}>
                   <div style={{padding:"12px 18px",background:"linear-gradient(135deg,#1e3a5f,#1d4ed8)",color:"white",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                    <div style={{fontWeight:"bold",fontSize:13}}>{sub}</div>
-                    <div style={{fontSize:11,opacity:.8}}>{classes.length} classes · {teachers.length} teacher(s)</div>
+                    <div>
+                      <div style={{fontWeight:"bold",fontSize:13}}>{sub}</div>
+                      <div style={{fontSize:11,opacity:.8}}>({getShort(sub)}) · {classes.length} classes · {teachers.length} teacher(s)</div>
+                    </div>
+                    <div style={{fontSize:11,opacity:.7}}>{teachers.join(", ")||"Unassigned"}</div>
                   </div>
                   <div style={{padding:"10px 18px",display:"grid",gap:6}}>
                     {classes.map(cls=>{
-                      const isUp=["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(cls);
-                      const teacher=isUp?getSubTeacher(cls,sub):getClsTeacher(cls);
-                      const n=getClsLpw(cls,sub);
-                      return(
+                      const isUp   = ["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(cls);
+                      const teacher = isUp ? getSubTeacher(cls,sub) : getClsTeacher(cls);
+                      const n      = getClsLpw(cls,sub);
+                      return (
                         <div key={cls} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:"#f8fafc",borderRadius:8,flexWrap:"wrap"}}>
                           <span style={{fontWeight:"bold",fontSize:12,color:"#1e3a5f",minWidth:80}}>{cls}</span>
-                          <span style={{fontSize:11,color:"#64748b"}}>{n} lessons/wk</span>
-                          {isUp?(
+                          <span style={{fontSize:11,color:"#64748b"}}>{n}×/wk</span>
+                          {isUp ? (
                             <select value={teacher} onChange={e=>setSubTeacher(cls,sub,e.target.value)}
-                              style={{flex:1,minWidth:140,border:"1.5px solid #e2e8f0",borderRadius:7,padding:"5px 8px",fontSize:12,fontFamily:F}}>
+                              style={{flex:1,minWidth:140,border:"1.5px solid #e2e8f0",borderRadius:7,padding:"5px 8px",fontSize:12,fontFamily:FT}}>
                               <option value="">— Assign teacher —</option>
                               {allTeachers.map(t=><option key={t} value={t}>{t}</option>)}
                             </select>
-                          ):(
-                            <span style={{fontSize:11,color:teacher?"#15803d":"#94a3b8",fontWeight:"bold"}}>{teacher||"No class teacher"}</span>
+                          ) : (
+                            <span style={{fontSize:11,color:teacher?"#15803d":"#94a3b8",fontWeight:"bold"}}>{teacher||"No class teacher assigned"}</span>
                           )}
                         </div>
                       );
@@ -3179,33 +3325,37 @@ function TimetablePage({students,staff,user,timetable:tt,setTimetable:setTt,ttSe
           })()}
 
           {/* BY TEACHER VIEW */}
-          {subView==="byteacher"&&allTeachers.map(teacher=>{
-            const lessons=[];
+          {subView==="byteacher" && allTeachers.map(teacher=>{
+            const lessons = [];
             ALL_CLASSES.forEach(cls=>{
-              const isUp=["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(cls);
-              getTimetableSubs(cls).forEach(sub=>{
-                const t=isUp?getSubTeacher(cls,sub):getClsTeacher(cls);
-                if(t===teacher) lessons.push({cls,sub,n:getClsLpw(cls,sub)});
+              const isUp = ["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(cls);
+              getTTSubs(cls).forEach(sub=>{
+                const t = isUp ? getSubTeacher(cls,sub) : getClsTeacher(cls);
+                if(t===teacher) lessons.push({cls, sub, n:getClsLpw(cls,sub)});
               });
             });
-            const total=lessons.reduce((a,l)=>a+l.n,0);
-            const over=total>30;
-            return(
+            const total = lessons.reduce((a,l)=>a+l.n, 0);
+            const over  = total > 30;
+            return (
               <div key={teacher} style={{background:"white",borderRadius:14,boxShadow:"0 2px 12px rgba(0,0,0,.07)",overflow:"hidden",border:`2px solid ${over?"#fecaca":"#e2e8f0"}`}}>
-                <div style={{padding:"12px 18px",background:over?"linear-gradient(135deg,#fee2e2,#fef2f2)":"linear-gradient(135deg,#f8fafc,#f1f5f9)",display:"flex",alignItems:"center",gap:12}}>
-                  <div style={{width:38,height:38,borderRadius:"50%",background:over?"#b91c1c":"#1e3a5f",color:"white",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:"bold",fontSize:16}}>{teacher[0]}</div>
+                <div style={{padding:"12px 18px",background:over?"#fef2f2":"#f0fdf4",display:"flex",alignItems:"center",gap:12}}>
+                  <div style={{width:38,height:38,borderRadius:"50%",background:over?"#b91c1c":"#15803d",color:"white",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:"bold",fontSize:13}}>
+                    {getInitials(teacher)}
+                  </div>
                   <div>
                     <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:14}}>{teacher}</div>
-                    <div style={{fontSize:11,color:over?"#b91c1c":"#64748b",fontWeight:over?"bold":"normal"}}>{total} lessons/week {over?"⚠️ Heavy load":""} · {lessons.length} assignments</div>
+                    <div style={{fontSize:11,color:over?"#b91c1c":"#64748b",fontWeight:over?"bold":"normal"}}>
+                      {total} lessons/week {over?"⚠️ Heavy load":""} · {lessons.length} class-subject assignments
+                    </div>
                   </div>
                 </div>
                 <div style={{padding:"10px 18px",display:"flex",gap:8,flexWrap:"wrap"}}>
-                  {lessons.length?lessons.map((l,i)=>(
+                  {lessons.length ? lessons.map((l,i)=>(
                     <div key={i} style={{background:"#eff6ff",borderRadius:8,padding:"6px 12px",fontSize:11}}>
                       <div style={{fontWeight:"bold",color:"#1e3a5f"}}>{l.cls}</div>
-                      <div style={{color:"#64748b"}}>{l.sub.split(" ").slice(0,2).join(" ")} · {l.n}×/wk</div>
+                      <div style={{color:"#64748b"}}>{getShort(l.sub)} ({l.sub.split(" ").slice(0,2).join(" ")}) · {l.n}×/wk</div>
                     </div>
-                  )):<span style={{fontSize:12,color:"#94a3b8"}}>No subjects assigned yet.</span>}
+                  )) : <span style={{fontSize:12,color:"#94a3b8"}}>No subjects assigned yet.</span>}
                 </div>
               </div>
             );
@@ -3213,24 +3363,24 @@ function TimetablePage({students,staff,user,timetable:tt,setTimetable:setTt,ttSe
         </div>
       )}
 
-      {/* ══════════ TEACHER VIEW TAB ══════════ */}
-      {tab==="teacher"&&(
+      {/* ════════════════════ TEACHER VIEW TAB ════════════════════ */}
+      {tab==="teacher" && (
         <div style={{display:"grid",gap:16}}>
           <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
-            <span style={{fontSize:13,fontWeight:"bold",color:"#1e3a5f"}}>Filter by teacher:</span>
-            <select value={filterTeacher} onChange={e=>setFilterTeacher(e.target.value)} style={{border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px 12px",fontSize:13,fontFamily:F}}>
+            <span style={{fontSize:13,fontWeight:"bold",color:"#1e3a5f"}}>Filter:</span>
+            <select value={filterTeacher} onChange={e=>setFilterTeacher(e.target.value)} style={{border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px 12px",fontSize:13,fontFamily:FT}}>
               <option value="All">All Teachers</option>
               {allTeachers.map(t=><option key={t} value={t}>{t}</option>)}
             </select>
           </div>
           {allTeachers.filter(t=>filterTeacher==="All"||t===filterTeacher).map(teacher=>{
-            const load=teacherLoad[teacher]||0;
-            const over=load>30;
-            return(
+            const load = teacherLoad[teacher]||0;
+            const over = load>30;
+            return (
               <div key={teacher} style={{background:"white",borderRadius:14,boxShadow:"0 2px 12px rgba(0,0,0,.07)",overflow:"hidden"}}>
                 <div style={{padding:"12px 18px",background:over?"linear-gradient(135deg,#fee2e2,#fef2f2)":"linear-gradient(135deg,#f0fdf4,#dcfce7)",display:"flex",alignItems:"center",gap:12,borderBottom:"1px solid #f1f5f9"}}>
-                  <div style={{width:40,height:40,borderRadius:"50%",background:over?"#b91c1c":"#15803d",color:"white",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:"bold",fontSize:16}}>
-                    {teacher.charAt(0)}
+                  <div style={{width:40,height:40,borderRadius:"50%",background:over?"#b91c1c":"#15803d",color:"white",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:"bold",fontSize:13}}>
+                    {getInitials(teacher)}
                   </div>
                   <div>
                     <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:14}}>{teacher}</div>
@@ -3248,22 +3398,24 @@ function TimetablePage({students,staff,user,timetable:tt,setTimetable:setTt,ttSe
                     <tbody>
                       {LESSON_SLOTS.map((slot,si)=>(
                         <tr key={slot.period} style={{borderTop:"1px solid #f1f5f9"}}>
-                          <td style={{padding:"6px 12px",fontSize:11,fontWeight:"bold",color:"#64748b",whiteSpace:"nowrap"}}>{slot.label} <span style={{fontWeight:"normal",fontSize:9}}>{slot.start}</span></td>
+                          <td style={{padding:"6px 12px",fontSize:11,fontWeight:"bold",color:"#64748b",whiteSpace:"nowrap"}}>
+                            {slot.name} <span style={{fontWeight:"normal",fontSize:9}}>{slot.start}</span>
+                          </td>
                           {DAYS.map(day=>{
-                            const cls=ALL_CLASSES.find(c=>{
-                              const cell=(tt[c]?.[day]||[])[si];
+                            const cls = ALL_CLASSES.find(c=>{
+                              const cell = (tt[c]?.[day]||[])[si];
                               return cell?.teacher?.replace("*","")===teacher;
                             });
-                            const cell=cls?(tt[cls]?.[day]||[])[si]:null;
-                            const bg=cell?.subject?(globalColMap[cell.subject]||"#eff6ff"):"#f8fafc";
-                            return(
+                            const cell = cls ? (tt[cls]?.[day]||[])[si] : null;
+                            const bg   = cell?.subject ? (globalColMap[cell.subject]||"#eff6ff") : "#f8fafc";
+                            return (
                               <td key={day} style={{padding:4}}>
-                                {cls?(
+                                {cls ? (
                                   <div style={{background:bg,borderRadius:7,padding:"5px 6px",textAlign:"center",fontSize:10}}>
-                                    <div style={{fontWeight:"bold",color:"#1e3a5f"}}>{cell.subject?.split(" ")[0]}</div>
+                                    <div style={{fontWeight:"bold",color:"#1e3a5f"}}>{getShort(cell.subject)}</div>
                                     <div style={{color:"#64748b",fontSize:9}}>{cls}</div>
                                   </div>
-                                ):(
+                                ) : (
                                   <div style={{background:"#f8fafc",borderRadius:7,padding:"5px 6px",textAlign:"center",fontSize:10,color:"#cbd5e1"}}>—</div>
                                 )}
                               </td>
@@ -3277,152 +3429,157 @@ function TimetablePage({students,staff,user,timetable:tt,setTimetable:setTt,ttSe
               </div>
             );
           })}
-          {allTeachers.length===0&&<div style={{textAlign:"center",padding:"30px",color:"#94a3b8",fontSize:13}}>No teaching staff found. Add staff in the Staff Manager.</div>}
+          {allTeachers.length===0 && <div style={{textAlign:"center",padding:"30px",color:"#94a3b8",fontSize:13}}>No teaching staff found. Add staff in the Staff Manager.</div>}
         </div>
       )}
 
-      {/* ══════════ FULL DAY TAB ══════════ */}
-      {tab==="daily"&&(
+      {/* ════════════════════ FULL DAY TAB ════════════════════ */}
+      {tab==="daily" && (
         <div style={{display:"grid",gap:10}}>
           <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:8,padding:"10px 14px",fontSize:12,color:"#1d4ed8"}}>
-            ℹ️ Full boarding school daily routine. Admins can edit activity descriptions for the editable rows (🟡).
+            ℹ️ Full boarding school daily routine. Admins can click a row to edit activity descriptions.
           </div>
           {daySchedule.map((item,i)=>(
             <div key={i} style={{background:"white",borderRadius:12,padding:"12px 18px",boxShadow:"0 1px 6px rgba(0,0,0,.06)",borderLeft:`4px solid ${item.editable?"#b45309":"#1d4ed8"}`,display:"flex",alignItems:"center",gap:14}}>
-              <span style={{fontSize:24,flexShrink:0}}>{item.icon}</span>
+              <span style={{fontSize:22,flexShrink:0}}>{item.icon}</span>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:11,fontWeight:"bold",color:"#94a3b8",fontFamily:"monospace",marginBottom:2}}>{item.time}</div>
-                {editSchedIdx===i?(
+                {editSchedIdx===i ? (
                   <div style={{display:"flex",gap:8}}>
-                    <input value={item.activity} onChange={e=>{const n=[...daySchedule];n[i]={...n[i],activity:e.target.value};setDaySchedule(n);}} style={{flex:1,border:"1.5px solid #93c5fd",borderRadius:6,padding:"5px 10px",fontSize:12,fontFamily:F,outline:"none"}}/>
-                    <button onClick={()=>{save("tnks_ttschedule",daySchedule);setEditSchedIdx(null);}} style={{background:"#15803d",color:"white",border:"none",borderRadius:7,padding:"5px 12px",cursor:"pointer",fontSize:12,fontFamily:F}}>✓</button>
-                    <button onClick={()=>setEditSchedIdx(null)} style={{background:"#f1f5f9",color:"#374151",border:"none",borderRadius:7,padding:"5px 10px",cursor:"pointer",fontSize:12,fontFamily:F}}>✕</button>
+                    <input value={item.activity} onChange={e=>{const n=[...daySchedule];n[i]={...n[i],activity:e.target.value};setDaySchedule(n);}}
+                      style={{flex:1,border:"1.5px solid #93c5fd",borderRadius:6,padding:"5px 10px",fontSize:12,fontFamily:FT,outline:"none"}}/>
+                    <button onClick={()=>setEditSchedIdx(null)} style={{background:"#15803d",color:"white",border:"none",borderRadius:7,padding:"5px 12px",cursor:"pointer",fontSize:12}}>Done</button>
                   </div>
-                ):(
-                  <div style={{fontSize:13,color:"#374151",display:"flex",alignItems:"center",gap:8}}>
-                    <span>{item.activity}</span>
-                    {item.editable&&isAdmin&&<button onClick={()=>setEditSchedIdx(i)} style={{background:"none",border:"none",cursor:"pointer",fontSize:13,color:"#b45309",padding:0}}>✏️</button>}
-                  </div>
+                ) : (
+                  <div style={{fontSize:13,color:"#374151",fontWeight:item.editable?"bold":"normal"}}>{item.activity}</div>
                 )}
               </div>
-              {item.editable&&<span style={{fontSize:9,background:"#fef3c7",color:"#b45309",padding:"2px 7px",borderRadius:16,fontWeight:"bold",flexShrink:0}}>EDITABLE</span>}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* ══════════ WEEKEND TAB — FULLY EDITABLE ══════════ */}
-      {tab==="weekend"&&(
-        <div style={{display:"grid",gap:16}}>
-          <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:8,padding:"10px 14px",fontSize:12,color:"#1d4ed8"}}>
-            ℹ️ Edit Saturday and Sunday schedules — click ✏️ to change the time, activity, or icon for any row. Admins can add or delete rows.
-          </div>
-
-          {[
-            {day:"Saturday",schedule:satSchedule,setSchedule:setSatSchedule,headerBg:"linear-gradient(135deg,#1e3a5f,#1d4ed8)",headerLabel:"📚 Saturday Schedule"},
-            {day:"Sunday",schedule:sunSchedule,setSchedule:setSunSchedule,headerBg:"linear-gradient(135deg,#15803d,#065f46)",headerLabel:"⛪ Sunday Schedule"},
-          ].map(({day,schedule,setSchedule,headerBg,headerLabel})=>(
-            <div key={day} style={{background:"white",borderRadius:14,boxShadow:"0 2px 12px rgba(0,0,0,.07)",overflow:"hidden"}}>
-              <div style={{padding:"12px 18px",background:headerBg,color:"white",fontWeight:"bold",fontSize:14,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                <span>{headerLabel}</span>
-                <span style={{fontSize:11,opacity:.8}}>{schedule.length} slots</span>
-              </div>
-              <div style={{padding:"0 0 8px 0"}}>
-                {schedule.map((item,i)=>(
-                  <div key={item.id??i} style={{borderBottom:i<schedule.length-1?"1px solid #f1f5f9":"none",padding:"10px 16px"}}>
-                    {editWeekendCell?.day===day&&editWeekendCell?.idx===i?(
-                      /* ── Edit row ── */
-                      <div style={{display:"grid",gridTemplateColumns:"auto 1fr 1fr 1fr auto auto",gap:8,alignItems:"center"}}>
-                        <input value={weekendEditVal.icon||""} onChange={e=>setWeekendEditVal(v=>({...v,icon:e.target.value}))}
-                          style={{width:48,border:"1.5px solid #93c5fd",borderRadius:6,padding:"5px 8px",fontSize:16,textAlign:"center",fontFamily:F,outline:"none"}}
-                          placeholder="🌅"/>
-                        <input type="time" value={weekendEditVal.startTime||""} onChange={e=>setWeekendEditVal(v=>({...v,startTime:e.target.value}))}
-                          style={{border:"1.5px solid #93c5fd",borderRadius:6,padding:"5px 8px",fontSize:12,fontFamily:F,outline:"none"}}/>
-                        <input type="time" value={weekendEditVal.endTime||""} onChange={e=>setWeekendEditVal(v=>({...v,endTime:e.target.value}))}
-                          style={{border:"1.5px solid #93c5fd",borderRadius:6,padding:"5px 8px",fontSize:12,fontFamily:F,outline:"none"}}/>
-                        <input value={weekendEditVal.activity||""} onChange={e=>setWeekendEditVal(v=>({...v,activity:e.target.value}))}
-                          style={{border:"1.5px solid #93c5fd",borderRadius:6,padding:"5px 10px",fontSize:12,fontFamily:F,outline:"none"}}
-                          placeholder="Activity name"/>
-                        <button onClick={()=>{
-                          const updated=[...schedule];
-                          const st=weekendEditVal.startTime||item.time?.split("–")[0]||"";
-                          const en=weekendEditVal.endTime||item.time?.split("–")[1]||"";
-                          const timeStr=st&&en?`${st}–${en}`:item.time;
-                          updated[i]={...updated[i],time:timeStr,activity:weekendEditVal.activity||item.activity,icon:weekendEditVal.icon||item.icon};
-                          setSchedule(updated);setEditWeekendCell(null);
-                        }} style={{background:"#15803d",color:"white",border:"none",borderRadius:7,padding:"6px 12px",cursor:"pointer",fontSize:12,fontFamily:F,whiteSpace:"nowrap"}}>✓ Save</button>
-                        <button onClick={()=>setEditWeekendCell(null)} style={{background:"#f1f5f9",color:"#374151",border:"none",borderRadius:7,padding:"6px 10px",cursor:"pointer",fontSize:12,fontFamily:F}}>✕</button>
-                      </div>
-                    ):(
-                      /* ── Display row ── */
-                      <div style={{display:"flex",alignItems:"center",gap:12}}>
-                        <span style={{fontSize:22,flexShrink:0}}>{item.icon}</span>
-                        <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:10,color:"#94a3b8",fontFamily:"monospace",marginBottom:1}}>{item.time}</div>
-                          <div style={{fontSize:13,color:"#374151",fontWeight:"bold"}}>{item.activity}</div>
-                        </div>
-                        {isAdmin&&(
-                          <div style={{display:"flex",gap:4,flexShrink:0}}>
-                            <button onClick={()=>{
-                              const parts=item.time?.split("–")||[];
-                              setWeekendEditVal({activity:item.activity,icon:item.icon,startTime:parts[0]||"",endTime:parts[1]||""});
-                              setEditWeekendCell({day,idx:i});
-                            }} style={{background:"#eff6ff",color:"#1d4ed8",border:"none",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontSize:12,fontFamily:F}}>✏️ Edit</button>
-                            <button onClick={()=>setSchedule(p=>p.filter((_,j)=>j!==i))}
-                              style={{background:"#fee2e2",color:"#b91c1c",border:"none",borderRadius:6,padding:"4px 8px",cursor:"pointer",fontSize:12,fontFamily:F}}>🗑️</button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-              {isAdmin&&(
-                <div style={{padding:"10px 16px",borderTop:"1px solid #f1f5f9",background:"#fafafa"}}>
-                  <button onClick={()=>{
-                    const last=schedule[schedule.length-1];
-                    setSchedule(p=>[...p,{id:Date.now(),time:"00:00–00:00",activity:"New Activity",icon:"📌"}]);
-                    setWeekendEditVal({activity:"New Activity",icon:"📌",startTime:"00:00",endTime:"00:00"});
-                    setEditWeekendCell({day,idx:schedule.length});
-                  }} style={{background:"linear-gradient(135deg,#1d4ed8,#1e3a5f)",color:"white",border:"none",borderRadius:8,padding:"8px 16px",cursor:"pointer",fontFamily:F,fontSize:12,fontWeight:"bold"}}>
-                    + Add Row
-                  </button>
-                </div>
+              {isAdmin && item.editable && editSchedIdx!==i && (
+                <button onClick={()=>setEditSchedIdx(i)} style={{background:"#eff6ff",color:"#1d4ed8",border:"none",borderRadius:8,padding:"6px 12px",cursor:"pointer",fontSize:11,fontWeight:"bold",whiteSpace:"nowrap"}}>Edit</button>
               )}
             </div>
           ))}
         </div>
       )}
 
-      {/* ══════════ EDIT CELL MODAL ══════════ */}
-      {editCell&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9000,padding:16}}>
-          <div style={{background:"white",borderRadius:18,padding:28,width:"95%",maxWidth:460,fontFamily:F,boxShadow:"0 24px 64px rgba(0,0,0,.25)"}}>
+      {/* ════════════════════ WEEKEND TAB ════════════════════ */}
+      {tab==="weekend" && (
+        <div style={{display:"grid",gap:10}}>
+          <div style={{display:"flex",gap:8,marginBottom:6}}>
+            {["Saturday","Sunday"].map(d=>(
+              <button key={d} onClick={()=>setWeekendEditCell(d)}
+                style={{padding:"8px 20px",border:"none",borderRadius:9,cursor:"pointer",fontFamily:FT,fontSize:13,fontWeight:"bold",
+                  background:weekendEditCell===d||(!weekendEditCell&&d==="Saturday")?"linear-gradient(135deg,#1d4ed8,#1e3a5f)":"#f1f5f9",
+                  color:weekendEditCell===d||(!weekendEditCell&&d==="Saturday")?"white":"#64748b"}}>
+                {d}
+              </button>
+            ))}
+          </div>
+          {(() => {
+            const day = weekendEditCell||"Saturday";
+            const schedule = day==="Saturday" ? satSchedule : sunSchedule;
+            const setSchedule = day==="Saturday" ? setSatSchedule : setSunSchedule;
+            return (schedule||[]).map((item,i)=>(
+              <div key={i} style={{background:"white",borderRadius:12,padding:"12px 18px",boxShadow:"0 1px 6px rgba(0,0,0,.06)",borderLeft:"4px solid #15803d",display:"flex",alignItems:"center",gap:14}}>
+                <div style={{flex:1}}>
+                  {weekendEditVal[`${day}-${i}`] !== undefined ? (
+                    <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                      <input value={weekendEditVal[`${day}-${i}`].time||item.time} onChange={e=>setWeekendEditVal(v=>({...v,[`${day}-${i}`]:{...(v[`${day}-${i}`]||{}),time:e.target.value}}))}
+                        style={{border:"1.5px solid #93c5fd",borderRadius:6,padding:"4px 8px",fontSize:12,fontFamily:FT,outline:"none",width:120}}/>
+                      <input value={weekendEditVal[`${day}-${i}`].activity||item.activity} onChange={e=>setWeekendEditVal(v=>({...v,[`${day}-${i}`]:{...(v[`${day}-${i}`]||{}),activity:e.target.value}}))}
+                        style={{flex:1,border:"1.5px solid #93c5fd",borderRadius:6,padding:"4px 8px",fontSize:12,fontFamily:FT,outline:"none",minWidth:180}}/>
+                      <button onClick={()=>{
+                        const ev = weekendEditVal[`${day}-${i}`]||{};
+                        const n = [...schedule]; n[i]={...n[i],...ev};
+                        setSchedule(n); setWeekendEditVal(v=>{const x={...v};delete x[`${day}-${i}`];return x;});
+                      }} style={{background:"#15803d",color:"white",border:"none",borderRadius:7,padding:"5px 12px",cursor:"pointer",fontSize:12}}>Done</button>
+                    </div>
+                  ) : (
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <div>
+                        <div style={{fontSize:11,fontWeight:"bold",color:"#94a3b8",fontFamily:"monospace"}}>{item.time}</div>
+                        <div style={{fontSize:13,color:"#374151"}}>{item.activity}</div>
+                      </div>
+                      {isAdmin && <button onClick={()=>setWeekendEditVal(v=>({...v,[`${day}-${i}`]:{time:item.time,activity:item.activity}}))}
+                        style={{background:"#eff6ff",color:"#1d4ed8",border:"none",borderRadius:8,padding:"5px 12px",cursor:"pointer",fontSize:11,fontWeight:"bold"}}>Edit</button>}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ));
+          })()}
+        </div>
+      )}
+
+      {/* ════════════════════ SAVED TIMETABLES TAB ════════════════════ */}
+      {tab==="saved" && (
+        <div style={{display:"grid",gap:16}}>
+          <div style={{background:"white",borderRadius:14,padding:20,boxShadow:"0 2px 12px rgba(0,0,0,.07)"}}>
+            <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:15,marginBottom:12}}>💾 Saved Timetable Snapshots</div>
+            <div style={{fontSize:12,color:"#64748b",marginBottom:16}}>
+              Save the current timetable state as a named snapshot. You can load any snapshot later to restore it. Up to 20 snapshots stored locally and synced to the cloud.
+            </div>
+            {isAdmin && (
+              <button onClick={()=>setShowSaveModal(true)}
+                style={{background:"linear-gradient(135deg,#1d4ed8,#1e3a5f)",color:"white",border:"none",borderRadius:9,padding:"9px 20px",cursor:"pointer",fontFamily:FT,fontSize:13,fontWeight:"bold",marginBottom:16}}>
+                💾 Save Current Timetable
+              </button>
+            )}
+            {savedTTs.length===0 ? (
+              <div style={{textAlign:"center",padding:"30px",color:"#94a3b8",fontSize:13}}>
+                <div style={{fontSize:40,marginBottom:8}}>💾</div>
+                No saved timetables yet. Generate a timetable and save it!
+              </div>
+            ) : (
+              <div style={{display:"grid",gap:10}}>
+                {savedTTs.map(snap=>(
+                  <div key={snap.id} style={{background:"#f8fafc",borderRadius:12,padding:"14px 18px",border:"1px solid #e2e8f0",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
+                    <div>
+                      <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:14}}>📅 {snap.name}</div>
+                      <div style={{fontSize:11,color:"#64748b",marginTop:2}}>Saved: {snap.savedAt}</div>
+                      {snap.ttSetup?.session && <div style={{fontSize:11,color:"#94a3b8"}}>Session: {snap.ttSetup.session}</div>}
+                    </div>
+                    <div style={{display:"flex",gap:8}}>
+                      <button onClick={()=>loadSnapshot(snap)}
+                        style={{background:"linear-gradient(135deg,#15803d,#065f46)",color:"white",border:"none",borderRadius:8,padding:"7px 16px",cursor:"pointer",fontFamily:FT,fontSize:12,fontWeight:"bold"}}>
+                        Load
+                      </button>
+                      {isAdmin && (
+                        <button onClick={()=>{ if(window.confirm(`Delete "${snap.name}"?`)) deleteSnapshot(snap.id); }}
+                          style={{background:"#fee2e2",color:"#b91c1c",border:"none",borderRadius:8,padding:"7px 12px",cursor:"pointer",fontFamily:FT,fontSize:12,fontWeight:"bold"}}>
+                          Del
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════ SAVE MODAL ════════════════════ */}
+      {showSaveModal && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9000,padding:16}}>
+          <div style={{background:"white",borderRadius:18,padding:28,width:"95%",maxWidth:420,fontFamily:FT}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
-              <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:16}}>
-                ✏️ Edit Cell — {editCell.cls} · {editCell.day} · {editCell.p<8?`P${editCell.p+1}`:`EP${editCell.p-7}`}
-              </div>
-              <button onClick={()=>setEditCell(null)} style={{background:"#f1f5f9",border:"none",borderRadius:8,padding:"6px 12px",cursor:"pointer",fontSize:16}}>✕</button>
+              <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:16}}>💾 Save Timetable Snapshot</div>
+              <button onClick={()=>setShowSaveModal(false)} style={{background:"#f1f5f9",border:"none",borderRadius:8,padding:"6px 14px",cursor:"pointer",fontSize:16}}>✕</button>
             </div>
-            <div style={{display:"grid",gap:12}}>
-              <div>
-                <label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:3,letterSpacing:.5}}>SUBJECT</label>
-                <select value={editVal.subject||""} onChange={e=>setEditVal(v=>({...v,subject:e.target.value}))} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"9px 10px",fontSize:13,fontFamily:F}}>
-                  {getSubs(editCell.cls).map(s=><option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:3,letterSpacing:.5}}>TEACHER</label>
-                <select value={editVal.teacher||""} onChange={e=>setEditVal(v=>({...v,teacher:e.target.value}))} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"9px 10px",fontSize:13,fontFamily:F}}>
-                  <option value="TBD">TBD</option>
-                  {allTeachers.map(t=><option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
+            <div style={{marginBottom:14}}>
+              <label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:4}}>SNAPSHOT NAME *</label>
+              <input value={saveName} onChange={e=>setSaveName(e.target.value)}
+                placeholder={`e.g. "${ttName||"TNKS Term 1 2025"} (Final)"`}
+                onKeyDown={e=>e.key==="Enter"&&saveSnapshot()}
+                style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"9px 12px",fontSize:13,outline:"none",fontFamily:FT,boxSizing:"border-box"}}/>
             </div>
-            <div style={{display:"flex",gap:8,marginTop:18}}>
-              <button onClick={()=>{updCell(editCell.cls,editCell.day,editCell.p,editVal);setEditCell(null);flash("✅ Cell updated!");}} style={{flex:1,background:"linear-gradient(135deg,#1d4ed8,#1e3a5f)",color:"white",border:"none",borderRadius:9,padding:"10px",cursor:"pointer",fontFamily:F,fontSize:13,fontWeight:"bold"}}>Save Changes</button>
-              <button onClick={()=>{updCell(editCell.cls,editCell.day,editCell.p,null);setEditCell(null);flash("🗑️ Cell cleared.");}} style={{background:"#fee2e2",color:"#b91c1c",border:"none",borderRadius:9,padding:"10px 16px",cursor:"pointer",fontFamily:F,fontSize:13,fontWeight:"bold"}}>Clear</button>
-              <button onClick={()=>setEditCell(null)} style={{background:"#f1f5f9",color:"#374151",border:"none",borderRadius:9,padding:"10px 16px",cursor:"pointer",fontFamily:F,fontSize:13}}>Cancel</button>
+            <div style={{fontSize:11,color:"#64748b",marginBottom:16}}>
+              This saves the full timetable grid, bell schedule, teacher assignments, and all settings.
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={saveSnapshot} style={{background:"linear-gradient(135deg,#15803d,#065f46)",color:"white",border:"none",borderRadius:9,padding:"10px 24px",cursor:"pointer",fontFamily:FT,fontSize:13,fontWeight:"bold"}}>Save Snapshot</button>
+              <button onClick={()=>setShowSaveModal(false)} style={{background:"#f1f5f9",color:"#374151",border:"none",borderRadius:9,padding:"10px 18px",cursor:"pointer",fontFamily:FT,fontSize:13}}>Cancel</button>
             </div>
           </div>
         </div>
@@ -3430,6 +3587,7 @@ function TimetablePage({students,staff,user,timetable:tt,setTimetable:setTt,ttSe
     </div>
   );
 }
+
 
 
 // ══════════════════════════════════════════════════════════
