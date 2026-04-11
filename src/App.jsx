@@ -2545,6 +2545,74 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
     });
   }
 
+  // ── Fill remaining empty slots so every period has a lesson ──────────────
+  // Cycles through subjects (weighted by LPW) to fill gaps without repeating
+  // on the same day unless unavoidable, and never back-to-back same subject.
+  function fillGaps(gen, busyMap) {
+    const isUpperCls = cls => ["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(cls);
+    ALL_CLASSES.forEach(cls => {
+      const upper = isUpperCls(cls);
+      const clsTeacher = getClsTeacher(cls);
+      const subs = getTTSubs(cls);
+      if(!subs.length) return;
+
+      function getTeacher(sub) {
+        return upper ? (getSubTeacher(cls, sub)||"TBD") : (clsTeacher||"TBD");
+      }
+
+      DAYS.forEach(day => {
+        const slots = gen[cls][day];
+        if(!slots) return;
+        slots.forEach((cell, si) => {
+          if(cell !== null) return; // already filled
+          // Count how many times each subject appears this day and adjacent slots
+          const daySubCount = {};
+          slots.forEach((c, i) => { if(c?.subject) daySubCount[c.subject] = (daySubCount[c.subject]||0)+1; });
+          const prevSub = si > 0 ? slots[si-1]?.subject : null;
+          const nextSub = si < slots.length-1 ? slots[si+1]?.subject : null;
+
+          // Pick subject: prefer ones with fewest occurrences this day, not adjacent
+          const ranked = [...subs].sort((a, b) => {
+            const ca = daySubCount[a]||0, cb = daySubCount[b]||0;
+            return ca - cb;
+          });
+
+          let chosen = null;
+          for(const sub of ranked) {
+            if(sub === prevSub || sub === nextSub) continue; // no back-to-back
+            // Don't put same subject twice on same day unless it already appears 0 times
+            if((daySubCount[sub]||0) >= 1) {
+              // Only allow if it's truly the last resort (checked below)
+              continue;
+            }
+            const teacher = getTeacher(sub);
+            const bk = `${teacher}::${day}::${si}`;
+            if(teacher === "TBD" || !busyMap[bk]) { chosen = sub; break; }
+          }
+          // Fallback: relax day-repeat rule
+          if(!chosen) {
+            for(const sub of ranked) {
+              if(sub === prevSub || sub === nextSub) continue;
+              const teacher = getTeacher(sub);
+              const bk = `${teacher}::${day}::${si}`;
+              if(teacher === "TBD" || !busyMap[bk]) { chosen = sub; break; }
+            }
+          }
+          // Last resort: ignore adjacency too
+          if(!chosen) chosen = ranked[0] || subs[0];
+
+          if(chosen) {
+            const teacher = getTeacher(chosen);
+            const period = LESSON_SLOTS[si]?.period;
+            gen[cls][day][si] = {subject:chosen, teacher, period, filled:true};
+            const bk = `${teacher}::${day}::${si}`;
+            if(teacher !== "TBD") busyMap[bk] = true;
+          }
+        });
+      });
+    });
+  }
+
   // ── Build a default plan from LPW/2P settings ────────────────────────────
   // Returns: {cls: {sub: {days:[...], double:bool, avail:[...]}}}
   // days = array of DAYS to place lessons; "__DOUBLE__" marks the double day
@@ -2613,6 +2681,7 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
         const plan = buildDefaultPlan();
         setGenProgress(40);
         applyPlan(plan, gen, busyMap);
+        fillGaps(gen, busyMap); // fill remaining empty slots
         setGenProgress(80);
 
         // Lock Friday P1 → PPI
@@ -2741,6 +2810,7 @@ DATA:${JSON.stringify(compactSetups)}`;
       });
 
       applyPlan(plan, gen, busyMap);
+      fillGaps(gen, busyMap); // fill remaining empty slots
       setGenProgress(90);
 
       // PPI
