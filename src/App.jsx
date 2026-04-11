@@ -2222,20 +2222,17 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
 
   // ── Timetable print helpers ───────────────────────────────────────────────
   function buildTTHeader(title, subtitle) {
+    const logoSrc = typeof logo==='string' && logo ? logo : '';
+    const logoTag = logoSrc
+      ? `<img src="${logoSrc}" style="height:72px;width:72px;object-fit:contain;display:block;margin:0 auto 6px auto;" onerror="this.style.display='none'"/>`
+      : '';
     return `
       <div style="text-align:center;margin-bottom:14px;border-bottom:2px solid #1e3a5f;padding-bottom:10px;">
-        <table style="width:100%;border-collapse:collapse;"><tr>
-          <td style="width:70px;vertical-align:middle;">
-            <img src="${typeof logo==='string'?logo:''}" style="height:60px;width:60px;object-fit:contain;" onerror="this.style.display='none'"/>
-          </td>
-          <td style="vertical-align:middle;text-align:center;">
-            <div style="font-size:17px;font-weight:bold;color:#1e3a5f;">${SCHOOL.name}</div>
-            <div style="font-size:10px;color:#64748b;">${SCHOOL.location}</div>
-            <div style="font-size:10px;color:#64748b;">${SCHOOL.phone} | ${SCHOOL.email}</div>
-            <div style="font-size:10px;font-style:italic;color:#15803d;font-weight:bold;">"${SCHOOL.motto}"</div>
-          </td>
-          <td style="width:70px;"></td>
-        </tr></table>
+        ${logoTag}
+        <div style="font-size:17px;font-weight:bold;color:#1e3a5f;">${SCHOOL.name}</div>
+        <div style="font-size:10px;color:#64748b;margin-top:2px;">${SCHOOL.location}</div>
+        <div style="font-size:10px;color:#64748b;">${SCHOOL.phone} | ${SCHOOL.email}</div>
+        <div style="font-size:10px;font-style:italic;color:#15803d;font-weight:bold;margin-top:2px;">"${SCHOOL.motto}"</div>
       </div>
       <div style="background:#1e3a5f;color:white;text-align:center;padding:6px 12px;border-radius:8px;margin-bottom:12px;">
         <div style="font-size:14px;font-weight:bold;">${title}</div>
@@ -2262,11 +2259,70 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
     </table>`;
   }
 
-  // ── Timetable-specific print: always uses overlay (no window.open needed) ──
+  // ── Timetable print: renders in overlay, triggers browser Print/Save-as-PDF ─
   function ttPrintOverlay(title, bodyHTML) {
     const html = buildHTMLDoc(title, bodyHTML, logo);
-    // Always use the overlay approach so it works in all environments
-    printViaMedianPDF(title, html);
+
+    // Build a full-screen overlay with an iframe containing the document
+    const overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:#374151;z-index:99999;display:flex;flex-direction:column;";
+
+    // Toolbar
+    const toolbar = document.createElement("div");
+    toolbar.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:#1e3a5f;flex-shrink:0;gap:10px;";
+
+    const titleEl = document.createElement("span");
+    titleEl.innerText = title;
+    titleEl.style.cssText = "color:white;font-size:13px;font-weight:bold;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+
+    const printBtn = document.createElement("button");
+    printBtn.innerText = "🖨️ Print / Save as PDF";
+    printBtn.style.cssText = "background:#15803d;color:white;border:none;border-radius:8px;padding:9px 18px;font-size:14px;cursor:pointer;font-weight:bold;white-space:nowrap;";
+
+    const closeBtn = document.createElement("button");
+    closeBtn.innerText = "✕ Close";
+    closeBtn.style.cssText = "background:rgba(255,255,255,0.15);color:white;border:1px solid rgba(255,255,255,0.3);border-radius:8px;padding:9px 14px;font-size:14px;cursor:pointer;font-weight:bold;white-space:nowrap;";
+    closeBtn.onclick = () => document.body.removeChild(overlay);
+
+    toolbar.appendChild(titleEl);
+    toolbar.appendChild(printBtn);
+    toolbar.appendChild(closeBtn);
+    overlay.appendChild(toolbar);
+
+    // iframe container
+    const iframeWrap = document.createElement("div");
+    iframeWrap.style.cssText = "flex:1;overflow:auto;-webkit-overflow-scrolling:touch;background:white;";
+
+    const iframe = document.createElement("iframe");
+    iframe.style.cssText = "width:100%;min-width:900px;height:100%;min-height:100%;border:none;display:block;";
+    iframeWrap.appendChild(iframe);
+    overlay.appendChild(iframeWrap);
+    document.body.appendChild(overlay);
+
+    // Write HTML into iframe
+    iframe.contentDocument.open();
+    iframe.contentDocument.write(html);
+    iframe.contentDocument.close();
+
+    // Resize iframe to content so scroll works
+    iframe.onload = () => {
+      try {
+        const h = iframe.contentDocument.body.scrollHeight;
+        if(h > 0) iframe.style.height = h + "px";
+      } catch(e) {}
+    };
+
+    // Print button triggers the iframe's print dialog (which includes "Save as PDF")
+    printBtn.onclick = () => {
+      try {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+      } catch(e) {
+        // Fallback: open in new tab and print from there
+        const w = window.open("","_blank");
+        if(w) { w.document.write(html); w.document.close(); w.onload = ()=>{ w.focus(); w.print(); }; }
+      }
+    };
   }
 
   function buildClassTimetableHTML(cls) {
@@ -2413,10 +2469,10 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
     return pairs.some(([a,b]) => (a===si1&&b===si2)||(a===si2&&b===si1));
   }
 
-  // ── Shared slot-placement engine ─────────────────────────────────────────
-  // Strictly places each subject EXACTLY its LPW number of times.
-  // Respects availability periods. Never fills "gaps" with wrong subjects.
-  // Uses a clean constraint-aware approach per class.
+  // ── Core placement engine ─────────────────────────────────────────────────
+  // Places each subject EXACTLY plan[cls][sub].lpw times.
+  // Strictly honours availability — only periods the user enabled are used.
+  // Spreads lessons across days; no same-subject back-to-back.
   function applyPlan(plan, gen, busyMap) {
     const CONSEC = getConsecPairs();
     const isUpperCls = cls => ["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(cls);
@@ -2427,175 +2483,133 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
       const clsTeacher = getClsTeacher(cls);
       const numSlots   = LESSON_SLOTS.length;
 
-      // Track what's in each slot for this class
-      const slotUsed   = {}; DAYS.forEach(d => { slotUsed[d] = new Set(); });
-      const subOnSlot  = {}; DAYS.forEach(d => { subOnSlot[d] = {}; });
-      const subDayCnt  = {}; DAYS.forEach(d => { subDayCnt[d] = {}; });
-      slotUsed["Friday"].add(0); // PPI reserved — never touch P1 on Friday
+      const slotUsed  = {}; DAYS.forEach(d => { slotUsed[d]  = new Set(); });
+      const subOnSlot = {}; DAYS.forEach(d => { subOnSlot[d] = {}; });
+      const subDayCnt = {}; DAYS.forEach(d => { subDayCnt[d] = {}; });
+      slotUsed["Friday"].add(0); // Friday P1 reserved for PPI
 
       function getTeacher(sub) {
-        return upper ? (getSubTeacher(cls, sub)||"TBD") : (clsTeacher||"TBD");
+        return upper ? (getSubTeacher(cls,sub)||"TBD") : (clsTeacher||"TBD");
       }
-
-      function wouldBeAdjacent(day, si, sub) {
-        return Object.entries(subOnSlot[day]).some(([esi, s]) =>
-          s === sub && areConsec(si, parseInt(esi), CONSEC)
+      function isAdj(day, si, sub) {
+        return Object.entries(subOnSlot[day]).some(([esi,s]) =>
+          s===sub && areConsec(si, parseInt(esi), CONSEC)
         );
       }
-
-      // Find best available slot for a subject on a given day
-      // strict=true: teacher must be free; strict=false: allow teacher clash
-      function findSlot(day, sub, avail, allowSecondOnDay, strict) {
+      function findSlot(day, sub, avail, allowSecond, relaxT) {
         const teacher = getTeacher(sub);
-        const candidates = [];
-        for(let si = 0; si < numSlots; si++) {
+        const best = [];
+        for(let si=0; si<numSlots; si++) {
           if(slotUsed[day].has(si)) continue;
           const period = LESSON_SLOTS[si].period;
-          // Respect availability setting
-          if(!avail.includes(period)) continue;
-          // Day-repeat rule: max 1 per day unless allowSecondOnDay and not adjacent
+          if(!avail.includes(period)) continue; // ★ hard availability check
           const cnt = subDayCnt[day][sub]||0;
-          if(cnt > 0 && !allowSecondOnDay) continue;
-          if(cnt >= 2) continue;
-          if(cnt > 0 && wouldBeAdjacent(day, si, sub)) continue;
-          // No back-to-back same subject
-          if(wouldBeAdjacent(day, si, sub)) continue;
+          if(cnt>=1 && !allowSecond) continue;
+          if(cnt>=2) continue;
+          if(isAdj(day, si, sub)) continue;
           const bk = `${teacher}::${day}::${si}`;
-          const teacherFree = teacher==="TBD" || !busyMap[bk];
-          if(strict && !teacherFree) continue;
-          candidates.push({si, teacherFree});
+          const tFree = teacher==="TBD" || !busyMap[bk];
+          if(!tFree && !relaxT) continue;
+          best.push({si, tFree});
         }
-        // Prefer teacher-free
-        const best = candidates.find(c=>c.teacherFree) || candidates[0] || null;
-        return best ? best.si : null;
+        const c = best.find(b=>b.tFree) || best[0] || null;
+        return c ? c.si : null;
       }
-
-      function findConsecPair(day, sub, avail, strict) {
+      function findConsec(day, sub, avail, relaxT) {
         const teacher = getTeacher(sub);
-        for(const [si1,si2] of CONSEC) {
+        for(const [si1,si2] of shuffle([...CONSEC])) {
+          if(!LESSON_SLOTS[si1]||!LESSON_SLOTS[si2]) continue;
           const p1=LESSON_SLOTS[si1].period, p2=LESSON_SLOTS[si2].period;
           if(!avail.includes(p1)||!avail.includes(p2)) continue;
           if(slotUsed[day].has(si1)||slotUsed[day].has(si2)) continue;
-          if(strict && teacher!=="TBD") {
+          if(!relaxT && teacher!=="TBD") {
             if(busyMap[`${teacher}::${day}::${si1}`]||busyMap[`${teacher}::${day}::${si2}`]) continue;
           }
           return [si1,si2];
         }
         return null;
       }
-
-      function occupy(day, si, sub, isDouble=false, isPart2=false) {
+      function occupy(day, si, sub, isDbl=false, isPart2=false) {
         const teacher = getTeacher(sub);
         const period  = LESSON_SLOTS[si].period;
-        gen[cls][day][si] = {subject:sub, teacher, period, double:isDouble, ...(isPart2?{doublePart:2}:{})};
+        gen[cls][day][si] = {subject:sub, teacher, period, double:isDbl, ...(isPart2?{doublePart:2}:{})};
         slotUsed[day].add(si);
         subOnSlot[day][si] = sub;
         subDayCnt[day][sub] = (subDayCnt[day][sub]||0)+1;
         if(teacher!=="TBD") busyMap[`${teacher}::${day}::${si}`] = true;
       }
 
-      // Process doubles first, then singles — sorted by LPW descending to place hardest first
-      const subEntries = Object.entries(plan[cls]||{});
-      const withDbl    = subEntries.filter(([,p])=>p.double);
-      const withoutDbl = subEntries.filter(([,p])=>!p.double)
-        .sort(([,a],[,b]) => (b.days.length - a.days.length)); // highest LPW first
+      // Sort: doubles first, then descending LPW (hardest to place first)
+      const entries = Object.entries(plan[cls]||{})
+        .sort(([,a],[,b]) => {
+          if(a.double && !b.double) return -1;
+          if(!a.double && b.double) return 1;
+          return b.lpw - a.lpw;
+        });
 
-      for(const [sub, {days:dayList, double:isDbl, avail}] of [...withDbl, ...withoutDbl]) {
-        let remaining = getClsLpw(cls, sub); // exact count from user settings
+      for(const [sub, {lpw, double:isDbl, avail}] of entries) {
+        let remaining = lpw; // user's exact count — never add or remove
         const daysUsed = new Set();
 
-        // ── Place double (2P) block ──────────────────────────────────
-        if(isDbl && remaining >= 2) {
-          const tryDays = shuffle([...DAYS]);
-          for(const day of tryDays) {
-            if(daysUsed.has(day)) continue;
-            // Try strict first, then relaxed
-            let pair = findConsecPair(day, sub, avail, true);
-            if(!pair) pair = findConsecPair(day, sub, avail, false);
-            if(pair) {
-              occupy(day, pair[0], sub, true, false);
-              occupy(day, pair[1], sub, true, true);
-              daysUsed.add(day);
-              remaining -= 2;
-              break;
+        // 1. Double block
+        if(isDbl && remaining>=2) {
+          for(const relaxT of [false, true]) {
+            if(daysUsed.size>0) break;
+            for(const day of shuffle([...DAYS])) {
+              const pair = findConsec(day, sub, avail, relaxT);
+              if(pair) {
+                occupy(day, pair[0], sub, true, false);
+                occupy(day, pair[1], sub, true, true);
+                daysUsed.add(day); remaining-=2; break;
+              }
             }
           }
         }
 
-        // ── Place single lessons ─────────────────────────────────────
-        const allowSecondOnDay = remaining > DAYS.length; // only when more lessons than days
-        // Try each day; prefer unused days first
-        const freshDays  = shuffle([...DAYS].filter(d=>!daysUsed.has(d)));
-        const reuseDays  = allowSecondOnDay ? shuffle([...DAYS].filter(d=>daysUsed.has(d))) : [];
-
-        for(const day of [...freshDays, ...reuseDays]) {
+        // 2. Single lessons — spread across days
+        const allowSameDay = remaining > DAYS.length;
+        for(const relaxT of [false, true]) {
           if(remaining<=0) break;
-          const isSecond = daysUsed.has(day);
-          if(isSecond && !allowSecondOnDay) continue;
-          // Try strict (teacher-free) first
-          let si = findSlot(day, sub, avail, isSecond, true);
-          if(si===null) si = findSlot(day, sub, avail, isSecond, false); // relax teacher
-          if(si!==null) { occupy(day,si,sub); daysUsed.add(day); remaining--; }
+          const fresh = shuffle([...DAYS].filter(d=>!daysUsed.has(d)));
+          const reuse = allowSameDay ? shuffle([...DAYS].filter(d=>daysUsed.has(d))) : [];
+          for(const day of [...fresh, ...reuse]) {
+            if(remaining<=0) break;
+            if(daysUsed.has(day) && !allowSameDay) continue;
+            const si = findSlot(day, sub, avail, daysUsed.has(day), relaxT);
+            if(si!==null) { occupy(day,si,sub); daysUsed.add(day); remaining--; }
+          }
         }
-        // Final pass: if still remaining, try all days again ignoring day-repeat
-        if(remaining>0) {
+
+        // 3. Last resort — any slot on any day, ignore day-spread
+        for(const relaxT of [false, true]) {
+          if(remaining<=0) break;
           for(const day of shuffle([...DAYS])) {
             if(remaining<=0) break;
-            let si = findSlot(day, sub, avail, true, true);
-            if(si===null) si = findSlot(day, sub, avail, true, false);
+            const si = findSlot(day, sub, avail, true, relaxT);
             if(si!==null) { occupy(day,si,sub); remaining--; }
           }
         }
+        // If remaining > 0 here, availability windows are too narrow for the LPW set.
       }
     });
   }
 
   // ── NOTE: No fillGaps — empty slots stay empty rather than get wrong subjects ──
 
-  // ── Build a default plan from LPW/2P settings ────────────────────────────
-  // Returns: {cls: {sub: {days:[...], double:bool, avail:[...]}}}
-  // days = array of DAYS to place lessons; "__DOUBLE__" marks the double day
+  // ── Build plan: reads ONLY user's custom LPW + availability ─────────────
+  // Returns {cls: {sub: {lpw, double, avail}}}
+  // applyPlan is responsible for ALL placement decisions.
   function buildDefaultPlan() {
     const plan = {};
-    const isUpperCls = cls => ["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(cls);
-    const shuffle = arr => { const a=[...arr]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; };
-
     ALL_CLASSES.forEach(cls => {
       plan[cls] = {};
       const subs = getTTSubs(cls);
       subs.forEach(sub => {
-        const count  = getClsLpw(cls, sub);
-        const isDbl  = getClsDouble(cls, sub);
-        const avail  = getAvail(cls, sub);
-        const days   = [];
-
-        if(isDbl) {
-          // 1 double day + (count-2) single days, all different
-          const shuffled = shuffle([...DAYS]);
-          days.push("__DOUBLE__"); // placeholder — applyPlan picks the actual day
-          let singles = count - 2;
-          for(const d of shuffled) {
-            if(singles <= 0) break;
-            days.push(d);
-            singles--;
-          }
-        } else {
-          // Spread count lessons across different days
-          // LPW ≤ 5: one lesson per day on `count` different days
-          // LPW = 6: 5 days, one day gets a 2nd (non-consecutive) — mark with repeat
-          // LPW = 7: similar with 2 repeats
-          const shuffled = shuffle([...DAYS]);
-          if(count <= DAYS.length) {
-            for(let i = 0; i < count; i++) days.push(shuffled[i % DAYS.length]);
-          } else {
-            // All 5 days first
-            DAYS.forEach(d => days.push(d));
-            // Extra: same days again (non-consecutive placement handled in applyPlan)
-            const extra = count - DAYS.length;
-            for(let i = 0; i < extra; i++) days.push(shuffled[i % DAYS.length]);
-          }
-        }
-        plan[cls][sub] = {days, double:isDbl, avail};
+        plan[cls][sub] = {
+          lpw:    getClsLpw(cls, sub),     // user's exact lesson count
+          double: getClsDouble(cls, sub),   // user's double-lesson flag
+          avail:  getAvail(cls, sub),       // user's allowed periods
+        };
       });
     });
     return plan;
