@@ -2146,6 +2146,7 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [loadingSnaps, setLoadingSnaps] = useState(false);
   const [editSchedIdx, setEditSchedIdx] = useState(null);
+  const [aiMode, setAiMode]             = useState(false); // true = AI generating
 
   const FT = "'Nunito',Georgia,sans-serif";
   const isAdmin = user?.role === "admin";
@@ -2358,8 +2359,10 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
         const teachers = [];
         ALL_CLASSES.forEach(cls => {
           const cell = (grid[cls]?.[day]||[])[si];
-          if(cell?.teacher && cell.teacher!=="TBD" && !cell.teacher.endsWith("*"))
-            teachers.push({cls, teacher:cell.teacher});
+          // Skip PPI — it is school-wide and never a teacher conflict
+          if(cell?.ppi) return;
+          if(cell?.teacher && cell.teacher!=="TBD" && !cell.teacher.includes("All Staff"))
+            teachers.push({cls, teacher:cell.teacher.replace("*","")});
         });
         const seen = {};
         teachers.forEach(({cls, teacher}) => {
@@ -2379,202 +2382,392 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // ⚡ PROFESSIONAL SMART GENERATOR — v3
-  // Rules:
-  //  • Max 1 lesson-slot (or 1 double) per subject per day
-  //  • 2P (double): uses 2 of the LPW period count; placed as 2 ADJACENT
-  //    bell-period slots with NO BREAK between them in bellPeriods
-  //  • Lessons spread across different days first
-  //  • Friday slot 0 (Period 1) = PPI for all classes
-  //  • Teacher conflict tracked per slot; soft fallback if unavoidable
+  // SHARED GENERATOR UTILITIES
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // All adjacent period-index pairs with NO break between them in bellPeriods
+  function getConsecPairs() {
+    const pairs = [];
+    for(let i = 0; i < bellPeriods.length - 1; i++) {
+      if(bellPeriods[i].type   !== "period") continue;
+      if(bellPeriods[i+1].type !== "period") continue;
+      const si1 = LESSON_SLOTS.findIndex(s => s.id === bellPeriods[i].id);
+      const si2 = LESSON_SLOTS.findIndex(s => s.id === bellPeriods[i+1].id);
+      if(si1 >= 0 && si2 >= 0) pairs.push([si1, si2]);
+    }
+    // Fallback: if bell not configured yet, treat consecutive indices as pairs
+    if(pairs.length === 0) {
+      for(let i = 0; i < LESSON_SLOTS.length - 1; i++) pairs.push([i, i+1]);
+    }
+    return pairs;
+  }
+
+  // Are two slot indices consecutive in the bell (no break between them)?
+  function areConsec(si1, si2, pairs) {
+    return pairs.some(([a,b]) => (a===si1&&b===si2)||(a===si2&&b===si1));
+  }
+
+  // ── Shared slot-placement engine ─────────────────────────────────────────
+  // Takes the full subject plan and fills gen[cls][day][si]
+  function applyPlan(plan, gen, busyMap) {
+    const CONSEC = getConsecPairs();
+    const isUpperCls = cls => ["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(cls);
+    const shuffle = arr => { for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];} return arr; };
+
+    ALL_CLASSES.forEach(cls => {
+      const upper      = isUpperCls(cls);
+      const clsTeacher = getClsTeacher(cls);
+      const numSlots   = LESSON_SLOTS.length;
+
+      // Track occupied slots for this class
+      const slotUsed  = {}; DAYS.forEach(d => { slotUsed[d]  = new Set(); });
+      const subOnSlot = {}; DAYS.forEach(d => { subOnSlot[d] = {}; }); // si→subject
+      slotUsed["Friday"].add(0); // PPI reserved
+
+      function getTeacher(sub) {
+        return upper ? (getSubTeacher(cls, sub)||"TBD") : (clsTeacher||"TBD");
+      }
+
+      // Would placing sub at (day,si) put it adjacent to itself? (forbidden unless double)
+      function wouldClash(day, si, sub) {
+        return Object.entries(subOnSlot[day]).some(([esi, s]) =>
+          s === sub && areConsec(si, parseInt(esi), CONSEC)
+        );
+      }
+
+      // Find a suitable slot on `day` for `sub`
+      // allowAdjSub: if true, relaxes the no-adjacent rule (emergency fallback)
+      function findSlot(day, sub, avail, allowAdjSub=false) {
+        const teacher = getTeacher(sub);
+        const byTeacher = [];
+        const byBusy   = [];
+        for(let si = 0; si < numSlots; si++) {
+          if(slotUsed[day].has(si)) continue;
+          const period = LESSON_SLOTS[si].period;
+          if(!avail.includes(period)) continue;
+          if(!allowAdjSub && wouldClash(day, si, sub)) continue;
+          const bk = `${teacher}::${day}::${si}`;
+          if(!busyMap[bk]) byTeacher.push(si);
+          else              byBusy.push(si);
+        }
+        const chosen = byTeacher[0] ?? byBusy[0] ?? null;
+        return chosen;
+      }
+
+      function occupy(day, si, sub, isDouble=false, isPart2=false) {
+        const teacher = getTeacher(sub);
+        const period  = LESSON_SLOTS[si].period;
+        gen[cls][day][si] = {subject:sub, teacher, period, double:isDouble, ...(isPart2?{doublePart:2}:{})};
+        slotUsed[day].add(si);
+        subOnSlot[day][si] = sub;
+        const bk = `${teacher}::${day}::${si}`;
+        if(teacher !== "TBD") busyMap[bk] = true;
+      }
+
+      // ── Process subjects from plan ─────────────────────────────────
+      // doubles first, then singles
+      const subEntries = Object.entries(plan[cls]||{});
+      const withDbl    = subEntries.filter(([, p]) => p.double);
+      const withoutDbl = subEntries.filter(([, p]) => !p.double);
+
+      [...withDbl, ...withoutDbl].forEach(([sub, {days:dayList, double:isDbl, avail}]) => {
+        let remaining = dayList.length;
+        const daysPlaced = new Set();
+
+        // ── Place double block ──────────────────────────────────────
+        if(isDbl) {
+          const doubleDayIdx = dayList.indexOf("__DOUBLE__");
+          const doubleDay    = doubleDayIdx >= 0 ? dayList[doubleDayIdx] : null;
+          // Try requested double day first, then any day
+          const tryDays = doubleDay ? [doubleDay, ...shuffle([...DAYS].filter(d=>d!==doubleDay))]
+                                    : shuffle([...DAYS]);
+          let placed = false;
+          for(const day of tryDays) {
+            if(placed) break;
+            for(const [si1,si2] of CONSEC) {
+              const p1=LESSON_SLOTS[si1].period, p2=LESSON_SLOTS[si2].period;
+              if(!avail.includes(p1)||!avail.includes(p2)) continue;
+              if(slotUsed[day].has(si1)||slotUsed[day].has(si2)) continue;
+              const t=getTeacher(sub);
+              const bk1=`${t}::${day}::${si1}`,bk2=`${t}::${day}::${si2}`;
+              if(t!=="TBD"&&(busyMap[bk1]||busyMap[bk2])) continue;
+              occupy(day,si1,sub,true,false); occupy(day,si2,sub,true,true);
+              daysPlaced.add(day); remaining-=2; placed=true; break;
+            }
+          }
+          if(!placed) remaining = Math.max(0, remaining-2); // couldn't place double
+        }
+
+        // ── Place single lessons ─────────────────────────────────────
+        const singleDays = dayList.filter(d => d!=="__DOUBLE__");
+        const dayOrder   = [...shuffle([...DAYS].filter(d=>!daysPlaced.has(d))),
+                            ...shuffle([...DAYS].filter(d=>daysPlaced.has(d)))];
+
+        for(const day of dayOrder) {
+          if(remaining <= 0) break;
+          if(daysPlaced.has(day) && !singleDays.includes(day)) continue;
+          const si = findSlot(day, sub, avail);
+          if(si !== null) { occupy(day,si,sub); daysPlaced.add(day); remaining--; }
+        }
+        // Emergency: relax adjacency
+        for(const day of DAYS) {
+          if(remaining <= 0) break;
+          const si = findSlot(day, sub, avail, true);
+          if(si !== null) { occupy(day,si,sub); remaining--; }
+        }
+      });
+    });
+  }
+
+  // ── Build a default plan from LPW/2P settings ────────────────────────────
+  // Returns: {cls: {sub: {days:[...], double:bool, avail:[...]}}}
+  // days = array of DAYS to place lessons; "__DOUBLE__" marks the double day
+  function buildDefaultPlan() {
+    const plan = {};
+    const isUpperCls = cls => ["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(cls);
+    const shuffle = arr => { const a=[...arr]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; };
+
+    ALL_CLASSES.forEach(cls => {
+      plan[cls] = {};
+      const subs = getTTSubs(cls);
+      subs.forEach(sub => {
+        const count  = getClsLpw(cls, sub);
+        const isDbl  = getClsDouble(cls, sub);
+        const avail  = getAvail(cls, sub);
+        const days   = [];
+
+        if(isDbl) {
+          // 1 double day + (count-2) single days, all different
+          const shuffled = shuffle([...DAYS]);
+          days.push("__DOUBLE__"); // placeholder — applyPlan picks the actual day
+          let singles = count - 2;
+          for(const d of shuffled) {
+            if(singles <= 0) break;
+            days.push(d);
+            singles--;
+          }
+        } else {
+          // Spread count lessons across different days
+          // LPW ≤ 5: one lesson per day on `count` different days
+          // LPW = 6: 5 days, one day gets a 2nd (non-consecutive) — mark with repeat
+          // LPW = 7: similar with 2 repeats
+          const shuffled = shuffle([...DAYS]);
+          if(count <= DAYS.length) {
+            for(let i = 0; i < count; i++) days.push(shuffled[i % DAYS.length]);
+          } else {
+            // All 5 days first
+            DAYS.forEach(d => days.push(d));
+            // Extra: same days again (non-consecutive placement handled in applyPlan)
+            const extra = count - DAYS.length;
+            for(let i = 0; i < extra; i++) days.push(shuffled[i % DAYS.length]);
+          }
+        }
+        plan[cls][sub] = {days, double:isDbl, avail};
+      });
+    });
+    return plan;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // ⚡ DETERMINISTIC AUTO-GENERATOR
   // ══════════════════════════════════════════════════════════════════════════
   function autoGen() {
-    setGenerating(true); setGenProgress(0);
+    setAiMode(false); setGenerating(true); setGenProgress(0);
     setTimeout(() => {
       try {
-        // ── Helpers ──────────────────────────────────────────────────────
-        // Returns array of adjacent period-slot index pairs that have NO
-        // break between them in the bellPeriods array.
-        function getConsecutivePairs() {
-          const pairs = [];
-          for(let i = 0; i < bellPeriods.length - 1; i++) {
-            if(bellPeriods[i].type   !== "period") continue;
-            if(bellPeriods[i+1].type !== "period") continue;
-            // No break between i and i+1 in bellPeriods
-            const si1 = LESSON_SLOTS.findIndex(s => s.id === bellPeriods[i].id);
-            const si2 = LESSON_SLOTS.findIndex(s => s.id === bellPeriods[i+1].id);
-            if(si1 >= 0 && si2 >= 0) pairs.push([si1, si2]);
-          }
-          return pairs;
-        }
-        const CONSEC_PAIRS = getConsecutivePairs();
-
-        const busy = {}; // `teacher::day::si` → true
-        const gen  = {};
+        const busyMap = {};
+        const gen     = {};
         const allDays = [...DAYS, ...WEEKEND_DAYS];
         ALL_CLASSES.forEach(cls => {
           gen[cls] = {};
           allDays.forEach(d => { gen[cls][d] = Array(LESSON_SLOTS.length).fill(null); });
         });
 
-        let prog = 0;
-        const isUpperCls = cls => ["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(cls);
+        setGenProgress(20);
+        const plan = buildDefaultPlan();
+        setGenProgress(40);
+        applyPlan(plan, gen, busyMap);
+        setGenProgress(80);
 
+        // Lock Friday P1 → PPI
         ALL_CLASSES.forEach(cls => {
-          prog += 8; setGenProgress(Math.min(prog, 90));
-          const clsSubs    = getTTSubs(cls);
-          const upper      = isUpperCls(cls);
-          const clsTeacher = getClsTeacher(cls);
-          const numSlots   = LESSON_SLOTS.length;
-          const numDays    = DAYS.length; // 5
-
-          // daySlotUsed[day] = Set of slotIdx already occupied for this class
-          const daySlotUsed = {};
-          DAYS.forEach(d => { daySlotUsed[d] = new Set(); });
-          daySlotUsed["Friday"].add(0); // Friday P1 reserved for PPI
-
-          // ── Place one subject's lessons ─────────────────────────────
-          function placeSubject(sub, count, isDouble) {
-            if(count <= 0) return;
-            const teacher = upper ? (getSubTeacher(cls, sub) || "TBD") : (clsTeacher || "TBD");
-            const avail   = getAvail(cls, sub); // allowed period numbers
-
-            // Spread: shuffle DAYS so we vary the starting day across subjects
-            const shuffledDays = [...DAYS].sort(() => Math.random() - 0.5);
-
-            let remaining = count; // total periods still to place
-            let daysUsed  = new Set();
-
-            // ── 1. Place the double block first (uses 2 of `count`) ───
-            if(isDouble && remaining >= 2 && CONSEC_PAIRS.length > 0) {
-              // Find a day + consecutive pair where both slots are free
-              let placed = false;
-              for(const day of shuffledDays) {
-                if(placed) break;
-                for(const [si1, si2] of CONSEC_PAIRS) {
-                  const p1 = LESSON_SLOTS[si1].period;
-                  const p2 = LESSON_SLOTS[si2].period;
-                  if(!avail.includes(p1) || !avail.includes(p2)) continue;
-                  if(daySlotUsed[day].has(si1) || daySlotUsed[day].has(si2)) continue;
-                  const bk1 = `${teacher}::${day}::${si1}`;
-                  const bk2 = `${teacher}::${day}::${si2}`;
-                  if(teacher !== "TBD" && (busy[bk1] || busy[bk2])) continue;
-                  // Place double
-                  gen[cls][day][si1] = {subject:sub, teacher, period:p1, double:true};
-                  gen[cls][day][si2] = {subject:sub, teacher, period:p2, double:true, doublePart:2};
-                  daySlotUsed[day].add(si1); daySlotUsed[day].add(si2);
-                  if(teacher !== "TBD") { busy[bk1] = true; busy[bk2] = true; }
-                  daysUsed.add(day);
-                  remaining -= 2;
-                  placed = true;
-                  break;
-                }
-              }
-              // If couldn't place double, fall through and place as singles
-            }
-
-            // ── 2. Place remaining single lessons ─────────────────────
-            // Try to use a different day for each lesson
-            const dayOrder = [...shuffledDays, ...shuffledDays]; // allow 2nd pass if needed
-            for(const day of dayOrder) {
-              if(remaining <= 0) break;
-              if(daysUsed.has(day)) continue; // already used this day for this subject
-              // Find a free slot on this day
-              let slotPlaced = false;
-              for(let si = 0; si < numSlots; si++) {
-                if(daySlotUsed[day].has(si)) continue;
-                const period = LESSON_SLOTS[si].period;
-                if(!avail.includes(period)) continue;
-                const bk = `${teacher}::${day}::${si}`;
-                // Prefer teacher-free slot; allow busy teacher as fallback
-                if(teacher !== "TBD" && busy[bk]) continue;
-                gen[cls][day][si] = {subject:sub, teacher, period, double:false};
-                daySlotUsed[day].add(si);
-                if(teacher !== "TBD") busy[bk] = true;
-                daysUsed.add(day);
-                remaining--;
-                slotPlaced = true;
-                break;
-              }
-              // Soft fallback: teacher-busy slot
-              if(!slotPlaced) {
-                for(let si = 0; si < numSlots; si++) {
-                  if(daySlotUsed[day].has(si)) continue;
-                  const period = LESSON_SLOTS[si].period;
-                  if(!avail.includes(period)) continue;
-                  gen[cls][day][si] = {subject:sub, teacher, period, double:false, conflict:true};
-                  daySlotUsed[day].add(si);
-                  daysUsed.add(day);
-                  remaining--;
-                  break;
-                }
-              }
-            }
-            // Last-resort: allow same day reuse if still unplaced
-            if(remaining > 0) {
-              for(const day of DAYS) {
-                if(remaining <= 0) break;
-                for(let si = 0; si < numSlots; si++) {
-                  if(remaining <= 0) break;
-                  if(daySlotUsed[day].has(si)) continue;
-                  const period = LESSON_SLOTS[si].period;
-                  if(!avail.includes(period)) continue;
-                  gen[cls][day][si] = {subject:sub, teacher, period, double:false};
-                  daySlotUsed[day].add(si);
-                  remaining--;
-                }
-              }
-            }
-          }
-
-          // ── Build subject plan and place ────────────────────────────
-          // Randomise subject order to avoid always favouring first subjects
-          const subPlans = [...clsSubs].sort(() => Math.random() - 0.5).map(sub => ({
-            sub,
-            count:  getClsLpw(cls, sub),
-            double: getClsDouble(cls, sub),
-          }));
-
-          // Place subjects with double first (they need consecutive slots)
-          const withDouble    = subPlans.filter(p => p.double);
-          const withoutDouble = subPlans.filter(p => !p.double);
-          [...withDouble, ...withoutDouble].forEach(({sub, count, double:isDbl}) => {
-            placeSubject(sub, count, isDbl);
-          });
-        });
-
-        // ── Lock Friday Period 1 → PPI for ALL classes ──────────────
-        ALL_CLASSES.forEach(cls => {
-          if(!gen[cls]["Friday"]) gen[cls]["Friday"] = Array(LESSON_SLOTS.length).fill(null);
           gen[cls]["Friday"][0] = {subject:"PPI", teacher:"— All Staff —", period:1, ppi:true};
         });
 
-        // ── Saturday round-robin ─────────────────────────────────────
+        // Saturday round-robin
+        const isUpperCls = cls => ["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(cls);
         ALL_CLASSES.forEach(cls => {
-          const clsSubs    = getTTSubs(cls);
-          const upper      = isUpperCls(cls);
-          const clsTeacher = getClsTeacher(cls);
-          gen[cls]["Saturday"] = SAT_LESSON_SLOTS.map((slot, si) => {
-            const sub     = clsSubs[si % clsSubs.length];
-            const teacher = upper ? (getSubTeacher(cls, sub) || "TBD") : (clsTeacher || "TBD");
-            return {subject:sub, teacher, period:slot.period};
+          const clsSubs=getTTSubs(cls), upper=isUpperCls(cls), ct=getClsTeacher(cls);
+          gen[cls]["Saturday"] = SAT_LESSON_SLOTS.map((slot,si) => {
+            const sub=clsSubs[si%clsSubs.length];
+            const teacher=upper?(getSubTeacher(cls,sub)||"TBD"):(ct||"TBD");
+            return {subject:sub,teacher,period:slot.period};
           });
         });
 
         const conflicts = buildConflicts(gen);
-        setConflictMap(conflicts);
-        setTt(gen);
-        setGenProgress(100);
-        setGenerating(false);
+        setConflictMap(conflicts); setTt(gen);
+        setGenProgress(100); setGenerating(false);
         const cc = Object.keys(conflicts).length;
-        flash(cc > 0
-          ? `Timetable generated — ${cc} conflict(s). Review highlighted cells.`
-          : "✅ Conflict-free timetable generated!", cc > 0 ? "warn" : "ok");
+        flash(cc>0?`Generated — ${cc} teacher conflict(s). Review clashes.`:"✅ Conflict-free timetable generated!", cc>0?"warn":"ok");
       } catch(e) {
         setGenerating(false);
-        flash("Generation error: " + e.message, "error");
+        flash("Generator error: " + e.message, "error");
       }
     }, 200);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // 🤖 AI-POWERED GENERATOR (Anthropic claude-sonnet-4-20250514)
+  // ══════════════════════════════════════════════════════════════════════════
+  async function aiGenerate() {
+    if(!isAdmin) return;
+    setAiMode(true); setGenerating(true); setGenProgress(5);
+
+    try {
+      const isUpperCls = cls => ["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(cls);
+
+      // Build class summary for the prompt
+      const classSetups = ALL_CLASSES.map(cls => {
+        const subs  = getTTSubs(cls);
+        const upper = isUpperCls(cls);
+        return {
+          class: cls,
+          subjects: subs.map(sub => ({
+            name:    sub,
+            short:   getShort(sub),
+            lpw:     getClsLpw(cls, sub),
+            double:  getClsDouble(cls, sub),
+            teacher: upper ? (getSubTeacher(cls, sub)||"TBD") : (getClsTeacher(cls)||"TBD"),
+          }))
+        };
+      });
+
+      const CONSEC = getConsecPairs();
+      const consecStr = CONSEC.map(([a,b])=>`P${LESSON_SLOTS[a]?.period}+P${LESSON_SLOTS[b]?.period}`).join(", ");
+      const bellStr   = LESSON_SLOTS.map(s=>`P${s.period}(${s.start}-${s.end})`).join(", ");
+
+      const prompt = `You are a CBC school timetable planner in Kenya. Plan which days each subject is taught each week.
+
+RULES (strictly enforced):
+1. A subject must NEVER appear in consecutive periods on the same day — UNLESS it is a 2P double period
+2. LPW = total number of periods per week for that subject
+3. LPW=2 → 2 different days, 1 period each
+4. LPW=3 → 3 different days, 1 period each (unless 2P — see rule 7)
+5. LPW=4 → exactly 4 different days, 1 period each
+6. LPW=5 → all 5 days (Mon–Fri), 1 period each
+7. LPW=6 → 5 days, ONE day gets 2 periods but they must be NON-CONSECUTIVE on that day (not back-to-back)
+8. LPW=7+ → spread across 5 days, some days get 2 periods (always non-consecutive unless 2P)
+9. 2P (double period): the subject appears on 1 day with 2 CONSECUTIVE periods (counted as 2 LPW slots), and remaining (LPW-2) periods on separate other days. Mark that day with "*" in your output
+10. PPI is fixed on Friday Period 1 for all classes — do NOT include it in your plan
+11. Avoid scheduling the same teacher (where known) in the same period slot across different classes
+12. Distribute lessons evenly across the week — do not cluster subjects
+
+BELL SCHEDULE: ${bellStr}
+CONSECUTIVE PAIRS (no break between): ${consecStr}
+DAYS: Monday, Tuesday, Wednesday, Thursday, Friday
+
+CLASS DATA:
+${JSON.stringify(classSetups, null, 1)}
+
+Return ONLY a valid JSON object (no markdown, no explanation) in this format:
+{
+  "ClassName": {
+    "SubjectName": ["Day", "Day", ...],
+    ...
+  }
+}
+Array length = LPW. For 2P subjects: the day that gets the double has an asterisk, e.g. ["Monday*","Wednesday","Friday"] means Monday gets the 2P double (2 consecutive periods) + 2 single periods on Wed and Fri = 4 total LPW.
+For LPW=6 non-2P: one day appears twice in the array (non-consecutive placement), e.g. ["Monday","Monday","Tuesday","Wednesday","Thursday","Friday"]`;
+
+      setGenProgress(15);
+
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          model:      "claude-sonnet-4-20250514",
+          max_tokens: 8000,
+          messages:   [{role:"user", content:prompt}]
+        })
+      });
+
+      if(!response.ok) throw new Error(`API ${response.status}: ${await response.text()}`);
+      const data = await response.json();
+      if(data.error) throw new Error(data.error.message);
+
+      const rawText = data.content?.find(b=>b.type==="text")?.text || "";
+      setGenProgress(65);
+
+      // Parse AI response
+      const jsonStr = rawText.replace(/```json
+?/g,"").replace(/```
+?/g,"").trim();
+      const aiPlan  = JSON.parse(jsonStr);
+
+      // Convert AI day-list plan → internal plan format
+      const plan = {};
+      ALL_CLASSES.forEach(cls => {
+        plan[cls] = {};
+        const subs = getTTSubs(cls);
+        subs.forEach(sub => {
+          const isDbl  = getClsDouble(cls, sub);
+          const avail  = getAvail(cls, sub);
+          const rawDays = aiPlan[cls]?.[sub] || aiPlan[cls]?.[getShort(sub)] || [];
+          const days = rawDays.map(d => {
+            const trimmed = d.replace(/['"]/g,"").trim();
+            if(trimmed.endsWith("*")) return "__DOUBLE__"; // mark double day
+            return trimmed; // regular day name
+          });
+          // Insert actual day for double
+          const doubleRaw = rawDays.find(d => d.endsWith("*"));
+          const doubleDay = doubleRaw ? doubleRaw.replace("*","").trim() : null;
+          if(isDbl && doubleDay) {
+            const dblIdx = days.indexOf("__DOUBLE__");
+            if(dblIdx >= 0) days.splice(dblIdx, 1, doubleDay, "__DOUBLE__");
+          }
+          plan[cls][sub] = {days, double:isDbl, avail};
+        });
+      });
+
+      setGenProgress(75);
+
+      // Build grid
+      const busyMap = {};
+      const gen     = {};
+      const allDays = [...DAYS,...WEEKEND_DAYS];
+      ALL_CLASSES.forEach(cls => {
+        gen[cls] = {};
+        allDays.forEach(d => { gen[cls][d] = Array(LESSON_SLOTS.length).fill(null); });
+      });
+
+      applyPlan(plan, gen, busyMap);
+      setGenProgress(90);
+
+      // PPI
+      ALL_CLASSES.forEach(cls => {
+        gen[cls]["Friday"][0] = {subject:"PPI", teacher:"— All Staff —", period:1, ppi:true};
+      });
+      // Saturday
+      ALL_CLASSES.forEach(cls => {
+        const clsSubs=getTTSubs(cls), upper=isUpperCls(cls), ct=getClsTeacher(cls);
+        gen[cls]["Saturday"] = SAT_LESSON_SLOTS.map((slot,si)=>{
+          const sub=clsSubs[si%clsSubs.length];
+          const teacher=upper?(getSubTeacher(cls,sub)||"TBD"):(ct||"TBD");
+          return {subject:sub,teacher,period:slot.period};
+        });
+      });
+
+      const conflicts = buildConflicts(gen);
+      setConflictMap(conflicts); setTt(gen);
+      setGenProgress(100); setGenerating(false);
+      const cc = Object.keys(conflicts).length;
+      flash(cc>0?`🤖 AI timetable generated — ${cc} teacher conflict(s).`:"🤖 ✅ AI-generated conflict-free timetable!", cc>0?"warn":"ok");
+
+    } catch(e) {
+      setGenerating(false);
+      flash("🤖 AI error: " + e.message + ". Try Auto-Generate instead.", "error");
+    }
   }
 
   // ── Cell updater ──────────────────────────────────────────────────────────
@@ -2865,8 +3058,12 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
                 💾 Save
               </button>
               <button onClick={autoGen} disabled={generating}
-                style={{background:generating?"#94a3b8":"linear-gradient(135deg,#15803d,#065f46)",color:"white",border:"none",borderRadius:10,padding:"9px 18px",cursor:generating?"not-allowed":"pointer",fontFamily:FT,fontSize:13,fontWeight:"bold",display:"flex",alignItems:"center",gap:7,boxShadow:"0 2px 8px rgba(21,128,61,.3)"}}>
-                {generating ? <>⚙️ Generating…</> : <>⚡ Auto-Generate</>}
+                style={{background:generating&&!aiMode?"#94a3b8":"linear-gradient(135deg,#15803d,#065f46)",color:"white",border:"none",borderRadius:10,padding:"9px 18px",cursor:generating?"not-allowed":"pointer",fontFamily:FT,fontSize:13,fontWeight:"bold",display:"flex",alignItems:"center",gap:7,boxShadow:"0 2px 8px rgba(21,128,61,.3)"}}>
+                {generating&&!aiMode ? <>⚙️ Generating…</> : <>⚡ Auto-Generate</>}
+              </button>
+              <button onClick={aiGenerate} disabled={generating}
+                style={{background:generating&&aiMode?"#94a3b8":"linear-gradient(135deg,#7c3aed,#4c1d95)",color:"white",border:"none",borderRadius:10,padding:"9px 18px",cursor:generating?"not-allowed":"pointer",fontFamily:FT,fontSize:13,fontWeight:"bold",display:"flex",alignItems:"center",gap:7,boxShadow:"0 2px 8px rgba(124,58,237,.3)"}}>
+                {generating&&aiMode ? <>🤖 AI Thinking…</> : <>🤖 AI Generate</>}
               </button>
             </>
           )}
@@ -2877,9 +3074,11 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
       {generating && (
         <div style={{marginBottom:14}}>
           <div style={{background:"#e2e8f0",borderRadius:99,height:8,overflow:"hidden"}}>
-            <div style={{background:"linear-gradient(90deg,#15803d,#60a5fa)",height:"100%",width:`${genProgress}%`,transition:"width .3s",borderRadius:99}}/>
+            <div style={{background:aiMode?"linear-gradient(90deg,#7c3aed,#a78bfa)":"linear-gradient(90deg,#15803d,#60a5fa)",height:"100%",width:`${genProgress}%`,transition:"width .3s",borderRadius:99}}/>
           </div>
-          <div style={{fontSize:11,color:"#64748b",marginTop:4}}>Distributing lessons professionally — one per day per subject…</div>
+          <div style={{fontSize:11,color:"#64748b",marginTop:4}}>
+            {aiMode ? "🤖 AI planning lesson distribution — respecting all CBC constraints…" : "⚡ Distributing lessons — one per day per subject, no consecutive same-subject…"}
+          </div>
         </div>
       )}
 
