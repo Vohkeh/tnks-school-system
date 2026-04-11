@@ -2477,13 +2477,16 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
         // ── Place double block ──────────────────────────────────────
         if(isDbl) {
           const doubleDayIdx = dayList.indexOf("__DOUBLE__");
-          const doubleDay    = doubleDayIdx >= 0 ? dayList[doubleDayIdx] : null;
-          // Try requested double day first, then any day
-          const tryDays = doubleDay ? [doubleDay, ...shuffle([...DAYS].filter(d=>d!==doubleDay))]
-                                    : shuffle([...DAYS]);
+          // dayList is spliced as [dayName, "__DOUBLE__", ...], so the actual day is at doubleDayIdx-1
+          const doubleDay    = doubleDayIdx > 0 ? dayList[doubleDayIdx - 1] : null;
+          const validDoubleDay = doubleDay && DAYS.includes(doubleDay) ? doubleDay : null;
+          // Try requested double day first, then any valid weekday
+          const tryDays = validDoubleDay ? [validDoubleDay, ...shuffle([...DAYS].filter(d=>d!==validDoubleDay))]
+                                         : shuffle([...DAYS]);
           let placed = false;
           for(const day of tryDays) {
             if(placed) break;
+            if(!slotUsed[day]) continue; // guard: skip invalid/undefined days
             for(const [si1,si2] of CONSEC) {
               const p1=LESSON_SLOTS[si1].period, p2=LESSON_SLOTS[si2].period;
               if(!avail.includes(p1)||!avail.includes(p2)) continue;
@@ -2682,7 +2685,7 @@ For LPW=6 non-2P: one day appears twice in the array (non-consecutive placement)
 
       setGenProgress(15);
 
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const response = await fetch("/api/claude", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
@@ -2700,7 +2703,9 @@ For LPW=6 non-2P: one day appears twice in the array (non-consecutive placement)
       setGenProgress(65);
 
       // Parse AI response
-      const jsonStr = rawText.replace(/```json\n?/g,"").replace(/```\n?/g,"").trim();
+      const jsonStr = rawText.replace(/```json
+?/g,"").replace(/```
+?/g,"").trim();
       const aiPlan  = JSON.parse(jsonStr);
 
       // Convert AI day-list plan → internal plan format
