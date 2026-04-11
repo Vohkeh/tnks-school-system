@@ -2304,7 +2304,7 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
       <thead><tr>${["Period / Time",...days].map((h,i)=>`<th style="padding:8px;background:${i===0?"#1e3a5f":"#1d4ed8"};color:white;text-align:center;font-size:11px;">${h}</th>`).join("")}</tr></thead>
       <tbody>${allRows}</tbody>
     </table>`;
-    printWindow(`${cls} Timetable`, header+tableHTML, logo);
+    printWindow(`${cls} Timetable`, header+tableHTML+buildStampBox(), logo);
   }
 
   function printAllClassTimetables() {
@@ -2420,38 +2420,54 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
       const numSlots   = LESSON_SLOTS.length;
 
       // Track occupied slots for this class
-      const slotUsed  = {}; DAYS.forEach(d => { slotUsed[d]  = new Set(); });
-      const subOnSlot = {}; DAYS.forEach(d => { subOnSlot[d] = {}; }); // si→subject
+      const slotUsed   = {}; DAYS.forEach(d => { slotUsed[d]  = new Set(); });
+      const subOnSlot  = {}; DAYS.forEach(d => { subOnSlot[d] = {}; }); // si→subject
+      const subDayCnt  = {}; DAYS.forEach(d => { subDayCnt[d] = {}; }); // sub→count on that day
       slotUsed["Friday"].add(0); // PPI reserved
 
       function getTeacher(sub) {
         return upper ? (getSubTeacher(cls, sub)||"TBD") : (clsTeacher||"TBD");
       }
 
-      // Would placing sub at (day,si) put it adjacent to itself? (forbidden unless double)
-      function wouldClash(day, si, sub) {
+      // Is slot si adjacent (consecutive, no break) to any existing slot of the same subject on that day?
+      function wouldBeAdjacent(day, si, sub) {
         return Object.entries(subOnSlot[day]).some(([esi, s]) =>
           s === sub && areConsec(si, parseInt(esi), CONSEC)
         );
       }
 
+      // Would placing sub on this day violate the "max once per day unless LPW≥6" rule?
+      // allowSecond: true only when lpw>=6 and we intentionally want a second period on a day
+      // When a second period IS allowed, ensure there is at least 1 other subject between them (not adjacent)
+      function wouldViolateDayRule(day, si, sub, lpw, allowSecond) {
+        const cnt = subDayCnt[day][sub] || 0;
+        if(cnt === 0) return false; // first time on this day — always OK
+        if(!allowSecond) return true; // already on this day and not allowed twice
+        if(cnt >= 2) return true; // never more than twice on same day
+        // Second allowed only if NOT adjacent to the existing one
+        return wouldBeAdjacent(day, si, sub);
+      }
+
       // Find a suitable slot on `day` for `sub`
-      // allowAdjSub: if true, relaxes the no-adjacent rule (emergency fallback)
-      function findSlot(day, sub, avail, allowAdjSub=false) {
+      function findSlot(day, sub, avail, lpw, allowSecondOnDay=false, relaxTeacher=false) {
+        if(!slotUsed[day]) return null;
         const teacher = getTeacher(sub);
-        const byTeacher = [];
-        const byBusy   = [];
+        const candidates = [];
         for(let si = 0; si < numSlots; si++) {
           if(slotUsed[day].has(si)) continue;
           const period = LESSON_SLOTS[si].period;
           if(!avail.includes(period)) continue;
-          if(!allowAdjSub && wouldClash(day, si, sub)) continue;
+          // Enforce day-repeat rule
+          if(wouldViolateDayRule(day, si, sub, lpw, allowSecondOnDay)) continue;
+          // Enforce no adjacency to same subject (also catches non-double adjacency)
+          if(wouldBeAdjacent(day, si, sub)) continue;
           const bk = `${teacher}::${day}::${si}`;
-          if(!busyMap[bk]) byTeacher.push(si);
-          else              byBusy.push(si);
+          const teacherFree = !busyMap[bk];
+          if(teacherFree || relaxTeacher) candidates.push({si, teacherFree});
         }
-        const chosen = byTeacher[0] ?? byBusy[0] ?? null;
-        return chosen;
+        // Prefer teacher-free slots
+        const best = candidates.find(c=>c.teacherFree) || candidates[0] || null;
+        return best ? best.si : null;
       }
 
       function occupy(day, si, sub, isDouble=false, isPart2=false) {
@@ -2460,6 +2476,7 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
         gen[cls][day][si] = {subject:sub, teacher, period, double:isDouble, ...(isPart2?{doublePart:2}:{})};
         slotUsed[day].add(si);
         subOnSlot[day][si] = sub;
+        subDayCnt[day][sub] = (subDayCnt[day][sub]||0) + 1;
         const bk = `${teacher}::${day}::${si}`;
         if(teacher !== "TBD") busyMap[bk] = true;
       }
@@ -2471,22 +2488,21 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
       const withoutDbl = subEntries.filter(([, p]) => !p.double);
 
       [...withDbl, ...withoutDbl].forEach(([sub, {days:dayList, double:isDbl, avail}]) => {
+        const lpw = dayList.filter(d=>d!=="__DOUBLE__").length + (isDbl?2:0);
         let remaining = dayList.length;
         const daysPlaced = new Set();
 
-        // ── Place double block ──────────────────────────────────────
+        // ── Place double (2P) block ──────────────────────────────────
         if(isDbl) {
           const doubleDayIdx = dayList.indexOf("__DOUBLE__");
-          // dayList is spliced as [dayName, "__DOUBLE__", ...], so the actual day is at doubleDayIdx-1
           const doubleDay    = doubleDayIdx > 0 ? dayList[doubleDayIdx - 1] : null;
           const validDoubleDay = doubleDay && DAYS.includes(doubleDay) ? doubleDay : null;
-          // Try requested double day first, then any valid weekday
           const tryDays = validDoubleDay ? [validDoubleDay, ...shuffle([...DAYS].filter(d=>d!==validDoubleDay))]
                                          : shuffle([...DAYS]);
           let placed = false;
           for(const day of tryDays) {
             if(placed) break;
-            if(!slotUsed[day]) continue; // guard: skip invalid/undefined days
+            if(!slotUsed[day]) continue;
             for(const [si1,si2] of CONSEC) {
               const p1=LESSON_SLOTS[si1].period, p2=LESSON_SLOTS[si2].period;
               if(!avail.includes(p1)||!avail.includes(p2)) continue;
@@ -2498,24 +2514,31 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
               daysPlaced.add(day); remaining-=2; placed=true; break;
             }
           }
-          if(!placed) remaining = Math.max(0, remaining-2); // couldn't place double
+          if(!placed) remaining = Math.max(0, remaining-2);
         }
 
         // ── Place single lessons ─────────────────────────────────────
+        // For LPW>=6 subjects, track which days already have one lesson (to allow second on some days)
+        const allowSecondOnDay = lpw >= 6 && !isDbl;
         const singleDays = dayList.filter(d => d!=="__DOUBLE__");
-        const dayOrder   = [...shuffle([...DAYS].filter(d=>!daysPlaced.has(d))),
-                            ...shuffle([...DAYS].filter(d=>daysPlaced.has(d)))];
+        // Prefer days not yet used; for lpw>=6 we'll also try days already used (second lesson)
+        const freshDays = shuffle([...DAYS].filter(d=>!daysPlaced.has(d)));
+        const usedDays  = shuffle([...DAYS].filter(d=>daysPlaced.has(d)));
+        const dayOrder  = [...freshDays, ...(allowSecondOnDay ? usedDays : [])];
 
         for(const day of dayOrder) {
           if(remaining <= 0) break;
-          if(daysPlaced.has(day) && !singleDays.includes(day)) continue;
-          const si = findSlot(day, sub, avail);
+          const isSecond = daysPlaced.has(day);
+          if(isSecond && !allowSecondOnDay) continue;
+          const si = findSlot(day, sub, avail, lpw, isSecond, false);
           if(si !== null) { occupy(day,si,sub); daysPlaced.add(day); remaining--; }
         }
-        // Emergency: relax adjacency
+        // Emergency pass: relax teacher conflicts but keep day/adjacency rules
         for(const day of DAYS) {
           if(remaining <= 0) break;
-          const si = findSlot(day, sub, avail, true);
+          const isSecond = (subDayCnt[day][sub]||0) > 0;
+          if(isSecond && !allowSecondOnDay) continue;
+          const si = findSlot(day, sub, avail, lpw, isSecond, true);
           if(si !== null) { occupy(day,si,sub); remaining--; }
         }
       });
