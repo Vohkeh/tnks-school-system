@@ -2702,9 +2702,7 @@ For LPW=6 non-2P: one day appears twice in the array (non-consecutive placement)
       setGenProgress(65);
 
       // Parse AI response
-      const jsonStr = rawText.replace(/```json
-?/g,"").replace(/```
-?/g,"").trim();
+      const jsonStr = rawText.replace(/```json\n?/g,"").replace(/```\n?/g,"").trim();
       const aiPlan  = JSON.parse(jsonStr);
 
       // Convert AI day-list plan → internal plan format
