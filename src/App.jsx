@@ -2647,41 +2647,17 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
       });
 
       const CONSEC = getConsecPairs();
-      const consecStr = CONSEC.map(([a,b])=>`P${LESSON_SLOTS[a]?.period}+P${LESSON_SLOTS[b]?.period}`).join(", ");
-      const bellStr   = LESSON_SLOTS.map(s=>`P${s.period}(${s.start}-${s.end})`).join(", ");
 
-      const prompt = `You are a CBC school timetable planner in Kenya. Plan which days each subject is taught each week.
+      // Compact class data - drop teachers/bell to fit Groq free tier token limit
+      const compactSetups = classSetups.map(c => ({
+        class: c.class,
+        subjects: c.subjects.map(s => ({ name: s.name, lpw: s.lpw, ...(s.double ? {double:true} : {}) }))
+      }));
 
-RULES (strictly enforced):
-1. A subject must NEVER appear in consecutive periods on the same day — UNLESS it is a 2P double period
-2. LPW = total number of periods per week for that subject
-3. LPW=2 → 2 different days, 1 period each
-4. LPW=3 → 3 different days, 1 period each (unless 2P — see rule 7)
-5. LPW=4 → exactly 4 different days, 1 period each
-6. LPW=5 → all 5 days (Mon–Fri), 1 period each
-7. LPW=6 → 5 days, ONE day gets 2 periods but they must be NON-CONSECUTIVE on that day (not back-to-back)
-8. LPW=7+ → spread across 5 days, some days get 2 periods (always non-consecutive unless 2P)
-9. 2P (double period): the subject appears on 1 day with 2 CONSECUTIVE periods (counted as 2 LPW slots), and remaining (LPW-2) periods on separate other days. Mark that day with "*" in your output
-10. PPI is fixed on Friday Period 1 for all classes — do NOT include it in your plan
-11. Avoid scheduling the same teacher (where known) in the same period slot across different classes
-12. Distribute lessons evenly across the week — do not cluster subjects
-
-BELL SCHEDULE: ${bellStr}
-CONSECUTIVE PAIRS (no break between): ${consecStr}
-DAYS: Monday, Tuesday, Wednesday, Thursday, Friday
-
-CLASS DATA:
-${JSON.stringify(classSetups, null, 1)}
-
-Return ONLY a valid JSON object (no markdown, no explanation) in this format:
-{
-  "ClassName": {
-    "SubjectName": ["Day", "Day", ...],
-    ...
-  }
-}
-Array length = LPW. For 2P subjects: the day that gets the double has an asterisk, e.g. ["Monday*","Wednesday","Friday"] means Monday gets the 2P double (2 consecutive periods) + 2 single periods on Wed and Fri = 4 total LPW.
-For LPW=6 non-2P: one day appears twice in the array (non-consecutive placement), e.g. ["Monday","Monday","Tuesday","Wednesday","Thursday","Friday"]`;
+      const prompt = `CBC Kenya school timetable. Return ONLY valid JSON, no markdown, no explanation.
+RULES: Spread LPW lessons across Mon-Fri. No same subject back-to-back same day unless 2P double. 2P=2 consecutive periods on 1 day marked with "*". PPI fixed Friday P1, exclude it.
+FORMAT: {"ClassName":{"SubjectName":["Day",...]}} Array length=LPW. 2P example: ["Monday*","Wed","Fri"]=double Mon + 2 singles.
+DATA:${JSON.stringify(compactSetups)}`;
 
       setGenProgress(15);
 
@@ -2689,7 +2665,7 @@ For LPW=6 non-2P: one day appears twice in the array (non-consecutive placement)
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
-          max_tokens: 8000,
+          max_tokens: 4000,
           messages:   [{role:"user", content:prompt}]
         })
       });
