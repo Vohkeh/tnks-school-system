@@ -2663,53 +2663,230 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // ⚡ DETERMINISTIC AUTO-GENERATOR
+  // ⚡ IMPROVED AUTO-GENERATOR  — multi-attempt + conflict-repair
+  // Strategy:
+  //  1. Run up to MAX_ATTEMPTS full generations (each with a fresh random seed).
+  //  2. After each attempt, count teacher conflicts.
+  //  3. If conflicts > 0, run a targeted repair pass that tries to swap
+  //     conflicting cells to free slots on the same day or different days.
+  //  4. Keep the best (fewest-conflict) result across all attempts.
+  //  5. Build Saturday schedule with teacher-conflict awareness.
   // ══════════════════════════════════════════════════════════════════════════
   function autoGen() {
     setAiMode(false); setGenerating(true); setGenProgress(0);
-    setTimeout(() => {
-      try {
-        const busyMap = {};
-        const gen     = {};
-        const allDays = [...DAYS, ...WEEKEND_DAYS];
+
+    // Run asynchronously in chunks so the UI progress bar updates
+    const MAX_ATTEMPTS = 12;    // number of fresh random attempts
+    const REPAIR_ROUNDS = 8;    // repair passes per attempt
+
+    function runAttempt(attempt) {
+      const busyMap = {};
+      const gen     = {};
+      const allDays = [...DAYS, ...WEEKEND_DAYS];
+      ALL_CLASSES.forEach(cls => {
+        gen[cls] = {};
+        allDays.forEach(d => { gen[cls][d] = Array(LESSON_SLOTS.length).fill(null); });
+      });
+      const plan = buildDefaultPlan();
+      applyPlan(plan, gen, busyMap);
+      fillGaps(gen, busyMap);
+
+      // Friday P1 → PPI
+      ALL_CLASSES.forEach(cls => {
+        gen[cls]["Friday"][0] = {subject:"PPI", teacher:"— All Staff —", period:1, ppi:true};
+      });
+
+      // ── Conflict-repair pass ──────────────────────────────────────────────
+      // For each conflicting (teacher, day, slot) group, try to move one of
+      // the conflicting cells to a free slot on the same or another day.
+      const isUpperCls = c => ["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(c);
+
+      function rebuildBusy(g) {
+        const bm = {};
         ALL_CLASSES.forEach(cls => {
-          gen[cls] = {};
-          allDays.forEach(d => { gen[cls][d] = Array(LESSON_SLOTS.length).fill(null); });
+          DAYS.forEach(day => {
+            (g[cls][day]||[]).forEach((cell, si) => {
+              if(cell?.teacher && cell.teacher!=="TBD" && !cell.ppi) {
+                bm[`${cell.teacher}::${day}::${si}`] = cls;
+              }
+            });
+          });
         });
+        return bm;
+      }
 
-        setGenProgress(20);
-        const plan = buildDefaultPlan();
-        setGenProgress(40);
-        applyPlan(plan, gen, busyMap);
-        fillGaps(gen, busyMap); // fill remaining empty slots
-        setGenProgress(80);
+      for(let round = 0; round < REPAIR_ROUNDS; round++) {
+        const conflicts = buildConflicts(gen);
+        if(Object.keys(conflicts).length === 0) break;
 
-        // Lock Friday P1 → PPI
+        // Build teacher→day→si→classes map to find clash groups
+        const teacherDaySlot = {}; // key: "teacher::day::si" → [cls,...]
         ALL_CLASSES.forEach(cls => {
-          gen[cls]["Friday"][0] = {subject:"PPI", teacher:"— All Staff —", period:1, ppi:true};
-        });
-
-        // Saturday round-robin
-        const isUpperCls = cls => ["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(cls);
-        ALL_CLASSES.forEach(cls => {
-          const clsSubs=getTTSubs(cls), upper=isUpperCls(cls), ct=getClsTeacher(cls);
-          gen[cls]["Saturday"] = SAT_LESSON_SLOTS.map((slot,si) => {
-            const sub=clsSubs[si%clsSubs.length];
-            const teacher=upper?(getSubTeacher(cls,sub)||"TBD"):(ct||"TBD");
-            return {subject:sub,teacher,period:slot.period};
+          DAYS.forEach(day => {
+            (gen[cls][day]||[]).forEach((cell, si) => {
+              if(!cell?.teacher || cell.teacher==="TBD" || cell.ppi) return;
+              const k = `${cell.teacher}::${day}::${si}`;
+              if(!teacherDaySlot[k]) teacherDaySlot[k] = [];
+              teacherDaySlot[k].push(cls);
+            });
           });
         });
 
-        const conflicts = buildConflicts(gen);
-        setConflictMap(conflicts); setTt(gen);
+        const bm = rebuildBusy(gen);
+
+        // For each clash group, try to relocate the "extra" class's lesson
+        Object.entries(teacherDaySlot).forEach(([key, classes]) => {
+          if(classes.length <= 1) return;
+          const [teacher, day, siStr] = key.split("::");
+          const si = parseInt(siStr);
+
+          // Keep the first class, try to move the others
+          for(let i = 1; i < classes.length; i++) {
+            const cls = classes[i];
+            const cell = (gen[cls][day]||[])[si];
+            if(!cell || cell.ppi) continue;
+
+            // Try to find a free slot for this subject in this class (different day preferred)
+            let moved = false;
+
+            // Try other days first, then same day (different slot)
+            const tryDays = [...DAYS.filter(d=>d!==day), day];
+            for(const tDay of tryDays) {
+              if(moved) break;
+              const slots = gen[cls][tDay] || [];
+              for(let tSi = 0; tSi < slots.length; tSi++) {
+                if(slots[tSi] !== null) continue; // slot not empty
+                if(tDay === "Friday" && tSi === 0) continue; // PPI slot
+                const tBk = `${teacher}::${tDay}::${tSi}`;
+                if(bm[tBk]) continue; // teacher busy there
+                // Check no back-to-back same subject on target day
+                const prev = tSi > 0 ? slots[tSi-1]?.subject : null;
+                const next = tSi < slots.length-1 ? slots[tSi+1]?.subject : null;
+                if(prev === cell.subject || next === cell.subject) continue;
+                // Move: clear old slot, fill new slot
+                gen[cls][day][si] = null;
+                gen[cls][tDay][tSi] = {...cell, period: LESSON_SLOTS[tSi]?.period || (tSi+1)};
+                delete bm[`${teacher}::${day}::${si}`];
+                bm[tBk] = cls;
+                moved = true;
+                break;
+              }
+            }
+
+            // If still not moved, try swapping with a TBD/different-teacher slot
+            if(!moved) {
+              for(const tDay of tryDays) {
+                if(moved) break;
+                const slots = gen[cls][tDay] || [];
+                for(let tSi = 0; tSi < slots.length; tSi++) {
+                  const target = slots[tSi];
+                  if(!target || target.ppi) continue;
+                  if(tDay === day && tSi === si) continue;
+                  const targetTeacher = target.teacher || "TBD";
+                  const tBk = `${teacher}::${tDay}::${tSi}`;
+                  const srcBk2 = `${targetTeacher}::${day}::${si}`;
+                  if(targetTeacher !== "TBD" && bm[srcBk2]) continue; // swap target would clash at source
+                  // Do the swap
+                  gen[cls][day][si]   = {...target, period: LESSON_SLOTS[si]?.period || (si+1)};
+                  gen[cls][tDay][tSi] = {...cell,   period: LESSON_SLOTS[tSi]?.period || (tSi+1)};
+                  // Update bm
+                  delete bm[`${teacher}::${day}::${si}`];
+                  if(targetTeacher!=="TBD") { delete bm[`${targetTeacher}::${tDay}::${tSi}`]; bm[srcBk2]=cls; }
+                  bm[tBk] = cls;
+                  moved = true;
+                  break;
+                }
+              }
+            }
+          }
+        });
+      }
+
+      // ── Saturday: build with teacher-conflict awareness ───────────────────
+      // Track which teachers are used per Saturday slot across classes
+      const satBusy = {}; // "teacher::si" → cls
+      ALL_CLASSES.forEach(cls => {
+        const clsSubs = getTTSubs(cls);
+        const upper   = isUpperCls(cls);
+        const ct      = getClsTeacher(cls);
+        const satSlots = Array(SAT_LESSON_SLOTS.length).fill(null);
+
+        // Build ordered subject list, rotated per class to distribute teachers
+        const clsIdx = ALL_CLASSES.indexOf(cls);
+        const rotated = [...clsSubs.slice(clsIdx % clsSubs.length), ...clsSubs.slice(0, clsIdx % clsSubs.length)];
+
+        let subCursor = 0;
+        for(let si = 0; si < SAT_LESSON_SLOTS.length; si++) {
+          // Try subjects in rotation; skip if teacher already busy this slot
+          let placed = false;
+          for(let attempt2 = 0; attempt2 < rotated.length; attempt2++) {
+            const sub = rotated[(subCursor + attempt2) % rotated.length];
+            const teacher = upper ? (getSubTeacher(cls, sub)||"TBD") : (ct||"TBD");
+            const bk = `${teacher}::${si}`;
+            if(teacher === "TBD" || !satBusy[bk]) {
+              satSlots[si] = {subject:sub, teacher, period:SAT_LESSON_SLOTS[si].period};
+              if(teacher !== "TBD") satBusy[bk] = cls;
+              subCursor = (subCursor + attempt2 + 1) % rotated.length;
+              placed = true;
+              break;
+            }
+          }
+          // Fallback: place anyway (TBD or unavoidable)
+          if(!placed) {
+            const sub = rotated[subCursor % rotated.length];
+            const teacher = upper ? (getSubTeacher(cls, sub)||"TBD") : (ct||"TBD");
+            satSlots[si] = {subject:sub, teacher, period:SAT_LESSON_SLOTS[si].period};
+            subCursor = (subCursor + 1) % rotated.length;
+          }
+        }
+        gen[cls]["Saturday"] = satSlots;
+      });
+
+      return gen;
+    }
+
+    // ── Run attempts in async chunks ────────────────────────────────────────
+    let bestGen = null;
+    let bestCount = Infinity;
+    let attempt = 0;
+
+    function nextAttempt() {
+      if(attempt >= MAX_ATTEMPTS) {
+        // Done — commit best result
+        const conflicts = buildConflicts(bestGen);
+        setConflictMap(conflicts); setTt(bestGen);
         setGenProgress(100); setGenerating(false);
         const cc = Object.keys(conflicts).length;
-        flash(cc>0?`Generated — ${cc} teacher conflict(s). Review clashes.`:"✅ Conflict-free timetable generated!", cc>0?"warn":"ok");
-      } catch(e) {
-        setGenerating(false);
-        flash("Generator error: " + e.message, "error");
+        flash(
+          cc > 0
+            ? `Generated (${MAX_ATTEMPTS} attempts) — ${cc} conflict(s) remain. Try again or adjust teacher assignments.`
+            : `✅ Conflict-free timetable generated in ${attempt} attempt(s)!`,
+          cc > 0 ? "warn" : "ok"
+        );
+        return;
       }
-    }, 200);
+
+      setTimeout(() => {
+        try {
+          const gen = runAttempt(attempt);
+          const cc  = Object.keys(buildConflicts(gen)).length;
+          setGenProgress(Math.round(10 + (attempt / MAX_ATTEMPTS) * 88));
+
+          if(cc < bestCount) { bestCount = cc; bestGen = gen; }
+          if(cc === 0) {
+            // Perfect — stop early
+            attempt = MAX_ATTEMPTS;
+          }
+          attempt++;
+          nextAttempt();
+        } catch(e) {
+          setGenerating(false);
+          flash("Generator error: " + e.message, "error");
+        }
+      }, 0);
+    }
+
+    setTimeout(() => nextAttempt(), 50);
   }
 
   // ══════════════════════════════════════════════════════════════════════════
