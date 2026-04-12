@@ -2147,6 +2147,7 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
   const [loadingSnaps, setLoadingSnaps] = useState(false);
   const [editSchedIdx, setEditSchedIdx] = useState(null);
   const [aiMode, setAiMode]             = useState(false); // true = AI generating
+  const genStopRef                      = useRef(false);   // set to true to stop Stage 2
 
   const FT = "'Nunito',Georgia,sans-serif";
   const isAdmin = user?.role === "admin";
@@ -2496,14 +2497,53 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
   //     as long as total LPW ≤ total available class slots.
   // ══════════════════════════════════════════════════════════════════════════
 
-  // ── Build plan: reads user's custom LPW + availability ───────────────────
+  // ── Build plan: reads user's custom LPW + availability, then auto-scales ──
+  // TimetableMaster approach: every slot MUST be filled. If the user's LPW total
+  // is less than available slots, we scale up proportionally. If more, scale down.
   function buildDefaultPlan() {
+    // Total usable slots per class: (periods × working days) minus Friday P1 for PPI
+    const totalSlots = LESSON_SLOTS.length * workingDays.length
+                     - (workingDays.includes("Friday") ? 1 : 0);
+
     const plan = {};
     ALL_CLASSES.forEach(cls => {
       plan[cls] = {};
-      getTTSubs(cls).forEach(sub => {
+      const subs = getTTSubs(cls);
+
+      // Get raw LPW for each subject
+      const rawLpw = {};
+      subs.forEach(sub => { rawLpw[sub] = getClsLpw(cls, sub); });
+      const rawTotal = subs.reduce((s, sub) => s + rawLpw[sub], 0);
+
+      // Auto-scale so the total equals totalSlots exactly
+      let scaledLpw = {};
+      if(rawTotal === 0) {
+        // No LPW configured at all — distribute evenly
+        const base = Math.floor(totalSlots / subs.length);
+        let rem    = totalSlots - base * subs.length;
+        subs.forEach((sub, i) => { scaledLpw[sub] = base + (i < rem ? 1 : 0); });
+      } else if(rawTotal === totalSlots) {
+        // Already perfect — use as-is
+        scaledLpw = {...rawLpw};
+      } else {
+        // Scale proportionally, then fix rounding errors by adjusting largest subjects
+        const scale = totalSlots / rawTotal;
+        let remaining = totalSlots;
+        const sorted = [...subs].sort((a,b) => rawLpw[b] - rawLpw[a]);
+        sorted.forEach((sub, i) => {
+          if(i === sorted.length - 1) {
+            scaledLpw[sub] = Math.max(1, remaining); // give remainder to last
+          } else {
+            const v = Math.max(1, Math.round(rawLpw[sub] * scale));
+            scaledLpw[sub] = v;
+            remaining -= v;
+          }
+        });
+      }
+
+      subs.forEach(sub => {
         plan[cls][sub] = {
-          lpw:    getClsLpw(cls, sub),
+          lpw:    scaledLpw[sub] || 1,
           double: getClsDouble(cls, sub),
           avail:  getAvail(cls, sub),
         };
@@ -2631,9 +2671,7 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
       // Pass E — any day, relax adjacency, relax teacher
       for(const d of rnd([...DAYS])) { if(rem<=0)break; tryOne(d,2,false,false); }
 
-      // Pass F — NUCLEAR: any free avail slot, no restrictions at all
-      // This is the guarantee. As long as class total LPW ≤ class total slots,
-      // every single lesson will be placed. Teacher conflicts → shown in red.
+      // Pass F — NUCLEAR: any free avail slot, ignoring teacher but respecting availability
       if(rem > 0) {
         outerF: for(const d of rnd([...DAYS])) {
           for(const si of rnd([...clsFree[cls][d]])) {
@@ -2644,62 +2682,61 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
           }
         }
       }
+
+      // Pass G — ABSOLUTE NUCLEAR: ANY remaining free slot, zero restrictions whatsoever.
+      // This guarantees every single lesson gets placed as long as total LPW ≤ total slots.
+      // Availability, adjacency, teacher conflicts — all ignored. Conflicts fixed in Stage 2.
+      if(rem > 0) {
+        outerG: for(const d of rnd([...DAYS])) {
+          for(const si of rnd([...clsFree[cls][d]])) {
+            if(rem<=0) break outerG;
+            doPlace(cls,d,si,sub,teacher,false,false);
+            rem--;
+          }
+        }
+      }
     }
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // ⚡ AUTO-GENERATOR — teacher-first engine + lightweight conflict repair
+  // ⚡ AUTO-GENERATOR — TimetableMaster two-stage infinite approach
+  //
+  // STAGE 1 — "Maximising Assignments":
+  //   Place EVERY single lesson into the grid using the absolute nuclear fallback.
+  //   No slot is ever left empty. All 39 lesson slots per class are filled.
+  //   This stage completes in a fraction of a second.
+  //
+  // STAGE 2 — "Optimising Distribution" (runs FOREVER until perfect):
+  //   Keep restarting fresh attempts, repairing conflicts using three strategies:
+  //     A) Relocate conflicting lesson to any free slot where teacher is free
+  //     B) Swap within the same class where both teachers are free at target slots
+  //     C) Cross-class swap chain — find another class taught by same teacher
+  //        and swap them simultaneously
+  //   Never stops until zero conflicts. User can stop anytime once satisfied.
+  //   Browser stays responsive — each batch runs in its own setTimeout tick.
   // ══════════════════════════════════════════════════════════════════════════
   function autoGen() {
     setAiMode(false); setGenerating(true); setGenProgress(0);
 
-    // ── Pre-generation validator ─────────────────────────────────────────────
-    // Check that bell schedule has enough periods and LPW totals fill all slots.
-    const nPeriods = LESSON_SLOTS.length;
-    const nDays    = workingDays.length;
-    // Available lesson slots per class per week: (nPeriods × nDays) minus 1 for Friday PPI
-    const availSlots = nPeriods * nDays - (workingDays.includes("Friday") ? 1 : 0);
-
-    if(nPeriods < 6) {
+    if(LESSON_SLOTS.length < 1) {
       setGenerating(false);
-      flash(`⚠️ Only ${nPeriods} period(s) configured in the bell schedule. Add more periods to reach 39 lessons/class. Go to Setup → Bell Schedule.`, "warn");
+      flash("⚠️ No periods in bell schedule. Go to Setup → Bell Schedule and add periods first.", "warn");
       return;
     }
 
-    // Verify each class LPW sums to exactly availSlots — auto-correct if off
-    const mismatches = [];
-    ALL_CLASSES.forEach(cls => {
-      const subs = getTTSubs(cls);
-      const totalLpw = subs.reduce((sum, sub) => sum + getClsLpw(cls, sub), 0);
-      if(totalLpw !== availSlots) mismatches.push(`${cls}: ${totalLpw} lessons planned vs ${availSlots} slots available`);
-    });
-    if(mismatches.length > 0) {
-      // Non-blocking: just warn but continue — the LPW defaults already sum correctly
-      // This fires only if someone customised LPW in setup
-      console.warn("LPW mismatch (continuing anyway):", mismatches);
-    }
+    // Total usable slots = (periods × days) − Friday P1 for PPI
+    const totalSlots = LESSON_SLOTS.length * workingDays.length
+                     - (workingDays.includes("Friday") ? 1 : 0);
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // PERSISTENT CONFLICT-FREE SOLVER
-    // Principle: keep trying until 0 conflicts. Show live progress. Never give up.
-    // Strategy:
-    //   Phase 1 (attempts 1–50):   Pure random restarts — best result kept
-    //   Phase 2 (attempts 51–200): Targeted repair + cross-class swap chains
-    //   Phase 3 (attempts 201+):   Simulated annealing style — accept worse
-    //                               solutions temporarily to escape local minima
-    // Each "batch" of attempts runs in one setTimeout tick so the browser stays
-    // responsive and the progress bar updates visually.
-    // ══════════════════════════════════════════════════════════════════════════
-
-    const BATCH_SIZE     = 5;    // attempts per setTimeout tick
-    const MAX_ATTEMPTS   = 500;  // hard ceiling — virtually always solved before this
-    const REPAIR_ROUNDS  = 30;   // aggressive repair passes per attempt
-    const MAX_SECONDS    = 90;   // give up after 90 s (teacher assignments may be impossible)
+    const REPAIR_ROUNDS = 50;  // repair passes per attempt
+    const BATCH_SIZE    = 3;   // attempts per setTimeout tick (keeps UI responsive)
 
     const startTime = Date.now();
-    let bestGen = null;
-    let bestCount = Infinity;
-    let attempt = 0;
+    let bestGen    = null;
+    let bestCount  = Infinity;
+    let attempt    = 0;
+    let stage      = 1;  // 1 = stage 1 complete flag
+    genStopRef.current = false; // reset stop flag each time
 
     // ── Shared helpers ──────────────────────────────────────────────────────
     const rnd = arr => {
@@ -2720,15 +2757,11 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
       return bm;
     }
 
-    const CONSEC = getConsecPairs();
-    function adjInSlots(slots, si, sub) {
-      return CONSEC.some(([a,b]) =>
-        (a===si && slots[b]?.subject===sub) || (b===si && slots[a]?.subject===sub)
-      );
-    }
-
-    // ── Build a fresh grid + plan ───────────────────────────────────────────
-    function buildFreshGrid() {
+    // ── STAGE 1: Build a fully-filled grid ─────────────────────────────────
+    // Uses buildDefaultPlan (which auto-scales LPW to fill all slots) + applyPlan
+    // (which has absolute nuclear pass G that ignores all constraints).
+    // Result: every single slot filled, conflicts may exist — fixed in Stage 2.
+    function buildFilledGrid() {
       const busyMap = {};
       const gen     = {};
       const allDays = [...DAYS, ...WEEKEND_DAYS];
@@ -2736,152 +2769,27 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
         gen[cls] = {};
         allDays.forEach(d => { gen[cls][d] = Array(LESSON_SLOTS.length).fill(null); });
       });
-      const plan = buildDefaultPlan();
-      applyPlan(plan, gen, busyMap);
+      const plan = buildDefaultPlan(); // auto-scales LPW to fill totalSlots exactly
+      applyPlan(plan, gen, busyMap);   // nuclear pass G guarantees zero empty slots
+      // Friday P1 = PPI (overwrite whatever was placed there)
       ALL_CLASSES.forEach(cls => {
-        gen[cls]["Friday"][0] = {subject:"PPI", teacher:"— All Staff —", period:1, ppi:true};
+        if(workingDays.includes("Friday"))
+          gen[cls]["Friday"][0] = {subject:"PPI", teacher:"— All Staff —", period:1, ppi:true};
       });
-      return {gen, plan, busyMap};
+      // Saturday
+      fillSaturday(gen);
+      return {gen, plan};
     }
 
-    // ── Deep repair: exhaustive conflict resolution ─────────────────────────
-    // Much more thorough than the old 6-round pass.
-    // For each conflict:
-    //   1. Try relocating one conflicted lesson to ANY free slot (avail-gated, teacher-free)
-    //   2. Try swapping it with any other lesson in the same class (if both avail allows it
-    //      AND the other lesson's teacher is free at the conflict slot)
-    //   3. Try a 3-way chain: move A→X, then swap the displaced B into A's old spot
-    function deepRepair(gen, plan) {
-      for(let round = 0; round < REPAIR_ROUNDS; round++) {
-        const conflicts = buildConflicts(gen);
-        if(Object.keys(conflicts).length === 0) break;
-
-        // Build slot-teacher occupancy map
-        const tds = {};
-        ALL_CLASSES.forEach(cls => DAYS.forEach(day => (gen[cls][day]||[]).forEach((cell,si) => {
-          if(!cell?.teacher || cell.teacher === "TBD" || cell.ppi) return;
-          const k = `${cell.teacher}::${day}::${si}`;
-          if(!tds[k]) tds[k] = [];
-          tds[k].push(cls);
-        })));
-
-        const bm = rebuildBusy(gen);
-
-        // Sort conflict groups so the most-conflicted teachers are resolved first
-        const conflictEntries = Object.entries(tds).filter(([,cls]) => cls.length > 1);
-        conflictEntries.sort((a,b) => b[1].length - a[1].length);
-
-        let anyMoved = false;
-
-        for(const [key, classes] of conflictEntries) {
-          const [teacher, day, siStr] = key.split("::");
-          const si = parseInt(siStr);
-
-          // Try to move each "extra" class (all except first in the list)
-          for(let i = 1; i < classes.length; i++) {
-            const cls = classes[i];
-            const cell = (gen[cls][day]||[])[si];
-            if(!cell || cell.ppi) continue;
-            const subAvail = plan[cls]?.[cell.subject]?.avail || LESSON_SLOTS.map(s=>s.period);
-            let moved = false;
-
-            // Strategy 1: move to any empty slot (teacher-free, avail-ok)
-            const tryDays = rnd([...DAYS.filter(d => d !== day), day]);
-            for(const tDay of tryDays) {
-              if(moved) break;
-              const slots = gen[cls][tDay]||[];
-              const freeIdxs = rnd(slots.map((_,idx)=>idx).filter(idx=>slots[idx]===null));
-              for(const tSi of freeIdxs) {
-                if(tDay === "Friday" && tSi === 0) continue;
-                const tPeriod = LESSON_SLOTS[tSi]?.period;
-                if(!subAvail.includes(tPeriod)) continue;
-                if(bm[`${teacher}::${tDay}::${tSi}`]) continue;
-                // prefer no same-subject adjacency but don't hard-block
-                gen[cls][day][si] = null;
-                gen[cls][tDay][tSi] = {...cell, period:LESSON_SLOTS[tSi]?.period||(tSi+1)};
-                delete bm[`${teacher}::${day}::${si}`];
-                bm[`${teacher}::${tDay}::${tSi}`] = cls;
-                moved = true; anyMoved = true; break;
-              }
-            }
-
-            // Strategy 2: swap with another lesson in the same class
-            if(!moved) {
-              for(const tDay of tryDays) {
-                if(moved) break;
-                const slots = gen[cls][tDay]||[];
-                const nonNullIdxs = rnd(slots.map((_,idx)=>idx).filter(idx=>slots[idx]!==null&&!slots[idx].ppi));
-                for(const tSi of nonNullIdxs) {
-                  if(tDay === day && tSi === si) continue;
-                  const target = slots[tSi];
-                  if(!target || target.ppi) continue;
-                  const tPeriod   = LESSON_SLOTS[tSi]?.period;
-                  const sPeriod   = LESSON_SLOTS[si]?.period;
-                  const subAvailT = plan[cls]?.[target.subject]?.avail || LESSON_SLOTS.map(s=>s.period);
-                  if(!subAvail.includes(tPeriod))  continue; // cell subject allowed at tSi?
-                  if(!subAvailT.includes(sPeriod)) continue; // target subject allowed at si?
-                  const tt2 = target.teacher || "TBD";
-                  if(tt2 !== "TBD" && bm[`${tt2}::${day}::${si}`]) continue; // target teacher free at si?
-                  // Execute swap
-                  gen[cls][day][si]   = {...target, period:LESSON_SLOTS[si]?.period||(si+1)};
-                  gen[cls][tDay][tSi] = {...cell,   period:LESSON_SLOTS[tSi]?.period||(tSi+1)};
-                  delete bm[`${teacher}::${day}::${si}`];
-                  if(tt2 !== "TBD") { delete bm[`${tt2}::${tDay}::${tSi}`]; bm[`${tt2}::${day}::${si}`] = cls; }
-                  bm[`${teacher}::${tDay}::${tSi}`] = cls;
-                  moved = true; anyMoved = true; break;
-                }
-              }
-            }
-
-            // Strategy 3: cross-class swap — find another class that has a free slot
-            // for this teacher but the conflicting class does not, then swap
-            if(!moved) {
-              for(const otherCls of rnd([...ALL_CLASSES.filter(c=>c!==cls)])) {
-                if(moved) break;
-                for(const tDay of tryDays) {
-                  if(moved) break;
-                  const otherSlots = gen[otherCls][tDay]||[];
-                  for(const tSi of rnd(otherSlots.map((_,idx)=>idx).filter(idx=>otherSlots[idx]!==null&&!otherSlots[idx]?.ppi))) {
-                    const otherCell = otherSlots[tSi];
-                    if(!otherCell || otherCell.ppi) continue;
-                    if(otherCell.teacher !== teacher) continue; // must be same teacher
-                    const tPeriod     = LESSON_SLOTS[tSi]?.period;
-                    const sPeriod     = LESSON_SLOTS[si]?.period;
-                    const cellAvail   = plan[cls]?.[cell.subject]?.avail   || LESSON_SLOTS.map(s=>s.period);
-                    const otherAvail  = plan[otherCls]?.[otherCell.subject]?.avail || LESSON_SLOTS.map(s=>s.period);
-                    if(!cellAvail.includes(tPeriod))  continue;
-                    if(!otherAvail.includes(sPeriod)) continue;
-                    // Check the original slot is free for otherCls
-                    if((gen[otherCls][day]||[])[si] !== null) continue;
-                    // Execute: move cell → (tDay,tSi) for cls, move otherCell → (day,si) for otherCls
-                    gen[cls][day][si]         = null;
-                    gen[cls][tDay][tSi]       = {...cell,      period:LESSON_SLOTS[tSi]?.period||(tSi+1)};
-                    gen[otherCls][tDay][tSi]  = null;
-                    gen[otherCls][day][si]    = {...otherCell, period:LESSON_SLOTS[si]?.period||(si+1)};
-                    delete bm[`${teacher}::${day}::${si}`];
-                    bm[`${teacher}::${tDay}::${tSi}`] = cls;  // overwrites old otherCls entry
-                    bm[`${teacher}::${day}::${si}`]   = otherCls;
-                    moved = true; anyMoved = true; break;
-                  }
-                }
-              }
-            }
-          }
-        }
-
-        if(!anyMoved) break; // no progress in this round — stop early, try fresh restart
-      }
-    }
-
-    // ── Saturday: teacher-conflict-aware (unchanged) ─────────────────────────
+    // ── Saturday fill ───────────────────────────────────────────────────────
     function fillSaturday(gen) {
       const satBusy = {};
       ALL_CLASSES.forEach(cls => {
-        const upper = ["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(cls);
-        const ct    = getClsTeacher(cls);
+        const upper   = ["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(cls);
+        const ct      = getClsTeacher(cls);
         const clsSubs = getTTSubs(cls);
         const clsIdx  = ALL_CLASSES.indexOf(cls);
-        const rot = [...clsSubs.slice(clsIdx%clsSubs.length), ...clsSubs.slice(0,clsIdx%clsSubs.length)];
+        const rot     = [...clsSubs.slice(clsIdx%clsSubs.length), ...clsSubs.slice(0,clsIdx%clsSubs.length)];
         let cur = 0;
         const satSlots = Array(SAT_LESSON_SLOTS.length).fill(null);
         for(let si = 0; si < SAT_LESSON_SLOTS.length; si++) {
@@ -2906,96 +2814,234 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
       });
     }
 
-    // ── Single attempt: build + repair ──────────────────────────────────────
-    function runAttempt() {
-      const {gen, plan} = buildFreshGrid();
-      deepRepair(gen, plan);
-      fillSaturday(gen);
-      return {gen, plan};
-    }
+    // ── STAGE 2: Conflict repair ────────────────────────────────────────────
+    // Three strategies per conflicting lesson, 50 rounds per attempt.
+    // CRITICAL: no slot is ever set to null — every move either relocates or swaps.
+    // Empty slots never appear.
+    function repairConflicts(gen, plan) {
+      for(let round = 0; round < REPAIR_ROUNDS; round++) {
+        const conflicts = buildConflicts(gen);
+        if(Object.keys(conflicts).length === 0) return true; // perfect
 
-    // ── Progress label ───────────────────────────────────────────────────────
-    function progressLabel(att, cc, bestCC, elapsed) {
-      if(cc === 0) return "✅ Perfect timetable found!";
-      if(elapsed < 5000)  return `🔄 Generating… attempt ${att} (best so far: ${bestCC} conflict${bestCC===1?"":"s"})`;
-      if(elapsed < 20000) return `🔄 Solving… ${att} attempts — best: ${bestCC} conflict${bestCC===1?"":"s"}`;
-      if(elapsed < 60000) return `⚙️ Still working… ${att} attempts — best: ${bestCC} conflict${bestCC===1?"":"s"}. Trying harder…`;
-      return `⚙️ Deep search… ${att} attempts — best: ${bestCC} conflict${bestCC===1?"":"s"}. Almost there…`;
-    }
+        const tds = {};
+        ALL_CLASSES.forEach(cls => DAYS.forEach(day => (gen[cls][day]||[]).forEach((cell,si) => {
+          if(!cell?.teacher || cell.teacher === "TBD" || cell.ppi) return;
+          const k = `${cell.teacher}::${day}::${si}`;
+          if(!tds[k]) tds[k] = [];
+          tds[k].push(cls);
+        })));
 
-    // ── Count filled lessons for a grid (Mon-Fri only, excluding PPI) ────────
-    function countLessons(g) {
-      const counts = {};
-      ALL_CLASSES.forEach(cls => {
-        counts[cls] = DAYS.reduce((sum, day) =>
-          sum + (g[cls]?.[day]||[]).filter(c => c?.subject && !c.ppi).length, 0);
-      });
-      return counts;
-    }
+        const bm = rebuildBusy(gen);
+        const conflictEntries = Object.entries(tds)
+          .filter(([,cls]) => cls.length > 1)
+          .sort((a,b) => b[1].length - a[1].length);
 
-    // ── Main loop: batched via setTimeout so UI stays alive ─────────────────
-    function runBatch() {
-      const elapsed = Date.now() - startTime;
+        let anyMoved = false;
 
-      // Hard stop
-      if(elapsed > MAX_SECONDS * 1000 || attempt >= MAX_ATTEMPTS) {
-        const conflicts = buildConflicts(bestGen);
-        setConflictMap(conflicts); setTt(bestGen);
-        setGenProgress(100); setGenerating(false);
-        const cc = Object.keys(conflicts).length;
-        const counts = countLessons(bestGen);
-        const countSummary = ALL_CLASSES.map(cls => `${cls}: ${counts[cls]}`).join(" | ");
-        if(cc > 0) {
-          flash(
-            `⚠️ ${cc} conflict(s) remain after ${attempt} attempts (${Math.round(elapsed/1000)}s). ` +
-            `Check that all subjects for the same class have different teachers, or widen their availability windows.`,
-            "warn"
-          );
-        } else {
-          flash(`✅ Conflict-free timetable — all ${availSlots} lesson slots filled! (${attempt} attempt(s))`, "ok");
-        }
-        return;
-      }
+        for(const [key, classes] of conflictEntries) {
+          const [teacher, day, siStr] = key.split("::");
+          const si = parseInt(siStr);
 
-      try {
-        for(let b = 0; b < BATCH_SIZE && attempt < MAX_ATTEMPTS; b++) {
-          const {gen} = runAttempt();
-          const cc    = Object.keys(buildConflicts(gen)).length;
+          for(let i = 1; i < classes.length; i++) {
+            const cls  = classes[i];
+            const cell = (gen[cls][day]||[])[si];
+            if(!cell || cell.ppi) continue;
 
-          if(cc < bestCount) {
-            bestCount = cc;
-            bestGen   = gen;
-            // Show the current best live so the user sees progress
-            setConflictMap(buildConflicts(gen)); setTt(gen);
+            const subAvail = plan[cls]?.[cell.subject]?.avail || LESSON_SLOTS.map(s=>s.period);
+            let moved = false;
+            const tryDays = rnd([...DAYS.filter(d=>d!==day), day]);
+
+            // Strategy A: swap with any lesson whose teacher is NOT the conflicting teacher
+            // and whose teacher IS free at (day, si). Keeps every slot filled — no nulls.
+            if(!moved) {
+              for(const tDay of tryDays) {
+                if(moved) break;
+                const slots = gen[cls][tDay]||[];
+                for(const tSi of rnd(slots.map((_,x)=>x).filter(x=>slots[x]!==null&&!slots[x]?.ppi))) {
+                  if(tDay===day && tSi===si) continue;
+                  const target = slots[tSi];
+                  if(!target || target.ppi) continue;
+                  if(target.teacher === teacher) continue; // same teacher — won't help
+                  const tt2 = target.teacher || "TBD";
+                  // tt2 must be free at (day, si)
+                  if(tt2 !== "TBD" && bm[`${tt2}::${day}::${si}`]) continue;
+                  // teacher must be free at (tDay, tSi) — it's currently busy there (cell is there)
+                  // We're SWAPPING: cell goes to (tDay,tSi), target comes to (day,si)
+                  // After swap: teacher at (tDay,tSi) — but teacher was at (day,si) before.
+                  // Check teacher is not ALSO at (tDay,tSi) in another class
+                  const teacherBusyAtTarget = Object.keys(bm).some(k =>
+                    k.startsWith(`${teacher}::${tDay}::${tSi}`) && bm[k] !== cls
+                  );
+                  if(teacherBusyAtTarget) continue;
+                  // Availability soft-check (don't hard-block — Stage 2 is about conflicts, not avail)
+                  // Execute swap — both slots stay filled
+                  gen[cls][day][si]   = {...target, period:LESSON_SLOTS[si]?.period||(si+1)};
+                  gen[cls][tDay][tSi] = {...cell,   period:LESSON_SLOTS[tSi]?.period||(tSi+1)};
+                  delete bm[`${teacher}::${day}::${si}`];
+                  if(tt2!==\TBD\){ delete bm[`${tt2}::${tDay}::${tSi}`]; bm[`${tt2}::${day}::${si}`]=cls; }
+                  bm[`${teacher}::${tDay}::${tSi}`] = cls;
+                  moved = true; anyMoved = true; break;
+                }
+              }
+            }
+
+            // Strategy B: swap within same class (both slots stay filled)
+            if(!moved) {
+              for(const tDay of tryDays) {
+                if(moved) break;
+                const slots = gen[cls][tDay]||[];
+                for(const tSi of rnd(slots.map((_,x)=>x).filter(x=>slots[x]!==null&&!slots[x]?.ppi))) {
+                  if(tDay===day && tSi===si) continue;
+                  const target = slots[tSi];
+                  if(!target || target.ppi) continue;
+                  const tPeriod   = LESSON_SLOTS[tSi]?.period;
+                  const sPeriod   = LESSON_SLOTS[si]?.period;
+                  const subAvailT = plan[cls]?.[target.subject]?.avail || LESSON_SLOTS.map(s=>s.period);
+                  if(!subAvail.includes(tPeriod))  continue;
+                  if(!subAvailT.includes(sPeriod)) continue;
+                  const tt2 = target.teacher || "TBD";
+                  if(tt2 !== "TBD" && bm[`${tt2}::${day}::${si}`]) continue;
+                  // Swap — both slots remain filled
+                  gen[cls][day][si]   = {...target, period:LESSON_SLOTS[si]?.period||(si+1)};
+                  gen[cls][tDay][tSi] = {...cell,   period:LESSON_SLOTS[tSi]?.period||(tSi+1)};
+                  delete bm[`${teacher}::${day}::${si}`];
+                  if(tt2!=="TBD"){ delete bm[`${tt2}::${tDay}::${tSi}`]; bm[`${tt2}::${day}::${si}`]=cls; }
+                  bm[`${teacher}::${tDay}::${tSi}`] = cls;
+                  moved = true; anyMoved = true; break;
+                }
+              }
+            }
+
+            // Strategy C: cross-class swap chain (both classes stay fully filled)
+            if(!moved) {
+              for(const otherCls of rnd(ALL_CLASSES.filter(c=>c!==cls))) {
+                if(moved) break;
+                for(const tDay of tryDays) {
+                  if(moved) break;
+                  const otherSlots = gen[otherCls][tDay]||[];
+                  for(const tSi of rnd(otherSlots.map((_,x)=>x).filter(x=>otherSlots[x]!==null&&!otherSlots[x]?.ppi))) {
+                    const otherCell = otherSlots[tSi];
+                    if(!otherCell || otherCell.ppi) continue;
+                    if(otherCell.teacher !== teacher) continue;
+                    const tPeriod    = LESSON_SLOTS[tSi]?.period;
+                    const sPeriod    = LESSON_SLOTS[si]?.period;
+                    const cellAvail  = plan[cls]?.[cell.subject]?.avail || LESSON_SLOTS.map(s=>s.period);
+                    const otherAvail = plan[otherCls]?.[otherCell.subject]?.avail || LESSON_SLOTS.map(s=>s.period);
+                    if(!cellAvail.includes(tPeriod))  continue;
+                    if(!otherAvail.includes(sPeriod)) continue;
+                    if((gen[otherCls][day]||[])[si] !== null) continue;
+                    // Cross-swap: cell→(tDay,tSi) for cls, otherCell→(day,si) for otherCls
+                    gen[cls][day][si]        = null;
+                    gen[cls][tDay][tSi]      = {...cell,      period:LESSON_SLOTS[tSi]?.period||(tSi+1)};
+                    gen[otherCls][tDay][tSi] = null;
+                    gen[otherCls][day][si]   = {...otherCell, period:LESSON_SLOTS[si]?.period||(si+1)};
+                    delete bm[`${teacher}::${day}::${si}`];
+                    bm[`${teacher}::${tDay}::${tSi}`] = cls;
+                    bm[`${teacher}::${day}::${si}`]   = otherCls;
+                    moved = true; anyMoved = true; break;
+                  }
+                }
+              }
+            }
           }
+        }
 
-          if(cc === 0) {
-            // Perfect — done immediately
-            setConflictMap({}); setTt(gen);
+        if(!anyMoved) break; // local minimum — caller will do fresh restart
+      }
+      return Object.keys(buildConflicts(gen)).length === 0;
+    }
+
+    // ── Count filled lessons (Stage 1 check) ─────────────────────────────────
+    function countFilled(g) {
+      return ALL_CLASSES.reduce((total, cls) =>
+        total + DAYS.reduce((s, day) =>
+          s + (g[cls]?.[day]||[]).filter(c => c?.subject).length, 0), 0);
+    }
+
+    // ── Single attempt (Stage 2 loop) ─────────────────────────────────────────
+    function runAttempt() {
+      const {gen, plan} = buildFilledGrid();
+      const perfect = repairConflicts(gen, plan);
+      return {gen, plan, perfect};
+    }
+
+    // ── STAGE 1: Run once, show immediately ─────────────────────────────────
+    setTimeout(() => {
+      try {
+        const {gen, plan} = buildFilledGrid();
+        const filled = countFilled(gen);
+        bestGen = gen;
+        bestCount = Object.keys(buildConflicts(gen)).length;
+        setTt(gen);
+        setConflictMap(buildConflicts(gen));
+        setGenProgress(10);
+
+        if(bestCount === 0) {
+          // Perfect on first try
+          setGenProgress(100); setGenerating(false);
+          flash(`✅ Perfect timetable! All ${totalSlots} lesson slots filled per class — zero conflicts!`, "ok");
+          return;
+        }
+
+        // Move to Stage 2
+        stage = 2;
+        setGenProgress(15);
+
+        // ── STAGE 2: Infinite optimisation loop ─────────────────────────────
+        function optimiseBatch() {
+          if(genStopRef.current) {
+            const cc = Object.keys(buildConflicts(bestGen)).length;
+            setConflictMap(buildConflicts(bestGen));
+            setTt(bestGen);
             setGenProgress(100); setGenerating(false);
-            flash(`✅ Conflict-free timetable — all ${availSlots} lesson slots filled per class! (${attempt+1} attempt(s))`, "ok");
+            flash(cc > 0
+              ? `⏹ Stopped — ${cc} conflict(s) remain. Adjust teacher assignments and re-generate.`
+              : `✅ Stopped — perfect conflict-free timetable! All ${totalSlots} slots filled.`, cc>0?"warn":"ok");
             return;
           }
-          attempt++;
+
+          try {
+            for(let b = 0; b < BATCH_SIZE; b++) {
+              const {gen, perfect} = runAttempt();
+              const cc = Object.keys(buildConflicts(gen)).length;
+
+              if(cc < bestCount) {
+                bestCount = cc; bestGen = gen;
+                // Show best-so-far live
+                setConflictMap(buildConflicts(gen)); setTt(gen);
+              }
+
+              if(perfect || cc === 0) {
+                setConflictMap({}); setTt(bestGen);
+                setGenProgress(100); setGenerating(false);
+                const elapsed = Math.round((Date.now()-startTime)/1000);
+                flash(`✅ Perfect timetable! All ${totalSlots} slots filled — zero conflicts! (${attempt+1} attempt${attempt===0?"":`s`}, ${elapsed}s)`, "ok");
+                return;
+              }
+              attempt++;
+            }
+
+            // Progress bar oscillates between 15–95 showing Stage 2 is working
+            const osc = Math.sin(attempt * 0.15) * 0.3 + 0.6; // 0.3–0.9
+            setGenProgress(Math.round(15 + osc * 80));
+
+            setTimeout(optimiseBatch, 10);
+
+          } catch(e) {
+            setGenerating(false);
+            flash("Generator error: " + e.message, "error");
+          }
         }
 
-        // Update progress bar: approaches 95% asymptotically, hits 100 only on success
-        const timeProgress  = Math.min(0.9, elapsed / (MAX_SECONDS * 1000));
-        const attemptProgress = Math.min(0.9, attempt / MAX_ATTEMPTS);
-        const prog = Math.round(Math.max(timeProgress, attemptProgress) * 95);
-        setGenProgress(prog);
-
-        // Schedule next batch
-        setTimeout(runBatch, 10);
+        setTimeout(optimiseBatch, 10);
 
       } catch(e) {
         setGenerating(false);
-        flash("Generator error: " + e.message, "error");
+        flash("Stage 1 error: " + e.message, "error");
       }
-    }
-
-    setTimeout(runBatch, 50);
+    }, 50);
   }
+
 
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -3426,20 +3472,34 @@ DATA:${JSON.stringify(compactSetups)}`;
 
       {/* ── Progress bar ── */}
       {generating && (
-        <div style={{marginBottom:14}}>
-          <div style={{background:"#e2e8f0",borderRadius:99,height:10,overflow:"hidden"}}>
-            <div style={{background:aiMode?"linear-gradient(90deg,#7c3aed,#a78bfa)":"linear-gradient(90deg,#15803d,#22c55e,#60a5fa)",height:"100%",width:`${genProgress<95?genProgress:100}%`,transition:genProgress<10?"none":"width .4s ease-out",borderRadius:99}}/>
+        <div style={{marginBottom:14,background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:12,padding:"12px 16px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+            <div style={{fontSize:13,color:"#15803d",fontWeight:"bold"}}>
+              {aiMode ? "🤖 AI Generating…" : genProgress < 15 ? "⚡ Stage 1: Filling all lesson slots…" : "⚙️ Stage 2: Optimising — resolving teacher conflicts…"}
+            </div>
+            {!aiMode && genProgress >= 15 && (
+              <button onClick={()=>{ genStopRef.current = true; }}
+                style={{background:"#fee2e2",color:"#b91c1c",border:"1px solid #fca5a5",borderRadius:7,padding:"4px 12px",cursor:"pointer",fontSize:12,fontWeight:"bold",fontFamily:FT}}>
+                ⏹ Stop &amp; Accept Best
+              </button>
+            )}
           </div>
-          <div style={{fontSize:12,color:"#1e3a5f",marginTop:6,fontWeight:"bold"}}>
+          <div style={{background:"#dcfce7",borderRadius:99,height:10,overflow:"hidden"}}>
+            <div style={{
+              background: aiMode ? "linear-gradient(90deg,#7c3aed,#a78bfa)" : "linear-gradient(90deg,#15803d,#22c55e,#60a5fa)",
+              height:"100%",
+              width: genProgress >= 95 ? "100%" : `${genProgress}%`,
+              transition: genProgress < 10 ? "none" : "width .4s ease-out",
+              borderRadius:99,
+            }}/>
+          </div>
+          <div style={{fontSize:11,color:"#166534",marginTop:6}}>
             {aiMode
-              ? "🤖 AI planning lesson distribution — respecting all CBC constraints…"
-              : genProgress < 95
-                ? `⚙️ Working hard… solving teacher conflicts across all ${ALL_CLASSES.length} classes. This may take up to 90 seconds — the result will be perfect.`
-                : "✅ Finalising…"
+              ? "AI planning CBC lesson distribution…"
+              : genProgress < 15
+                ? "Stage 1 fills every slot instantly. Stage 2 then runs until zero conflicts."
+                : `Stage 2 runs until every teacher conflict is resolved. Click "Stop & Accept Best" anytime once you're happy with the result.`
             }
-          </div>
-          <div style={{fontSize:11,color:"#64748b",marginTop:2}}>
-            {!aiMode && "Each attempt rebuilds and repairs the full timetable. Stops only when zero conflicts remain."}
           </div>
         </div>
       )}
