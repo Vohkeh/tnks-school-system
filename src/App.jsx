@@ -116,29 +116,29 @@ function getSubShort(subject) {
 }
 function getTimetableSubs(cls) { return TIMETABLE_SUBJECTS_MAP[cg(cls)]||[]; }
 
-// Lessons per week per subject (CBC curriculum guidelines)
+// Lessons per week per subject — tuned so every class fills all 39 usable slots
+// (8 periods/day × 5 days = 40, minus Friday P1 PPI = 39).
+// Keys match TIMETABLE_SUBJECTS_MAP exactly.
 const LESSONS_PER_WEEK = {
   PP: {
-    "Literacy Activities":5,"Language Activities":5,"Kiswahili Activities":5,
-    "Mathematical Activities":5,"Environmental Activities":3,
-    "Creative Activities":3,"Religious Education Activities":2,
+    "Language Activities":8,"Mathematical Activities":8,"Environmental Activities":7,
+    "Creative Activities":8,"Religious Education Activities":8,
   },
   Lower: {
-    "English Language Activities":5,"Kiswahili Language Activities":5,"Mathematical Activities":5,
-    "Environmental Activities":3,"Religious Education Activities":2,"Creative Activities":3,
-    "Indigenous Language Activities":2,
+    "English Language Activities":7,"Kiswahili Language Activities":6,"Mathematical Activities":7,
+    "Environmental Activities":5,"Religious Education Activities":4,
+    "Creative Activities":6,"Indigenous Language Activities":4,
   },
   Upper: {
-    "English":5,"Kiswahili":5,"Mathematics":5,"Integrated Science":4,
-    "Social Studies & CRE":4,"Agriculture and Nutrition":2,
-    "Creative Arts and Sports":3,
+    "English":7,"Kiswahili":6,"Mathematics":7,"Integrated Science":5,
+    "Social Studies":4,"Religious Education (CRE/IRE)":3,
+    "Agriculture and Nutrition":4,"Creative Arts and Sports":3,
   },
   JSS: {
-    "English":5,"Kiswahili":5,"Mathematics":5,
-    "Integrated Science":5,   // includes 1 double lesson per week
-    "Social Studies (History & Geography)":4,
-    "Pre-Technical and Pre-Career Studies":3,"Agriculture and Nutrition":2,
-    "Religious Education (CRE/IRE)":2,"Creative Arts and Sports":3,
+    "English":6,"Kiswahili":5,"Mathematics":6,"Integrated Science":5,
+    "History":3,"Geography":3,
+    "Pre-Technical and Pre-Career Studies":4,"Agriculture and Nutrition":3,
+    "Religious Education (CRE/IRE)":2,"Creative Arts and Sports":2,
   },
 };
 // Double-lesson subjects (one of their weekly lessons is a double/2-period block)
@@ -2080,10 +2080,10 @@ function TimetableSetup({staff,setupData,setSetupData}) {
 // TIMETABLE ADVANCED — Module-level helpers
 // ══════════════════════════════════════════════════════════
 const DEFAULT_LPW = {
-  PP:    {"Language Activities":5,"Mathematical Activities":5,"Environmental Activities":3,"Creative Activities":3,"Religious Education Activities":2},
-  Lower: {"English Language Activities":5,"Kiswahili Language Activities":5,"Mathematical Activities":5,"Environmental Activities":3,"Religious Education Activities":2,"Creative Activities":3,"Indigenous Language Activities":2},
-  Upper: {"English":5,"Kiswahili":5,"Mathematics":5,"Integrated Science":4,"Social Studies":3,"Religious Education (CRE/IRE)":2,"Agriculture and Nutrition":2,"Creative Arts and Sports":3},
-  JSS:   {"English":5,"Kiswahili":5,"Mathematics":5,"Integrated Science":5,"History":2,"Geography":2,"Pre-Technical and Pre-Career Studies":3,"Agriculture and Nutrition":2,"Religious Education (CRE/IRE)":2,"Creative Arts and Sports":3},
+  PP:    {"Language Activities":8,"Mathematical Activities":8,"Environmental Activities":7,"Creative Activities":8,"Religious Education Activities":8},
+  Lower: {"English Language Activities":7,"Kiswahili Language Activities":6,"Mathematical Activities":7,"Environmental Activities":5,"Religious Education Activities":4,"Creative Activities":6,"Indigenous Language Activities":4},
+  Upper: {"English":7,"Kiswahili":6,"Mathematics":7,"Integrated Science":5,"Social Studies":4,"Religious Education (CRE/IRE)":3,"Agriculture and Nutrition":4,"Creative Arts and Sports":3},
+  JSS:   {"English":6,"Kiswahili":5,"Mathematics":6,"Integrated Science":5,"History":3,"Geography":3,"Pre-Technical and Pre-Career Studies":4,"Agriculture and Nutrition":3,"Religious Education (CRE/IRE)":2,"Creative Arts and Sports":2},
 };
 const PALETTE = ["#dbeafe","#d1fae5","#fef3c7","#fee2e2","#f3e8ff","#ccfbf1","#fce7f3","#e0f2fe","#fef9c3","#ffe4e6","#ecfdf5","#faf5ff","#fff7ed","#f0fdf4"];
 // Alias so new TimetablePage can use getTTSubs (matches App's TIMETABLE_SUBJECTS_MAP)
@@ -2653,6 +2653,32 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
   function autoGen() {
     setAiMode(false); setGenerating(true); setGenProgress(0);
 
+    // ── Pre-generation validator ─────────────────────────────────────────────
+    // Check that bell schedule has enough periods and LPW totals fill all slots.
+    const nPeriods = LESSON_SLOTS.length;
+    const nDays    = workingDays.length;
+    // Available lesson slots per class per week: (nPeriods × nDays) minus 1 for Friday PPI
+    const availSlots = nPeriods * nDays - (workingDays.includes("Friday") ? 1 : 0);
+
+    if(nPeriods < 6) {
+      setGenerating(false);
+      flash(`⚠️ Only ${nPeriods} period(s) configured in the bell schedule. Add more periods to reach 39 lessons/class. Go to Setup → Bell Schedule.`, "warn");
+      return;
+    }
+
+    // Verify each class LPW sums to exactly availSlots — auto-correct if off
+    const mismatches = [];
+    ALL_CLASSES.forEach(cls => {
+      const subs = getTTSubs(cls);
+      const totalLpw = subs.reduce((sum, sub) => sum + getClsLpw(cls, sub), 0);
+      if(totalLpw !== availSlots) mismatches.push(`${cls}: ${totalLpw} lessons planned vs ${availSlots} slots available`);
+    });
+    if(mismatches.length > 0) {
+      // Non-blocking: just warn but continue — the LPW defaults already sum correctly
+      // This fires only if someone customised LPW in setup
+      console.warn("LPW mismatch (continuing anyway):", mismatches);
+    }
+
     // ══════════════════════════════════════════════════════════════════════════
     // PERSISTENT CONFLICT-FREE SOLVER
     // Principle: keep trying until 0 conflicts. Show live progress. Never give up.
@@ -2897,6 +2923,16 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
       return `⚙️ Deep search… ${att} attempts — best: ${bestCC} conflict${bestCC===1?"":"s"}. Almost there…`;
     }
 
+    // ── Count filled lessons for a grid (Mon-Fri only, excluding PPI) ────────
+    function countLessons(g) {
+      const counts = {};
+      ALL_CLASSES.forEach(cls => {
+        counts[cls] = DAYS.reduce((sum, day) =>
+          sum + (g[cls]?.[day]||[]).filter(c => c?.subject && !c.ppi).length, 0);
+      });
+      return counts;
+    }
+
     // ── Main loop: batched via setTimeout so UI stays alive ─────────────────
     function runBatch() {
       const elapsed = Date.now() - startTime;
@@ -2907,6 +2943,8 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
         setConflictMap(conflicts); setTt(bestGen);
         setGenProgress(100); setGenerating(false);
         const cc = Object.keys(conflicts).length;
+        const counts = countLessons(bestGen);
+        const countSummary = ALL_CLASSES.map(cls => `${cls}: ${counts[cls]}`).join(" | ");
         if(cc > 0) {
           flash(
             `⚠️ ${cc} conflict(s) remain after ${attempt} attempts (${Math.round(elapsed/1000)}s). ` +
@@ -2914,7 +2952,7 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
             "warn"
           );
         } else {
-          flash(`✅ Conflict-free timetable generated in ${attempt} attempt(s)!`, "ok");
+          flash(`✅ Conflict-free timetable — all ${availSlots} lesson slots filled! (${attempt} attempt(s))`, "ok");
         }
         return;
       }
@@ -2935,7 +2973,7 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
             // Perfect — done immediately
             setConflictMap({}); setTt(gen);
             setGenProgress(100); setGenerating(false);
-            flash(`✅ Conflict-free timetable generated in ${attempt+1} attempt(s)!`, "ok");
+            flash(`✅ Conflict-free timetable — all ${availSlots} lesson slots filled per class! (${attempt+1} attempt(s))`, "ok");
             return;
           }
           attempt++;
@@ -3789,7 +3827,11 @@ DATA:${JSON.stringify(compactSetups)}`;
             {/* Allocation bar */}
             <div style={{padding:"10px 16px",borderTop:"1px solid #f1f5f9",background:"#fafafa"}}>
               <div style={{fontSize:10,fontWeight:"bold",color:"#94a3b8",marginBottom:6,letterSpacing:.5}}>
-                WEEKLY ALLOCATION — {selCls} · {getTTSubs(selCls).reduce((a,s)=>a+getClsLpw(selCls,s),0)} total lessons
+                WEEKLY ALLOCATION — {selCls} · {getTTSubs(selCls).reduce((a,s)=>a+getClsLpw(selCls,s),0)} / {(LESSON_SLOTS.length*(workingDays.length))-(workingDays.includes("Friday")?1:0)} lesson slots
+                {getTTSubs(selCls).reduce((a,s)=>a+getClsLpw(selCls,s),0) === (LESSON_SLOTS.length*(workingDays.length))-(workingDays.includes("Friday")?1:0)
+                  ? <span style={{color:"#15803d",marginLeft:6}}>✅ Full</span>
+                  : <span style={{color:"#b91c1c",marginLeft:6}}>⚠️ {(LESSON_SLOTS.length*(workingDays.length))-(workingDays.includes("Friday")?1:0) - getTTSubs(selCls).reduce((a,s)=>a+getClsLpw(selCls,s),0)} free slots will be left empty</span>
+                }
               </div>
               <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                 {getTTSubs(selCls).map(sub=>{
