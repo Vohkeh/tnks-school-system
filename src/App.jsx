@@ -2880,7 +2880,7 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
                   gen[cls][day][si]   = {...target, period:LESSON_SLOTS[si]?.period||(si+1)};
                   gen[cls][tDay][tSi] = {...cell,   period:LESSON_SLOTS[tSi]?.period||(tSi+1)};
                   delete bm[`${teacher}::${day}::${si}`];
-                  if(tt2!==\TBD\){ delete bm[`${tt2}::${tDay}::${tSi}`]; bm[`${tt2}::${day}::${si}`]=cls; }
+                  if(tt2!=="TBD"){ delete bm[`${tt2}::${tDay}::${tSi}`]; bm[`${tt2}::${day}::${si}`]=cls; }
                   bm[`${teacher}::${tDay}::${tSi}`] = cls;
                   moved = true; anyMoved = true; break;
                 }
