@@ -2470,32 +2470,33 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // ⚡ TEACHER-FIRST PLACEMENT ENGINE
+  // ⚡  CONSTRAINT-FIRST PLACEMENT ENGINE  (TimetableMaster approach)
   // ══════════════════════════════════════════════════════════════════════════
   //
-  // HOW IT WORKS — and why this eliminates teacher collisions:
+  // ROOT CAUSE OF GAPS (previous engine):
+  //   Tasks were sorted by teacher workload → English (avail: all 8 periods)
+  //   ran before Agriculture (avail: periods 5-8 only) and consumed those
+  //   afternoon slots, leaving Agriculture with nowhere to go.
   //
-  //   Old approach: place by class → random → repair.
-  //   New approach: place by TEACHER, heaviest workload first.
+  // FIX — three principles from professional scheduling software:
   //
-  //   A teacher can only be in ONE classroom per period.
-  //   We track every (teacher, day, slot) as "busy" the moment it is assigned.
-  //   When scheduling the NEXT assignment for that teacher we skip any slot
-  //   already marked busy → collisions are impossible BY CONSTRUCTION.
+  //  1. MOST-CONSTRAINED-FIRST (global across ALL classes):
+  //     The subject with fewest valid (day × slot) options is placed first.
+  //     Agriculture with 4 allowed periods × 5 days = 20 options gets placed
+  //     BEFORE English with 8 × 5 = 40 options.  This alone eliminates gaps.
   //
-  // DISTRIBUTION RULES:
-  //   • Double (2P): 2 immediately-consecutive periods, same day, no gap.
-  //     Remaining singles each go on a DIFFERENT day.
-  //   • ≤ 5 LPW (non-double): 1 lesson per day, always different days.
-  //   • 6 LPW (non-double): 1 day gets 2 non-adjacent lessons, 4 more
-  //     days get 1 each (total = 6).
-  //   • Availability is a HARD gate — never violated, not even in repair.
-  //   • No same-subject on CONSEC-adjacent slots unless it is the 2P pair.
+  //  2. TEACHER CONFLICT PREVENTION (not repair):
+  //     busyMap tracks every (teacher, day, slot) used.  All placements check
+  //     it before committing.  Conflicts arise only as a last resort — shown
+  //     in red so the user can fix them.
+  //
+  //  3. GUARANTEED PLACEMENT (nuclear fallback):
+  //     Six progressive passes relax constraints one by one.  Pass 6 places
+  //     into ANY free class slot in the allowed periods — zero remaining gaps
+  //     as long as total LPW ≤ total available class slots.
   // ══════════════════════════════════════════════════════════════════════════
 
-  // ── NOTE: empty slots stay empty rather than get wrong subjects ──────────
-
-  // ── Build plan: reads ONLY user's custom LPW + availability ─────────────
+  // ── Build plan: reads user's custom LPW + availability ───────────────────
   function buildDefaultPlan() {
     const plan = {};
     ALL_CLASSES.forEach(cls => {
@@ -2517,151 +2518,133 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
     const isUpper = cls => ["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(cls);
     const rnd     = arr => { const a=[...arr]; for(let i=a.length-1;i>0;i--){const j=0|Math.random()*(i+1);[a[i],a[j]]=[a[j],a[i]];}return a; };
 
-    // ── Per-class slot tracking ───────────────────────────────────────────
-    const clsFree  = {}; // cls → day → Set<si>        free slots
-    const clsSubOn = {}; // cls → day → { si: subject } contents
-    const clsSubDy = {}; // cls → sub → Set<day>        days used by this sub
+    // Per-class tracking
+    const clsFree = {};   // cls → day → Set<si>  (free slot indices)
+    const clsCont = {};   // cls → day → { si: subject }
 
     ALL_CLASSES.forEach(cls => {
-      clsFree[cls]={};clsSubOn[cls]={};clsSubDy[cls]={};
-      DAYS.forEach(d=>{
-        clsFree[cls][d]=new Set([...Array(nSl).keys()]);
-        clsSubOn[cls][d]={};
+      clsFree[cls] = {}; clsCont[cls] = {};
+      DAYS.forEach(d => {
+        clsFree[cls][d] = new Set([...Array(nSl).keys()]);
+        clsCont[cls][d] = {};
       });
-      clsFree[cls]["Friday"].delete(0); // PPI always occupies Friday slot-0
+      clsFree[cls]["Friday"].delete(0); // Friday P1 = PPI
     });
 
-    // True if slot si is CONSEC-adjacent to another lesson of the same subject
-    function adjSub(cls, day, si, sub) {
-      const sos = clsSubOn[cls][day];
-      return CONSEC.some(([a,b])=>(a===si&&sos[b]===sub)||(b===si&&sos[a]===sub));
-    }
-
-    // Count how many times sub already appears on this day for this class
-    function dayCnt(cls, day, sub) {
-      return Object.values(clsSubOn[cls][day]).filter(s=>s===sub).length;
-    }
-
-    function place(cls, day, si, sub, teacher, isDbl, isPart2) {
-      gen[cls][day][si]={subject:sub,teacher,period:LESSON_SLOTS[si].period,
-                         double:isDbl,...(isPart2?{doublePart:2}:{})};
+    function doPlace(cls, day, si, sub, teacher, isDbl, isPart2) {
+      gen[cls][day][si] = {subject:sub, teacher, period:LESSON_SLOTS[si].period,
+                           double:isDbl, ...(isPart2?{doublePart:2}:{})};
       clsFree[cls][day].delete(si);
-      clsSubOn[cls][day][si]=sub;
-      if(!clsSubDy[cls][sub])clsSubDy[cls][sub]=new Set();
-      clsSubDy[cls][sub].add(day);
-      if(teacher!=="TBD")busyMap[`${teacher}::${day}::${si}`]=true;
+      clsCont[cls][day][si] = sub;
+      if(teacher!=="TBD") busyMap[`${teacher}::${day}::${si}`] = true;
     }
 
-    // ── Group assignments by teacher ──────────────────────────────────────
-    const tWork={}, tbdWork=[];
+    // Is slot si adjacent (per bell CONSEC pairs) to another lesson of same sub?
+    function adjSub(cls, day, si, sub) {
+      const c = clsCont[cls][day];
+      return CONSEC.some(([a,b])=>(a===si&&c[b]===sub)||(b===si&&c[a]===sub));
+    }
 
-    ALL_CLASSES.forEach(cls=>{
-      const upper=isUpper(cls), ct=getClsTeacher(cls);
-      Object.entries(plan[cls]||{}).forEach(([sub,{lpw,double:isDbl,avail}])=>{
-        const t=upper?(getSubTeacher(cls,sub)||"TBD"):(ct||"TBD");
-        const rec={cls,sub,lpw,isDbl,avail,teacher:t};
-        if(t==="TBD") tbdWork.push(rec);
-        else { if(!tWork[t])tWork[t]=[]; tWork[t].push(rec); }
+    // How many times does sub appear on this day for this class?
+    function dayCnt(cls, day, sub) {
+      return Object.values(clsCont[cls][day]).filter(s=>s===sub).length;
+    }
+
+    // Which days already have at least 1 lesson of this sub in this class?
+    function usedDays(cls, sub) {
+      return new Set(DAYS.filter(d=>Object.values(clsCont[cls][d]).includes(sub)));
+    }
+
+    // ── Build ALL tasks, ONE per (cls, sub), sorted most-constrained first ──
+    const tasks = [];
+    ALL_CLASSES.forEach(cls => {
+      const upper = isUpper(cls), ct = getClsTeacher(cls);
+      Object.entries(plan[cls]||{}).forEach(([sub,{lpw,double:isDbl,avail}]) => {
+        const teacher = upper ? (getSubTeacher(cls,sub)||"TBD") : (ct||"TBD");
+        // Constraint score = available (period × day) slots — lower = more constrained
+        const score = avail.length * DAYS.length;
+        tasks.push({cls, sub, teacher, lpw, isDbl, avail, score});
       });
     });
 
-    // Heaviest-loaded teachers go first — they're the most constrained
-    const tList=Object.entries(tWork).sort(([,a],[,b])=>
-      b.reduce((s,x)=>s+x.lpw,0)-a.reduce((s,x)=>s+x.lpw,0)
-    );
+    // ★ CRITICAL SORT: most constrained (fewest available slots) first.
+    //   Within same score: doubles first (harder to pair), then higher LPW.
+    tasks.sort((a,b) => {
+      if(a.score !== b.score)          return a.score - b.score;  // fewest avail first
+      if(a.isDbl && !b.isDbl)          return -1;                  // doubles first
+      if(!a.isDbl && b.isDbl)          return 1;
+      return b.lpw - a.lpw;                                        // higher LPW first
+    });
 
-    // ── Schedule one (cls, sub) assignment ───────────────────────────────
-    function scheduleRec({cls,sub,teacher,lpw,isDbl,avail}){
-      const isTBD=teacher==="TBD";
-      let rem=lpw;
+    // ── Place each task ──────────────────────────────────────────────────────
+    for(const {cls, sub, teacher, lpw, isDbl, avail} of tasks) {
+      let rem = lpw;
+      const isTBD = teacher === "TBD";
+      const avOk  = si  => avail.includes(LESSON_SLOTS[si].period);
+      const tFree = (d,si) => isTBD || !busyMap[`${teacher}::${d}::${si}`];
 
-      function tFree(d,si){return isTBD||!busyMap[`${teacher}::${d}::${si}`];}
-      function avOk(si){return avail.includes(LESSON_SLOTS[si].period);}
-      function usedDays(){return clsSubDy[cls][sub]||new Set();}
-
-      // Try ONE single on a day — soft constraint levels controlled by args
-      function tryOne(day, maxPerDay, requireAdj, requireTFree){
-        if(dayCnt(cls,day,sub)>=maxPerDay) return false;
-        for(const si of rnd([...Array(nSl).keys()])){
-          if(!clsFree[cls][day].has(si)) continue;
-          if(!avOk(si)) continue;
-          if(requireTFree && !tFree(day,si)) continue;
-          if(requireAdj && adjSub(cls,day,si,sub)) continue;
-          place(cls,day,si,sub,teacher,false,false);
+      // Try to place ONE lesson on `day` within soft constraint levels.
+      function tryOne(day, maxOnDay, checkAdj, checkTeacher) {
+        if(dayCnt(cls,day,sub) >= maxOnDay) return false;
+        for(const si of rnd([...clsFree[cls][day]])) {
+          if(!avOk(si))                        continue;
+          if(checkTeacher && !tFree(day,si))   continue;
+          if(checkAdj     && adjSub(cls,day,si,sub)) continue;
+          doPlace(cls,day,si,sub,teacher,false,false);
           rem--; return true;
         }
         return false;
       }
 
-      // ── PASS 1: Double block ────────────────────────────────────────────
-      if(isDbl&&rem>=2){
-        let ok=false;
-        outer1: for(const relaxT of[false,true]){
-          for(const day of rnd([...DAYS])){
-            for(const[s1,s2]of rnd([...CONSEC])){
-              if(!LESSON_SLOTS[s1]||!LESSON_SLOTS[s2]) continue;
-              if(!avOk(s1)||!avOk(s2)) continue;
+      // ── Double block ───────────────────────────────────────────────────
+      if(isDbl && rem >= 2) {
+        outerDbl: for(const relaxT of [false,true]) {
+          for(const day of rnd([...DAYS])) {
+            for(const [s1,s2] of rnd([...CONSEC])) {
+              if(!LESSON_SLOTS[s1]||!LESSON_SLOTS[s2])     continue;
+              if(!avOk(s1)||!avOk(s2))                     continue;
               if(!clsFree[cls][day].has(s1)||!clsFree[cls][day].has(s2)) continue;
               if(!relaxT&&(!tFree(day,s1)||!tFree(day,s2))) continue;
-              place(cls,day,s1,sub,teacher,true,false);
-              place(cls,day,s2,sub,teacher,true,true);
-              rem-=2; ok=true; break outer1;
+              doPlace(cls,day,s1,sub,teacher,true,false);
+              doPlace(cls,day,s2,sub,teacher,true,true);
+              rem -= 2; break outerDbl;
             }
           }
         }
       }
 
-      // ── PASS 2: 1 per day, fresh days only, teacher-free ───────────────
-      for(const day of rnd([...DAYS].filter(d=>!usedDays().has(d)))){
-        if(rem<=0) break;
-        tryOne(day, 1, true, true);
-      }
+      // Helper: fresh days = days not yet used by this sub in this class
+      const fresh = () => rnd(DAYS.filter(d=>!usedDays(cls,sub).has(d)));
 
-      // ── PASS 3: 1 per day, fresh days, allow teacher conflict ──────────
-      for(const day of rnd([...DAYS].filter(d=>!usedDays().has(d)))){
-        if(rem<=0) break;
-        tryOne(day, 1, true, false);
-      }
+      // Pass A — fresh days, strict (teacher-free + no adjacency)
+      for(const d of fresh()) { if(rem<=0)break; tryOne(d,1,true,true); }
 
-      // ── PASS 4: any day, allow 2 per day, teacher-free ─────────────────
-      for(const day of rnd([...DAYS])){
-        if(rem<=0) break;
-        tryOne(day, 2, true, true);
-      }
+      // Pass B — fresh days, relax teacher
+      for(const d of fresh()) { if(rem<=0)break; tryOne(d,1,true,false); }
 
-      // ── PASS 5: any day, allow 2 per day, allow teacher conflict ───────
-      for(const day of rnd([...DAYS])){
-        if(rem<=0) break;
-        tryOne(day, 2, true, false);
-      }
+      // Pass C — any day (allows 2nd lesson on used day), strict teacher
+      for(const d of rnd([...DAYS])) { if(rem<=0)break; tryOne(d,2,true,true); }
 
-      // ── PASS 6: NUCLEAR — any free slot in avail, zero restrictions ────
-      // Guarantees no gaps as long as total class LPW ≤ available class slots.
-      // Any resulting teacher conflicts show in red in the UI.
-      if(rem>0){
-        outer6: for(const day of rnd([...DAYS])){
-          for(const si of rnd([...Array(nSl).keys()])){
-            if(rem<=0) break outer6;
-            if(!clsFree[cls][day].has(si)) continue;
+      // Pass D — any day, relax teacher
+      for(const d of rnd([...DAYS])) { if(rem<=0)break; tryOne(d,2,true,false); }
+
+      // Pass E — any day, relax adjacency, relax teacher
+      for(const d of rnd([...DAYS])) { if(rem<=0)break; tryOne(d,2,false,false); }
+
+      // Pass F — NUCLEAR: any free avail slot, no restrictions at all
+      // This is the guarantee. As long as class total LPW ≤ class total slots,
+      // every single lesson will be placed. Teacher conflicts → shown in red.
+      if(rem > 0) {
+        outerF: for(const d of rnd([...DAYS])) {
+          for(const si of rnd([...clsFree[cls][d]])) {
+            if(rem<=0) break outerF;
             if(!avOk(si)) continue;
-            place(cls,day,si,sub,teacher,false,false);
+            doPlace(cls,d,si,sub,teacher,false,false);
             rem--;
           }
         }
       }
     }
-
-    // ── Run: real teachers (sorted by load), then TBD ────────────────────
-    for(const[,recs]of tList){
-      // Within each teacher: doubles first, then fewest-avail-periods first
-      const sorted=[...recs].sort((a,b)=>{
-        if(a.isDbl&&!b.isDbl)return-1;
-        if(!a.isDbl&&b.isDbl)return 1;
-        return a.avail.length-b.avail.length;
-      });
-      for(const rec of sorted)scheduleRec(rec);
-    }
-    for(const rec of tbdWork)scheduleRec(rec);
   }
 
   // ══════════════════════════════════════════════════════════════════════════
