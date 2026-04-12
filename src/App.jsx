@@ -2575,78 +2575,77 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
       const isTBD=teacher==="TBD";
       let rem=lpw;
 
-      // Hard gates
       function tFree(d,si){return isTBD||!busyMap[`${teacher}::${d}::${si}`];}
       function avOk(si){return avail.includes(LESSON_SLOTS[si].period);}
+      function usedDays(){return clsSubDy[cls][sub]||new Set();}
 
-      // Try to place ONE single lesson on `day`.
-      // allowSecond: allow a 2nd lesson of this sub on this day (6-LPW rule only).
-      // relaxT: if true, accept even if teacher is technically busy
-      //         (only used as absolute last resort — may create a conflict
-      //          that the post-pass repair will fix).
-      function tryOne(day, allowSecond, relaxT){
-        if(dayCnt(cls,day,sub)>=(allowSecond?2:1))return false;
+      // Try ONE single on a day — soft constraint levels controlled by args
+      function tryOne(day, maxPerDay, requireAdj, requireTFree){
+        if(dayCnt(cls,day,sub)>=maxPerDay) return false;
         for(const si of rnd([...Array(nSl).keys()])){
-          if(!clsFree[cls][day].has(si))continue;
-          if(!avOk(si))continue;
-          if(!relaxT&&!tFree(day,si))continue;
-          if(adjSub(cls,day,si,sub))continue;
+          if(!clsFree[cls][day].has(si)) continue;
+          if(!avOk(si)) continue;
+          if(requireTFree && !tFree(day,si)) continue;
+          if(requireAdj && adjSub(cls,day,si,sub)) continue;
           place(cls,day,si,sub,teacher,false,false);
           rem--; return true;
         }
         return false;
       }
 
-      // ── 1. Double block (2P) ────────────────────────────────────────────
+      // ── PASS 1: Double block ────────────────────────────────────────────
       if(isDbl&&rem>=2){
         let ok=false;
-        for(const relaxT of[false,true]){
-          if(ok)break;
+        outer1: for(const relaxT of[false,true]){
           for(const day of rnd([...DAYS])){
             for(const[s1,s2]of rnd([...CONSEC])){
-              if(!LESSON_SLOTS[s1]||!LESSON_SLOTS[s2])continue;
-              if(!avOk(s1)||!avOk(s2))continue;
-              if(!clsFree[cls][day].has(s1)||!clsFree[cls][day].has(s2))continue;
-              if(!relaxT&&(!tFree(day,s1)||!tFree(day,s2)))continue;
+              if(!LESSON_SLOTS[s1]||!LESSON_SLOTS[s2]) continue;
+              if(!avOk(s1)||!avOk(s2)) continue;
+              if(!clsFree[cls][day].has(s1)||!clsFree[cls][day].has(s2)) continue;
+              if(!relaxT&&(!tFree(day,s1)||!tFree(day,s2))) continue;
               place(cls,day,s1,sub,teacher,true,false);
               place(cls,day,s2,sub,teacher,true,true);
-              rem-=2; ok=true; break;
+              rem-=2; ok=true; break outer1;
             }
-            if(ok)break;
           }
         }
       }
 
-      // ── 2. Singles — strictly 1 per FRESH day ──────────────────────────
-      for(const relaxT of[false,true]){
-        if(rem<=0)break;
-        const fresh=rnd([...DAYS].filter(d=>!(clsSubDy[cls][sub]||new Set()).has(d)));
-        for(const day of fresh){
-          if(rem<=0)break;
-          tryOne(day,false,relaxT);
-        }
+      // ── PASS 2: 1 per day, fresh days only, teacher-free ───────────────
+      for(const day of rnd([...DAYS].filter(d=>!usedDays().has(d)))){
+        if(rem<=0) break;
+        tryOne(day, 1, true, true);
       }
 
-      // ── 3. For 6-LPW: add 1 extra on an already-used day (non-adjacent) ─
-      if(!isDbl&&lpw>=6&&rem>0){
-        const used=rnd([...DAYS].filter(d=>(clsSubDy[cls][sub]||new Set()).has(d)));
-        for(const relaxT of[false,true]){
-          let placed=false;
-          for(const day of used){
-            if(rem<=0||placed)break;
-            if(tryOne(day,true,relaxT)){placed=true;}
-          }
-          if(placed)break;
-        }
+      // ── PASS 3: 1 per day, fresh days, allow teacher conflict ──────────
+      for(const day of rnd([...DAYS].filter(d=>!usedDays().has(d)))){
+        if(rem<=0) break;
+        tryOne(day, 1, true, false);
       }
 
-      // ── 4. Last resort: any day (avail & adjacency still hard-gated) ────
+      // ── PASS 4: any day, allow 2 per day, teacher-free ─────────────────
+      for(const day of rnd([...DAYS])){
+        if(rem<=0) break;
+        tryOne(day, 2, true, true);
+      }
+
+      // ── PASS 5: any day, allow 2 per day, allow teacher conflict ───────
+      for(const day of rnd([...DAYS])){
+        if(rem<=0) break;
+        tryOne(day, 2, true, false);
+      }
+
+      // ── PASS 6: NUCLEAR — any free slot in avail, zero restrictions ────
+      // Guarantees no gaps as long as total class LPW ≤ available class slots.
+      // Any resulting teacher conflicts show in red in the UI.
       if(rem>0){
-        for(const relaxT of[false,true]){
-          if(rem<=0)break;
-          for(const day of rnd([...DAYS])){
-            if(rem<=0)break;
-            tryOne(day,true,relaxT);
+        outer6: for(const day of rnd([...DAYS])){
+          for(const si of rnd([...Array(nSl).keys()])){
+            if(rem<=0) break outer6;
+            if(!clsFree[cls][day].has(si)) continue;
+            if(!avOk(si)) continue;
+            place(cls,day,si,sub,teacher,false,false);
+            rem--;
           }
         }
       }
