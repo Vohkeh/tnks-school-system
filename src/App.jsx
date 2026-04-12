@@ -2532,9 +2532,11 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
         const sorted = [...subs].sort((a,b) => rawLpw[b] - rawLpw[a]);
         sorted.forEach((sub, i) => {
           if(i === sorted.length - 1) {
-            scaledLpw[sub] = Math.max(1, remaining); // give remainder to last
+            // Give all remaining to last subject (clamp to at least 1)
+            scaledLpw[sub] = Math.max(1, remaining);
           } else {
-            const v = Math.max(1, Math.round(rawLpw[sub] * scale));
+            // Round proportionally but never below 1 and never steal from remaining
+            const v = Math.min(remaining - (sorted.length - 1 - i), Math.max(1, Math.round(rawLpw[sub] * scale)));
             scaledLpw[sub] = v;
             remaining -= v;
           }
@@ -3197,13 +3199,22 @@ DATA:${JSON.stringify(compactSetups)}`;
 
   // ── Dashboard stats ───────────────────────────────────────────────────────
   const totalConflicts   = Object.keys(conflictMap).length;
+  // Count every filled slot (including PPI) — target is periods×days per class
   const totalScheduled   = ALL_CLASSES.reduce((sum,cls)=>sum+DAYS.reduce((s2,d)=>s2+((tt[cls]?.[d]||[]).filter(c=>c?.subject).length),0),0);
-  const totalPossible    = ALL_CLASSES.length * DAYS.length * LESSON_SLOTS.length;
+  // Target: all LESSON_SLOTS × all working days × all classes
+  const totalPossible    = ALL_CLASSES.length * workingDays.length * LESSON_SLOTS.length;
   const coverage         = totalPossible > 0 ? Math.round(totalScheduled/totalPossible*100) : 0;
+  // Per-class lesson count for display
+  const perClassLessons  = ALL_CLASSES.map(cls => ({
+    cls,
+    count: workingDays.reduce((s,d) => s + ((tt[cls]?.[d]||[]).filter(c=>c?.subject).length), 0),
+    target: LESSON_SLOTS.length * workingDays.length,
+  }));
+  const allClassesFull   = perClassLessons.every(x => x.count === x.target);
   const teacherLoad      = {};
-  ALL_CLASSES.forEach(cls => DAYS.forEach(day => {
+  ALL_CLASSES.forEach(cls => workingDays.forEach(day => {
     (tt[cls]?.[day]||[]).forEach(cell => {
-      if(cell?.teacher && cell.teacher!=="TBD") {
+      if(cell?.teacher && cell.teacher!=="TBD" && !cell.teacher.includes("All Staff") && !cell.ppi) {
         const t = cell.teacher.replace("*","");
         teacherLoad[t] = (teacherLoad[t]||0) + 1;
       }
@@ -3459,7 +3470,7 @@ DATA:${JSON.stringify(compactSetups)}`;
               </button>
               <button onClick={autoGen} disabled={generating}
                 style={{background:generating&&!aiMode?"#94a3b8":"linear-gradient(135deg,#15803d,#065f46)",color:"white",border:"none",borderRadius:10,padding:"9px 18px",cursor:generating?"not-allowed":"pointer",fontFamily:FT,fontSize:13,fontWeight:"bold",display:"flex",alignItems:"center",gap:7,boxShadow:"0 2px 8px rgba(21,128,61,.3)"}}>
-                {generating&&!aiMode ? <>⚙️ Solving… (please wait)</> : <>⚡ Auto-Generate</>}
+                {generating&&!aiMode ? (genProgress<15 ? <>⚡ Stage 1: Filling…</> : <>⚙️ Stage 2: Optimising…</>) : <>⚡ Auto-Generate</>}
               </button>
               <button onClick={aiGenerate} disabled={generating}
                 style={{background:generating&&aiMode?"#94a3b8":"linear-gradient(135deg,#7c3aed,#4c1d95)",color:"white",border:"none",borderRadius:10,padding:"9px 18px",cursor:generating?"not-allowed":"pointer",fontFamily:FT,fontSize:13,fontWeight:"bold",display:"flex",alignItems:"center",gap:7,boxShadow:"0 2px 8px rgba(124,58,237,.3)"}}>
@@ -3730,10 +3741,14 @@ DATA:${JSON.stringify(compactSetups)}`;
       {tab==="dashboard" && (
         <div style={{display:"grid",gap:16}}>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:12}}>
-            <TMStat icon="📅" value={`${coverage}%`} label="Schedule Coverage" color="#1d4ed8" sub={`${totalScheduled}/${totalPossible} slots`}/>
-            <TMStat icon="⚠️" value={totalConflicts} label="Conflicts" color={totalConflicts>0?"#b91c1c":"#15803d"} sub={totalConflicts?"Resolve in Timetable tab":"All clear!"}/>
-            <TMStat icon="👨‍🏫" value={allTeachers.length} label="Teaching Staff" color="#7c3aed"/>
-            <TMStat icon="🏫" value={ALL_CLASSES.length} label="Classes" color="#0e7490"/>
+            <TMStat icon="📅" value={`${coverage}%`} label="Slot Fill Rate" color="#1d4ed8"
+              sub={allClassesFull ? `✅ All ${ALL_CLASSES.length} classes fully filled` : `${totalScheduled}/${totalPossible} slots — ${perClassLessons.filter(x=>x.count<x.target).length} class(es) incomplete`}/>
+            <TMStat icon="⚠️" value={totalConflicts} label="Teacher Conflicts" color={totalConflicts>0?"#b91c1c":"#15803d"}
+              sub={totalConflicts>0?"Stage 2 is resolving — or click Stop":"✅ Zero conflicts!"}/>
+            <TMStat icon="👨‍🏫" value={allTeachers.length} label="Teaching Staff" color="#7c3aed"
+              sub={`${Object.keys(teacherLoad).length} assigned in timetable`}/>
+            <TMStat icon="🏫" value={`${LESSON_SLOTS.length * workingDays.length - (workingDays.includes("Friday")?1:0)}`} label="Lessons/Class/Week" color="#0e7490"
+              sub={`${LESSON_SLOTS.length} periods × ${workingDays.filter(d=>d!=="Saturday"&&d!=="Sunday").length} days − 1 PPI`}/>
           </div>
           {/* Teacher workload */}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
@@ -3886,13 +3901,20 @@ DATA:${JSON.stringify(compactSetups)}`;
             </div>
             {/* Allocation bar */}
             <div style={{padding:"10px 16px",borderTop:"1px solid #f1f5f9",background:"#fafafa"}}>
-              <div style={{fontSize:10,fontWeight:"bold",color:"#94a3b8",marginBottom:6,letterSpacing:.5}}>
-                WEEKLY ALLOCATION — {selCls} · {getTTSubs(selCls).reduce((a,s)=>a+getClsLpw(selCls,s),0)} / {(LESSON_SLOTS.length*(workingDays.length))-(workingDays.includes("Friday")?1:0)} lesson slots
-                {getTTSubs(selCls).reduce((a,s)=>a+getClsLpw(selCls,s),0) === (LESSON_SLOTS.length*(workingDays.length))-(workingDays.includes("Friday")?1:0)
-                  ? <span style={{color:"#15803d",marginLeft:6}}>✅ Full</span>
-                  : <span style={{color:"#b91c1c",marginLeft:6}}>⚠️ {(LESSON_SLOTS.length*(workingDays.length))-(workingDays.includes("Friday")?1:0) - getTTSubs(selCls).reduce((a,s)=>a+getClsLpw(selCls,s),0)} free slots will be left empty</span>
-                }
-              </div>
+              {(()=>{
+                const rawTotal  = getTTSubs(selCls).reduce((a,s)=>a+getClsLpw(selCls,s),0);
+                const tgtSlots  = LESSON_SLOTS.length * workingDays.length - (workingDays.includes("Friday")?1:0);
+                const isExact   = rawTotal === tgtSlots;
+                return (
+                  <div style={{fontSize:10,fontWeight:"bold",color:"#94a3b8",marginBottom:6,letterSpacing:.5}}>
+                    WEEKLY ALLOCATION — {selCls} · {rawTotal} / {tgtSlots} lesson slots
+                    {isExact
+                      ? <span style={{color:"#15803d",marginLeft:6}}>✅ Exactly {tgtSlots} — fully filled</span>
+                      : <span style={{color:"#b45309",marginLeft:6}}>⚠️ Will auto-scale to {tgtSlots} at generation</span>
+                    }
+                  </div>
+                );
+              })()}
               <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                 {getTTSubs(selCls).map(sub=>{
                   const n=getClsLpw(selCls,sub); const dbl=getClsDouble(selCls,sub);
@@ -3984,6 +4006,8 @@ DATA:${JSON.stringify(compactSetups)}`;
             const clsSubs = getTTSubs(cls);
             const isUp    = ["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(cls);
             const totalLpw = clsSubs.reduce((a,s)=>a+getClsLpw(cls,s),0);
+            const targetSlots = LESSON_SLOTS.length * workingDays.length - (workingDays.includes("Friday")?1:0);
+            const lpwMatchesTarget = totalLpw === targetSlots;
             const assigned = isUp ? clsSubs.filter(s=>getSubTeacher(cls,s)).length : (getClsTeacher(cls)?clsSubs.length:0);
             const complete = assigned===clsSubs.length;
             return (
@@ -3995,7 +4019,10 @@ DATA:${JSON.stringify(compactSetups)}`;
                     </div>
                     <div>
                       <div style={{fontWeight:"bold",color:"#1e3a5f",fontSize:14}}>{cls}</div>
-                      <div style={{fontSize:11,color:"#64748b"}}>{clsSubs.length} subjects · {totalLpw} lessons/wk</div>
+                      <div style={{fontSize:11,color:lpwMatchesTarget?"#15803d":"#b45309",fontWeight:lpwMatchesTarget?"normal":"bold"}}>
+                        {clsSubs.length} subjects · {totalLpw}/{targetSlots} lessons/wk
+                        {lpwMatchesTarget ? " ✅" : ` ⚠️ auto-scales to ${targetSlots}`}
+                      </div>
                     </div>
                   </div>
                   <span style={{fontSize:11,fontWeight:"bold",padding:"3px 10px",borderRadius:20,background:complete?"#dcfce7":"#fef3c7",color:complete?"#15803d":"#b45309"}}>
