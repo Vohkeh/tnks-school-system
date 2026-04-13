@@ -20,8 +20,8 @@ const SCHOOL = {
   philosophy: "Investing in Children for Sustainability",
   website: "nyagakindikischools.sc.ke", founded: "7th January 2015",
 };
-// ── PASTE YOUR FREE GROQ KEY HERE (get one free at console.groq.com) ──────────
-const GROQ_API_KEY = "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";
+// ── PASTE YOUR FREE GEMINI KEY HERE (get one free at aistudio.google.com) ──────
+const GEMINI_API_KEY = "PASTE_YOUR_GEMINI_KEY_HERE";
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ALL_CLASSES = ["PP1","PP2","Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"];
@@ -2620,19 +2620,30 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
     const plan = {};
     ALL_CLASSES.forEach(cls => {
       plan[cls] = {};
-      const subs    = getTTSubs(cls);
-      const rawLpw  = {};
+      const subs   = getTTSubs(cls);
+      const rawLpw = {};
       subs.forEach(sub => { rawLpw[sub] = getClsLpw(cls, sub); });
       const rawTotal = subs.reduce((s, sub) => s + rawLpw[sub], 0);
 
+      // ── If the class has explicit per-class rules (DEFAULT_LPW_CLS or
+      //    user customLpw), NEVER auto-scale — use the exact values as-is.
+      //    Auto-scaling only applies to classes using generic group defaults.
+      const hasExplicitRules =
+        DEFAULT_LPW_CLS[cls] !== undefined ||
+        subs.some(sub => customLpw[`${cls}::${sub}`] !== undefined);
+
       let scaledLpw = {};
-      if(rawTotal === 0) {
-        const base = Math.floor(totalSlots / subs.length);
-        let rem    = totalSlots - base * subs.length;
-        subs.forEach((sub, i) => { scaledLpw[sub] = base + (i < rem ? 1 : 0); });
-      } else if(rawTotal === totalSlots) {
-        scaledLpw = {...rawLpw};
+      if(hasExplicitRules || rawTotal === totalSlots || rawTotal === 0) {
+        if(rawTotal === 0) {
+          const base = Math.floor(totalSlots / subs.length);
+          let rem    = totalSlots - base * subs.length;
+          subs.forEach((sub, i) => { scaledLpw[sub] = base + (i < rem ? 1 : 0); });
+        } else {
+          // Use exact values — no scaling
+          scaledLpw = {...rawLpw};
+        }
       } else {
+        // Generic group defaults that don't sum to totalSlots — scale proportionally
         const scale   = totalSlots / rawTotal;
         let remaining = totalSlots;
         const sorted  = [...subs].sort((a,b) => rawLpw[b] - rawLpw[a]);
