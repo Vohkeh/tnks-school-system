@@ -3685,7 +3685,7 @@ DATA:${JSON.stringify(compactSetups)}`;
         <div style={{marginBottom:14,background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:12,padding:"12px 16px"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
             <div style={{fontSize:13,color:"#15803d",fontWeight:"bold"}}>
-              {aiMode ? "🤖 AI Generating…" : genProgress < 20 ? "⚡ Stage 1: Constraint-based placement — filling all lesson slots…" : `⚙️ Stage 2: AI cost-minimisation engine running… (attempt ${attempt+1})`}
+              {aiMode ? "🤖 AI Generating…" : genProgress < 20 ? "⚡ Stage 1: Placing all lessons using constraint-based algorithm…" : "⚙️ Stage 2: Resolving teacher conflicts — optimising distribution…"}
             </div>
             {!aiMode && genProgress >= 20 && (
               <button onClick={()=>{ genStopRef.current = true; }}
