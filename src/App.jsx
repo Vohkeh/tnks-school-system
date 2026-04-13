@@ -2479,17 +2479,24 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
     return c;
   }
 
-  // ── Consecutive period pairs (no break between them in bell) ─────────────
+  // ── Valid 2P double-lesson pairs: only P1+P2, P3+P4, P5+P6, P7+P8 ────────
+  // (i.e. odd-numbered period paired with the next even-numbered period)
+  // These are pairs of LESSON_SLOT indices where both periods are truly
+  // adjacent with NO break between them in the bell schedule.
   function getConsecPairs() {
     const pairs = [];
+    // Walk the full bell schedule. A valid double pair = two period entries
+    // that appear back-to-back with NO break between them.
     for(let i = 0; i < bellPeriods.length - 1; i++) {
-      if(bellPeriods[i].type !== "period" || bellPeriods[i+1].type !== "period") continue;
+      if(bellPeriods[i].type !== "period") continue;
+      if(bellPeriods[i+1].type !== "period") continue; // break between them — skip
       const si1 = LESSON_SLOTS.findIndex(s => s.id === bellPeriods[i].id);
       const si2 = LESSON_SLOTS.findIndex(s => s.id === bellPeriods[i+1].id);
       if(si1 >= 0 && si2 >= 0) pairs.push([si1, si2]);
     }
+    // Fallback: if nothing found, pair up even-odd indices
     if(pairs.length === 0) {
-      for(let i = 0; i < LESSON_SLOTS.length - 1; i++) pairs.push([i, i+1]);
+      for(let i = 0; i < LESSON_SLOTS.length - 1; i += 2) pairs.push([i, i+1]);
     }
     return pairs;
   }
@@ -2546,19 +2553,21 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // aSc PLACEMENT ENGINE
-  // Implements your 6 scheduling rules exactly:
-  //   Rule 1: LPW=2 → 1 lesson on each of 2 different days
-  //   Rule 2: LPW=4 → 1 lesson on each of 4 different days
-  //   Rule 3: LPW=5 → 1 lesson on each of 5 days (Mon-Fri)
-  //   Rule 4: LPW=6 → 4 days × 1 lesson + 1 day × 2 NON-consecutive lessons
-  //   Rule 5: 2P flag → double (2 consecutive periods, no break) + singles
-  //   Rule 6: Availability → hard gate on all passes except final nuclear
+  // PLACEMENT ENGINE  — strict rule enforcement
+  //
+  //  LPW=2 → exactly 2 different days, 1 lesson each
+  //  LPW=4 → exactly 4 different days, 1 lesson each
+  //  LPW=5 → all 5 days, 1 lesson each (daily)
+  //  LPW=6 → all 5 days (1 each) + the 6th on any 1 day (non-consecutive with the first)
+  //  2P flag (any LPW) → place the double in a valid adjacent pair first (P1+P2,
+  //           P3+P4, P5+P6, P7+P8), then spread remaining singles on fresh days
+  //           (one per day, different from double's day and each other)
   // ══════════════════════════════════════════════════════════════════════════
   function applyPlan(plan, gen, busyMap) {
     const CONSEC = getConsecPairs();
     const nSl    = LESSON_SLOTS.length;
     const isUpper = cls => ["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(cls);
+
     const rnd = arr => {
       const a = [...arr];
       for(let i=a.length-1;i>0;i--){
@@ -2567,7 +2576,7 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
       return a;
     };
 
-    // Initialise free-slot tracking per class per day
+    // ── Free-slot tracking ────────────────────────────────────────────────────
     const clsFree = {}, clsCont = {};
     ALL_CLASSES.forEach(cls => {
       clsFree[cls] = {}; clsCont[cls] = {};
@@ -2588,149 +2597,155 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
       if(teacher !== "TBD") busyMap[`${teacher}::${day}::${si}`] = true;
     };
 
-    const dayCnt    = (cls,d,sub) => Object.values(clsCont[cls][d]||{}).filter(s=>s===sub).length;
-    const usedDays  = (cls,sub)   => new Set(workingDays.filter(d=>Object.values(clsCont[cls][d]||{}).includes(sub)));
-    const isConsecSameSub = (cls,d,si,sub) =>
-      CONSEC.some(([a,b]) => (a===si && clsCont[cls][d][b]===sub) || (b===si && clsCont[cls][d][a]===sub));
+    const dayCnt   = (cls,d,sub) => Object.values(clsCont[cls][d]||{}).filter(s=>s===sub).length;
+    const usedDays = (cls,sub)   => new Set(workingDays.filter(d=>Object.values(clsCont[cls][d]||{}).includes(sub)));
+    const avOk     = (si,avail)  => avail.includes(LESSON_SLOTS[si].period);
+    const tFree    = (teacher,d,si) => teacher==="TBD" || !busyMap[`${teacher}::${d}::${si}`];
 
-    // Build tasks — most constrained first (fewest avail×day combos)
+    // Try to place one lesson on a given day, return true on success.
+    // relax=true ignores teacher conflicts (used as fallback only).
+    const placeOnDay = (cls, day, sub, teacher, avail, relax=false) => {
+      for(const si of rnd([...clsFree[cls][day]])) {
+        if(!avOk(si,avail)) continue;
+        if(!relax && !tFree(teacher,day,si)) continue;
+        doPlace(cls,day,si,sub,teacher,false,false);
+        return true;
+      }
+      return false;
+    };
+
+    // ── Sort tasks: most-constrained (fewest available day×slot combos) first ─
     const tasks = [];
     ALL_CLASSES.forEach(cls => {
       const upper = isUpper(cls), ct = getClsTeacher(cls);
       Object.entries(plan[cls]||{}).forEach(([sub,{lpw,double:isDbl,avail}]) => {
         const teacher = upper ? (getSubTeacher(cls,sub)||"TBD") : (ct||"TBD");
         tasks.push({cls,sub,teacher,lpw,isDbl,avail,
-          score: avail.length * workingDays.length - (isDbl ? 1000 : 0)});
+          score: avail.length * workingDays.length - (isDbl?1000:0)});
       });
     });
     tasks.sort((a,b) => a.score-b.score || (b.isDbl?-1:0) || b.lpw-a.lpw);
 
-    const getDays = (cls) => workingDays.filter(d => clsFree[cls][d]?.size > 0);
-    const avOk    = (si,avail) => avail.includes(LESSON_SLOTS[si].period);
-    const tFree   = (teacher,d,si) => teacher==="TBD" || !busyMap[`${teacher}::${d}::${si}`];
-
+    // ── Main placement loop ───────────────────────────────────────────────────
     for(const {cls, sub, teacher, lpw, isDbl, avail} of tasks) {
       let rem = lpw;
+      const wDays = workingDays; // Mon-Fri (5 days)
 
-      // ── Rule 5: Double lesson first ──────────────────────────────────────
+      // ════════════════════════════════════════════════════════════════════════
+      // CASE A: 2P (double lesson)
+      //   Step 1 — place the double in an adjacent pair (P1+P2, P3+P4 …)
+      //   Step 2 — spread remaining (lpw-2) singles, one per fresh day each
+      // ════════════════════════════════════════════════════════════════════════
       if(isDbl && rem >= 2) {
-        placed2P: for(const relax of [false,true]) {
-          for(const day of rnd(getDays(cls))) {
+        let doublePlaced = false;
+        let doubleDay = null;
+
+        // Try to place double in a strict adjacent pair — teacher-free first, then relax
+        for(const relax of [false, true]) {
+          if(doublePlaced) break;
+          for(const day of rnd([...wDays])) {
+            if(doublePlaced) break;
             for(const [s1,s2] of rnd([...CONSEC])) {
               if(!LESSON_SLOTS[s1]||!LESSON_SLOTS[s2]) continue;
-              if(!avOk(s1,avail)||!avOk(s2,avail))    continue; // Rule 6
+              if(!avOk(s1,avail)||!avOk(s2,avail)) continue;
               if(!clsFree[cls][day].has(s1)||!clsFree[cls][day].has(s2)) continue;
               if(!relax && (!tFree(teacher,day,s1)||!tFree(teacher,day,s2))) continue;
               doPlace(cls,day,s1,sub,teacher,true,false);
               doPlace(cls,day,s2,sub,teacher,true,true);
-              rem -= 2; break placed2P;
+              rem -= 2;
+              doubleDay = day;
+              doublePlaced = true;
+              break;
             }
           }
         }
-        // Remaining singles after double — one each on fresh days
-        for(const relax of [false,true]) {
-          for(const d of rnd(workingDays.filter(d=>!usedDays(cls,sub).has(d)))) {
-            if(rem<=0) break;
-            for(const si of rnd([...clsFree[cls][d]])) {
-              if(!avOk(si,avail)) continue;
-              if(isConsecSameSub(cls,d,si,sub)) continue;
-              if(!relax && !tFree(teacher,d,si)) continue;
-              doPlace(cls,d,si,sub,teacher,false,false); rem--; break;
-            }
-          }
+
+        // Step 2: remaining singles — each on a DIFFERENT day, skip the double's day
+        // Pass 1: strict (fresh day, teacher-free)
+        for(const day of rnd(wDays.filter(d => d !== doubleDay && !usedDays(cls,sub).has(d)))) {
+          if(rem <= 0) break;
+          if(placeOnDay(cls, day, sub, teacher, avail, false)) rem--;
         }
+        // Pass 2: relax teacher if still remaining on fresh days
+        for(const day of rnd(wDays.filter(d => d !== doubleDay && !usedDays(cls,sub).has(d)))) {
+          if(rem <= 0) break;
+          if(placeOnDay(cls, day, sub, teacher, avail, true)) rem--;
+        }
+        // Pass 3: last resort — any day (not the double day), max 1 extra per day
+        for(const day of rnd(wDays.filter(d => d !== doubleDay && dayCnt(cls,d,sub) < 1))) {
+          if(rem <= 0) break;
+          if(placeOnDay(cls, day, sub, teacher, avail, true)) rem--;
+        }
+        continue; // done with this subject
       }
 
-      // ── Rule 4: LPW=6, no double ─────────────────────────────────────────
-      if(!isDbl && lpw===6 && rem>0) {
-        // 4 fresh days × 1 lesson
-        for(const relax of [false,true]) {
-          for(const d of rnd(workingDays.filter(d=>!usedDays(cls,sub).has(d)))) {
-            if(rem<=2) break;
-            for(const si of rnd([...clsFree[cls][d]])) {
-              if(!avOk(si,avail)) continue;
-              if(isConsecSameSub(cls,d,si,sub)) continue;
-              if(!relax && !tFree(teacher,d,si)) continue;
-              doPlace(cls,d,si,sub,teacher,false,false); rem--; break;
-            }
+      // ════════════════════════════════════════════════════════════════════════
+      // CASE B: LPW=6, no double flag
+      //   All 5 days get 1 lesson each (daily), then the 6th lesson goes on
+      //   any 1 of those days as a second lesson — must NOT be consecutive
+      //   with the first lesson on that day.
+      // ════════════════════════════════════════════════════════════════════════
+      if(!isDbl && lpw === 6 && rem > 0) {
+        // Step 1: place 1 lesson on each of the 5 days
+        for(const relax of [false, true]) {
+          for(const day of rnd(wDays.filter(d => !usedDays(cls,sub).has(d)))) {
+            if(rem <= 1) break; // leave 1 for the extra
+            if(placeOnDay(cls, day, sub, teacher, avail, relax)) rem--;
           }
         }
-        // 1 day × 2 non-consecutive lessons
-        if(rem>=2) {
-          placedPair: for(const relax of [false,true]) {
-            for(const d of rnd(getDays(cls))) {
-              const free = rnd([...clsFree[cls][d]]).filter(si=>avOk(si,avail));
-              for(let i=0;i<free.length;i++) {
-                for(let j=i+1;j<free.length;j++) {
-                  const s1=free[i], s2=free[j];
-                  const gap = Math.abs(s1-s2);
-                  if(gap<2) continue;
-                  if(CONSEC.some(([a,b])=>(a===s1&&b===s2)||(a===s2&&b===s1))) continue;
-                  if(!relax && (!tFree(teacher,d,s1)||!tFree(teacher,d,s2))) continue;
-                  doPlace(cls,d,s1,sub,teacher,false,false);
-                  doPlace(cls,d,s2,sub,teacher,false,false);
-                  rem-=2; break placedPair;
-                }
+
+        // Step 2: place the extra (6th) lesson on a day that already has 1 lesson,
+        // ensuring it is NOT adjacent (consecutive) to the existing one.
+        if(rem > 0) {
+          placedExtra: for(const relax of [false, true]) {
+            for(const day of rnd(wDays.filter(d => dayCnt(cls,d,sub) === 1 && clsFree[cls][d].size > 0))) {
+              // Find the existing slot index for this subject on this day
+              const existingSi = Object.entries(clsCont[cls][day]).find(([,s])=>s===sub)?.[0];
+              const exSi = existingSi !== undefined ? parseInt(existingSi) : -1;
+              for(const si of rnd([...clsFree[cls][day]])) {
+                if(!avOk(si,avail)) continue;
+                // Must NOT be consecutive with the existing lesson
+                if(exSi >= 0 && CONSEC.some(([a,b])=>(a===exSi&&b===si)||(a===si&&b===exSi))) continue;
+                if(!relax && !tFree(teacher,day,si)) continue;
+                doPlace(cls,day,si,sub,teacher,false,false);
+                rem--;
+                break placedExtra;
               }
             }
           }
         }
+        continue;
       }
 
-      // ── Rules 1,2,3: spread 1 lesson per fresh day ───────────────────────
-      if(rem>0) {
-        // Pass A: fresh days, avail, teacher-free, no consec same-sub
-        for(const d of rnd(workingDays.filter(d=>!usedDays(cls,sub).has(d)))) {
-          if(rem<=0) break;
-          for(const si of rnd([...clsFree[cls][d]])) {
-            if(!avOk(si,avail)||!tFree(teacher,d,si)||isConsecSameSub(cls,d,si,sub)) continue;
-            doPlace(cls,d,si,sub,teacher,false,false); rem--; break;
-          }
+      // ════════════════════════════════════════════════════════════════════════
+      // CASE C: LPW=2,3,4,5 — spread strictly, 1 per fresh day
+      //   LPW=2 → 2 different days
+      //   LPW=3 → 3 different days
+      //   LPW=4 → 4 different days
+      //   LPW=5 → all 5 days
+      // ════════════════════════════════════════════════════════════════════════
+      if(rem > 0) {
+        // Pass 1: strict — fresh day only, teacher-free
+        for(const day of rnd(wDays.filter(d => !usedDays(cls,sub).has(d)))) {
+          if(rem <= 0) break;
+          if(placeOnDay(cls, day, sub, teacher, avail, false)) rem--;
         }
-        // Pass B: fresh days, relax teacher
-        for(const d of rnd(workingDays.filter(d=>!usedDays(cls,sub).has(d)))) {
-          if(rem<=0) break;
-          for(const si of rnd([...clsFree[cls][d]])) {
-            if(!avOk(si,avail)||isConsecSameSub(cls,d,si,sub)) continue;
-            doPlace(cls,d,si,sub,teacher,false,false); rem--; break;
-          }
+        // Pass 2: fresh day, relax teacher
+        for(const day of rnd(wDays.filter(d => !usedDays(cls,sub).has(d)))) {
+          if(rem <= 0) break;
+          if(placeOnDay(cls, day, sub, teacher, avail, true)) rem--;
         }
-        // Pass C: any day, max 2/day, avail, teacher-free
-        for(const d of rnd(getDays(cls))) {
-          if(rem<=0||dayCnt(cls,d,sub)>=2) continue;
-          for(const si of rnd([...clsFree[cls][d]])) {
-            if(!avOk(si,avail)||!tFree(teacher,d,si)||isConsecSameSub(cls,d,si,sub)) continue;
-            doPlace(cls,d,si,sub,teacher,false,false); rem--; break;
-          }
+        // Pass 3 (safety net only — rule already satisfied above for LPW≤5):
+        // if rem still > 0 due to availability constraints, allow a 2nd on a used day
+        for(const day of rnd(wDays.filter(d => dayCnt(cls,d,sub) < 2 && clsFree[cls][d].size > 0))) {
+          if(rem <= 0) break;
+          if(placeOnDay(cls, day, sub, teacher, avail, true)) rem--;
         }
-        // Pass D: any day, relax teacher, avail
-        for(const d of rnd(getDays(cls))) {
-          if(rem<=0||dayCnt(cls,d,sub)>=2) continue;
-          for(const si of rnd([...clsFree[cls][d]])) {
-            if(!avOk(si,avail)) continue;
-            doPlace(cls,d,si,sub,teacher,false,false); rem--; break;
-          }
-        }
-        // Pass E: any day, max 3/day, avail
-        for(const d of rnd(getDays(cls))) {
-          if(rem<=0||dayCnt(cls,d,sub)>=3) continue;
-          for(const si of rnd([...clsFree[cls][d]])) {
-            if(!avOk(si,avail)) continue;
-            doPlace(cls,d,si,sub,teacher,false,false); rem--; break;
-          }
-        }
-        // Pass F: any free avail slot (avail still respected)
-        outerF: for(const d of rnd(getDays(cls))) {
-          for(const si of rnd([...clsFree[cls][d]])) {
-            if(rem<=0) break outerF;
-            if(avOk(si,avail)){ doPlace(cls,d,si,sub,teacher,false,false); rem--; }
-          }
-        }
-        // Pass G: absolute nuclear — ignore everything, zero empty slots
-        outerG: for(const d of rnd(getDays(cls))) {
-          for(const si of rnd([...clsFree[cls][d]])) {
-            if(rem<=0) break outerG;
-            doPlace(cls,d,si,sub,teacher,false,false); rem--;
+        // Pass 4: last resort — any free slot
+        outerP4: for(const day of rnd(wDays.filter(d => clsFree[cls][d].size > 0))) {
+          for(const si of rnd([...clsFree[cls][day]])) {
+            if(rem <= 0) break outerP4;
+            doPlace(cls,day,si,sub,teacher,false,false); rem--;
           }
         }
       }
