@@ -2866,7 +2866,10 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
       if(conflicts.length===0) return true;
 
       // Pick a random conflicted cell to fix
-      const {cls,day,si,cell} = conflicts[rnd(conflicts).shift()];
+      const conflictItem = rnd(conflicts)[0];
+      if(!conflictItem) return false;
+      const {cls,day,si,cell} = conflictItem;
+      if(!cell || cell.ppi || !cell.teacher || cell.teacher==="TBD") return false;
       const teacher = cell.teacher;
       const subAvail = plan[cls]?.[cell.subject]?.avail || LESSON_SLOTS.map(s=>s.period);
 
@@ -2938,33 +2941,42 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
       // Apply best swap found
       if(bestSwap) {
         addTabu(bestSwap.swapKey);
-        if(bestSwap.cross) {
-          const orig1=gen[cls][day][si];
-          const orig2=gen[bestSwap.otherCls][bestSwap.tDay][bestSwap.tSi];
-          gen[cls][day][si]                           =null;
-          gen[bestSwap.otherCls][bestSwap.tDay][bestSwap.tSi]=null;
-          gen[cls][bestSwap.tDay][bestSwap.tSi]       ={...orig1,period:LESSON_SLOTS[bestSwap.tSi]?.period||(bestSwap.tSi+1)};
-          gen[bestSwap.otherCls][day][si]             ={...orig2,period:LESSON_SLOTS[si]?.period||(si+1)};
+        const {tDay:bTDay, tSi:bTSi, otherCls:bOtherCls, cross:bCross} = bestSwap;
+        if(bCross && bOtherCls) {
+          const orig1 = gen[cls]?.[day]?.[si];
+          const orig2 = gen[bOtherCls]?.[bTDay]?.[bTSi];
+          if(orig1 && orig2) {
+            gen[cls][day][si]              = null;
+            gen[bOtherCls][bTDay][bTSi]   = null;
+            gen[cls][bTDay][bTSi]         = {...orig1, period:LESSON_SLOTS[bTSi]?.period||(bTSi+1)};
+            gen[bOtherCls][day][si]       = {...orig2, period:LESSON_SLOTS[si]?.period||(si+1)};
+          }
         } else {
-          const orig1=gen[cls][day][si];
-          const orig2=gen[cls][bestSwap.tDay][bestSwap.tSi];
-          gen[cls][day][si]                   ={...orig2,period:LESSON_SLOTS[si]?.period||(si+1)};
-          gen[cls][bestSwap.tDay][bestSwap.tSi]={...orig1,period:LESSON_SLOTS[bestSwap.tSi]?.period||(bestSwap.tSi+1)};
+          const orig1 = gen[cls]?.[day]?.[si];
+          const orig2 = gen[cls]?.[bTDay]?.[bTSi];
+          if(orig1 && orig2) {
+            gen[cls][day][si]      = {...orig2, period:LESSON_SLOTS[si]?.period||(si+1)};
+            gen[cls][bTDay][bTSi]  = {...orig1, period:LESSON_SLOTS[bTSi]?.period||(bTSi+1)};
+          }
         }
       } else {
         // No improvement possible — force a random non-tabu swap to escape
+        let escaped = false;
         for(const d of rnd([...workingDays])) {
-          const slots=gen[cls]?.[d]||[];
+          if(escaped) break;
+          const slots = gen[cls]?.[d]||[];
           for(const tSi of rnd(slots.map((_,x)=>x).filter(x=>slots[x]&&!slots[x].ppi))) {
             if(d===day&&tSi===si) continue;
             const swapKey=`F:${cls}:${day}:${si}:${d}:${tSi}`;
             if(isTabu(swapKey)) continue;
-            const orig1=gen[cls][day][si], orig2=gen[cls][d][tSi];
-            gen[cls][day][si]={...orig2,period:LESSON_SLOTS[si]?.period||(si+1)};
-            gen[cls][d][tSi] ={...orig1,period:LESSON_SLOTS[tSi]?.period||(tSi+1)};
-            addTabu(swapKey); break;
+            const orig1 = gen[cls]?.[day]?.[si];
+            const orig2 = gen[cls]?.[d]?.[tSi];
+            if(!orig1||!orig2) continue;
+            gen[cls][day][si] = {...orig2, period:LESSON_SLOTS[si]?.period||(si+1)};
+            gen[cls][d][tSi]  = {...orig1, period:LESSON_SLOTS[tSi]?.period||(tSi+1)};
+            addTabu(swapKey);
+            escaped = true; break;
           }
-          break;
         }
       }
 
@@ -2972,69 +2984,98 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
     };
 
     // ── MAIN LOOP ─────────────────────────────────────────────────────────────
-    // State shared across ticks
     let gen=null, plan=null, bestGen=null, bestCC=Infinity;
     let tick=0, noImproveTicks=0;
-    const MAX_NO_IMPROVE = 200; // fresh restart after this many ticks without improvement
+    const MAX_NO_IMPROVE = 150;
 
     const loop = () => {
+      // Check stop flag
       if(genStopRef.current) {
-        setConflictMap(buildConflicts(bestGen));
-        setTt({...bestGen});
+        const src = bestGen || gen;
+        if(!src) { setGenerating(false); return; }
+        const cc = Object.keys(buildConflicts(src)).length;
+        setConflictMap(buildConflicts(src));
+        setTt({...src});
         setGenProgress(100); setGenerating(false);
-        const cc=Object.keys(buildConflicts(bestGen)).length;
         flash(cc>0
-          ? `⏹ Stopped — ${cc} conflict(s) remain. Try reassigning teachers and regenerate.`
+          ? `⏹ Stopped — ${cc} conflict(s) remain. Reassign teachers and regenerate.`
           : `✅ Perfect timetable! All ${totalSlots} slots filled — zero conflicts!`,
           cc>0?"warn":"ok");
         return;
       }
 
       try {
-        // Start or restart with a fresh grid
+        // Build a fresh grid if starting or stuck
         if(!gen || noImproveTicks >= MAX_NO_IMPROVE) {
           const built = buildGrid();
-          gen=built.gen; plan=built.plan;
-          noImproveTicks=0;
-          tabuList.length=0; // reset tabu list on fresh start
+          gen  = built.gen;
+          plan = built.plan;
+          noImproveTicks = 0;
+          tabuList.length = 0;
+          // Show Stage 1 result immediately
+          const initCC = countConflicts(gen);
+          if(initCC < bestCC || bestGen===null) {
+            bestCC  = initCC;
+            bestGen = JSON.parse(JSON.stringify(gen));
+            setConflictMap(buildConflicts(gen));
+            setTt({...gen});
+          }
+          if(initCC === 0) {
+            setConflictMap({}); setTt({...gen});
+            setGenProgress(100); setGenerating(false);
+            flash(`✅ Perfect timetable! All ${totalSlots} slots filled — zero conflicts!`, "ok");
+            return;
+          }
         }
 
-        // ONE tabu-search move
-        const done = tabuMove(gen, plan);
-        const cc   = countConflicts(gen);
+        // ONE tabu-search move — safe, guarded
+        let done = false;
+        try { done = tabuMove(gen, plan); } catch(_) { /* ignore single-move errors */ }
+        const cc = countConflicts(gen);
         tick++;
 
+        // Track best result
         if(cc < bestCC) {
-          bestCC=cc; bestGen=JSON.parse(JSON.stringify(gen));
+          bestCC = cc;
+          bestGen = JSON.parse(JSON.stringify(gen));
           setConflictMap(buildConflicts(gen));
           setTt({...gen});
-          noImproveTicks=0;
+          noImproveTicks = 0;
         } else {
           noImproveTicks++;
         }
 
-        if(done || cc===0) {
+        // Done?
+        if(done || cc === 0) {
           setConflictMap({});
           setTt({...gen});
           setGenProgress(100); setGenerating(false);
-          const secs=Math.round((Date.now()-startTime)/1000);
+          const secs = Math.round((Date.now()-startTime)/1000);
           flash(`✅ Perfect timetable! All ${totalSlots} slots filled — zero conflicts! (${tick} moves, ${secs}s)`, "ok");
           return;
         }
 
-        // Progress: oscillate to show activity, lean toward 100 as cc→0
-        const prog = Math.min(95, Math.round(15 + (1-cc/Math.max(bestCC,1))*75 + Math.sin(tick*0.1)*5));
+        // Progress bar: reflects real reduction in conflicts
+        const prog = Math.min(95, Math.round(15 + (1 - cc/Math.max(bestCC,1)) * 75));
         setGenProgress(prog);
 
-        setTimeout(loop, 0); // yield to browser — NEVER blocks
+        setTimeout(loop, 0); // yield — never blocks browser
 
       } catch(e) {
-        setGenerating(false);
-        flash("Generator error: " + e.message, "error");
+        // On any error, try a fresh restart rather than crashing
+        console.warn("Generator tick error:", e.message);
+        gen = null; // forces fresh grid next tick
+        noImproveTicks = 0;
+        if(tick > 5000) {
+          setGenerating(false);
+          flash("Generator error: " + e.message, "error");
+          return;
+        }
+        setTimeout(loop, 50);
       }
     };
 
-    // Kick off
+    // Kick off with a small delay so UI renders first
     setTimeout(loop, 50);
   }
 
