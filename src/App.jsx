@@ -67,7 +67,10 @@ const SUBJECT_SHORT = {
   "Social Studies & CRE":      "SST CRE",
   "Agriculture and Nutrition": "AGRI",
   "Creative Arts and Sports":  "CAS",
+  "Social Studies":            "SOCSTU",
   "Social Studies (History & Geography)":  "SST",
+  "History":                   "HIS",
+  "Geography":                 "GEO",
   "Pre-Technical and Pre-Career Studies":  "PTC",
   "Religious Education (CRE/IRE)":         "CRE",
 };
@@ -3052,6 +3055,25 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
           setGenProgress(100); setGenerating(false);
           const secs = Math.round((Date.now()-startTime)/1000);
           flash(`✅ Perfect timetable! All ${totalSlots} slots filled — zero conflicts! (${tick} moves, ${secs}s)`, "ok");
+          // Auto-save to Supabase so timetable persists across sessions
+          try {
+            const autoSnap = {
+              id: Date.now(),
+              name: `Auto-Save ${new Date().toLocaleDateString("en-KE")}`,
+              savedAt: new Date().toLocaleString(),
+              timetable: gen,
+              ttSetup: ttSetup,
+            };
+            const existing = JSON.parse(localStorage.getItem(SNAP_KEY)||"[]");
+            const updated = [autoSnap, ...existing.filter(s=>!s.name.startsWith("Auto-Save"))].slice(0,20);
+            localStorage.setItem(SNAP_KEY, JSON.stringify(updated));
+            setSavedTTs(updated);
+            supabase.from("app_data").upsert({
+              key: SNAP_KEY,
+              value: JSON.stringify(updated),
+              updated_at: new Date().toISOString(),
+            }, { onConflict: "key" }).catch(()=>{});
+          } catch {}
           return;
         }
 
@@ -3269,6 +3291,18 @@ DATA:${JSON.stringify(compactSetups)}`;
   async function loadSnapshots() {
     setLoadingSnaps(true);
     try {
+      // Try Supabase first for cross-session persistence
+      const { data } = await supabase.from("app_data").select("value").eq("key", SNAP_KEY).single();
+      if(data?.value) {
+        const parsed = JSON.parse(data.value);
+        setSavedTTs(parsed);
+        localStorage.setItem(SNAP_KEY, data.value);
+        setLoadingSnaps(false);
+        return;
+      }
+    } catch {}
+    // Fall back to localStorage
+    try {
       const local = localStorage.getItem(SNAP_KEY);
       if(local) setSavedTTs(JSON.parse(local));
     } catch {}
@@ -3289,8 +3323,14 @@ DATA:${JSON.stringify(compactSetups)}`;
     const updated = [snap, ...savedTTs.filter(s => s.name !== saveName.trim())].slice(0, 20);
     setSavedTTs(updated);
     try { localStorage.setItem(SNAP_KEY, JSON.stringify(updated)); } catch {}
-    // Also try Supabase via the app's save() if available
-    try { if(typeof save !== "undefined") await save(SNAP_KEY, updated); } catch {}
+    // Save to Supabase for cross-session persistence
+    try {
+      await supabase.from("app_data").upsert({
+        key: SNAP_KEY,
+        value: JSON.stringify(updated),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "key" });
+    } catch {}
     setSaveName(""); setShowSaveModal(false);
     flash(`Timetable "${snap.name}" saved successfully!`);
   }
@@ -7827,17 +7867,17 @@ export default function App(){
     setupData:{subjectTeachers:{},subjectAvailability:{},classTeachers:{}},
     customLpw:{},customDouble:{},
     bellPeriods:[
-      {id:1,type:"period",name:"Period 1",start:"07:00",end:"07:40"},
-      {id:2,type:"period",name:"Period 2",start:"07:40",end:"08:20"},
-      {id:3,type:"break",name:"Short Break ☕",start:"08:20",end:"08:30"},
-      {id:4,type:"period",name:"Period 3",start:"08:30",end:"09:10"},
-      {id:5,type:"period",name:"Period 4",start:"09:10",end:"09:50"},
-      {id:6,type:"break",name:"Long Break 🧘",start:"09:50",end:"10:10"},
-      {id:7,type:"period",name:"Period 5",start:"10:10",end:"10:50"},
-      {id:8,type:"period",name:"Period 6",start:"10:50",end:"11:30"},
-      {id:9,type:"break",name:"Lunch 🍽️",start:"11:30",end:"12:10"},
-      {id:10,type:"period",name:"Period 7",start:"12:10",end:"12:50"},
-      {id:11,type:"period",name:"Period 8",start:"12:50",end:"13:30"},
+      {id:1,type:"period",name:"Period 1",start:"08:20",end:"09:00"},
+      {id:2,type:"period",name:"Period 2",start:"09:00",end:"09:40"},
+      {id:3,type:"break",name:"Short Break ☕",start:"09:40",end:"10:00"},
+      {id:4,type:"period",name:"Period 3",start:"10:00",end:"10:40"},
+      {id:5,type:"period",name:"Period 4",start:"10:40",end:"11:20"},
+      {id:6,type:"break",name:"Long Break 🧘",start:"11:20",end:"11:50"},
+      {id:7,type:"period",name:"Period 5",start:"11:50",end:"12:30"},
+      {id:8,type:"period",name:"Period 6",start:"12:30",end:"13:10"},
+      {id:9,type:"break",name:"Lunch 🍽️",start:"13:10",end:"13:50"},
+      {id:10,type:"period",name:"Period 7",start:"13:50",end:"14:30"},
+      {id:11,type:"period",name:"Period 8",start:"14:30",end:"15:10"},
     ],
     workingDays:["Monday","Tuesday","Wednesday","Thursday","Friday"],
     rooms:[{id:1,name:"Main Classroom"},{id:2,name:"Science Lab"},{id:3,name:"Computer Lab"},{id:4,name:"Library"}],
