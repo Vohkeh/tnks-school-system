@@ -2085,8 +2085,22 @@ function TimetableSetup({staff,setupData,setSetupData}) {
 const DEFAULT_LPW = {
   PP:    {"Language Activities":8,"Mathematical Activities":8,"Environmental Activities":7,"Creative Activities":8,"Religious Education Activities":8},
   Lower: {"English Language Activities":7,"Kiswahili Language Activities":6,"Mathematical Activities":7,"Environmental Activities":5,"Religious Education Activities":4,"Creative Activities":6,"Indigenous Language Activities":4},
-  Upper: {"English":7,"Kiswahili":6,"Mathematics":7,"Integrated Science":5,"Social Studies":4,"Religious Education (CRE/IRE)":3,"Agriculture and Nutrition":4,"Creative Arts and Sports":3},
-  JSS:   {"English":6,"Kiswahili":5,"Mathematics":6,"Integrated Science":5,"History":3,"Geography":3,"Pre-Technical and Pre-Career Studies":4,"Agriculture and Nutrition":3,"Religious Education (CRE/IRE)":2,"Creative Arts and Sports":2},
+  // Upper Primary (Grade 4-6): strict CBC allocation — total 39 usable lessons/week
+  // English(5) + Math(5) + Kiswahili(5) + Integrated Science(5) + Agri & Nutrition(5)
+  // + Religious Education(4) + Social Studies(4) + Creative Arts & Sports(6) = 39
+  Upper: {"English":5,"Kiswahili":5,"Mathematics":5,"Integrated Science":5,"Social Studies":4,"Religious Education (CRE/IRE)":4,"Agriculture and Nutrition":5,"Creative Arts and Sports":6},
+  // JSS (Grade 7-9): strict CBC allocation — total 39 usable lessons/week
+  // English(5) + Math(5) + Integrated Science(5) + Kiswahili(4) + Pre-Technical(4)
+  // + Agri & Nutrition(4) + Creative Arts(4) + Religious Education(4)
+  // + History(2) + Geography(2) = 39
+  JSS:   {"English":5,"Kiswahili":4,"Mathematics":5,"Integrated Science":5,"History":2,"Geography":2,"Pre-Technical and Pre-Career Studies":4,"Agriculture and Nutrition":4,"Religious Education (CRE/IRE)":4,"Creative Arts and Sports":4},
+};
+// Default double-lesson rules per CBC:
+//  • JSS Integrated Science → 1 double + 3 singles (Science Double Rule)
+//  • Upper Creative Arts & Sports → LPW=6, non-consecutive extra (handled by CASE B)
+//  • All other subjects → singles only
+const DEFAULT_DOUBLE = {
+  JSS: {"Integrated Science": true},
 };
 const PALETTE = ["#dbeafe","#d1fae5","#fef3c7","#fee2e2","#f3e8ff","#ccfbf1","#fce7f3","#e0f2fe","#fef9c3","#ffe4e6","#ecfdf5","#faf5ff","#fff7ed","#f0fdf4"];
 // Alias so new TimetablePage can use getTTSubs (matches App's TIMETABLE_SUBJECTS_MAP)
@@ -2214,7 +2228,9 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
   const getClsDouble = (cls, sub) => {
     const key = `${cls}::${sub}`;
     if(customDouble[key] !== undefined) return customDouble[key];
-    return false;
+    // CBC default: JSS Integrated Science always gets a double lesson
+    const grp = cg(cls);
+    return !!(DEFAULT_DOUBLE[grp]?.[sub]);
   };
   const toggleClsDouble = (cls, sub) =>
     setCustomDouble(p => ({...p, [`${cls}::${sub}`]:!getClsDouble(cls, sub)}));
