@@ -2096,11 +2096,93 @@ const DEFAULT_LPW = {
   JSS:   {"English":5,"Kiswahili":4,"Mathematics":5,"Integrated Science":5,"History":2,"Geography":2,"Pre-Technical and Pre-Career Studies":4,"Agriculture and Nutrition":4,"Religious Education (CRE/IRE)":4,"Creative Arts and Sports":4},
 };
 // Default double-lesson rules per CBC:
-//  • JSS Integrated Science → 1 double + 3 singles (Science Double Rule)
+//  • JSS Integrated Science → 1 double + 2 singles (LPW=4: Science Double Rule)
 //  • Upper Creative Arts & Sports → LPW=6, non-consecutive extra (handled by CASE B)
 //  • All other subjects → singles only
 const DEFAULT_DOUBLE = {
   JSS: {"Integrated Science": true},
+};
+// ── Per-class LPW overrides (exact lessons/week per subject per class) ─────
+// These override DEFAULT_LPW for specific classes. Values are sourced from
+// the school's official CBC timetable specification.
+const DEFAULT_LPW_CLS = {
+  "Grade 4": {"English":5,"Kiswahili":5,"Mathematics":5,"Integrated Science":4,"Social Studies":5,"Religious Education (CRE/IRE)":4,"Agriculture and Nutrition":5,"Creative Arts and Sports":6},
+  "Grade 5": {"English":5,"Kiswahili":5,"Mathematics":5,"Integrated Science":5,"Social Studies":4,"Religious Education (CRE/IRE)":4,"Agriculture and Nutrition":5,"Creative Arts and Sports":6},
+  "Grade 6": {"English":5,"Kiswahili":4,"Mathematics":5,"Integrated Science":5,"Social Studies":5,"Religious Education (CRE/IRE)":4,"Agriculture and Nutrition":5,"Creative Arts and Sports":6},
+  "Grade 7": {"English":5,"Kiswahili":4,"Mathematics":5,"Integrated Science":4,"History":2,"Geography":2,"Pre-Technical and Pre-Career Studies":4,"Agriculture and Nutrition":4,"Religious Education (CRE/IRE)":4,"Creative Arts and Sports":4},
+  "Grade 8": {"English":5,"Kiswahili":4,"Mathematics":5,"Integrated Science":4,"History":2,"Geography":2,"Pre-Technical and Pre-Career Studies":4,"Agriculture and Nutrition":4,"Religious Education (CRE/IRE)":4,"Creative Arts and Sports":4},
+  "Grade 9": {"English":5,"Kiswahili":4,"Mathematics":5,"Integrated Science":4,"History":2,"Geography":2,"Pre-Technical and Pre-Career Studies":4,"Agriculture and Nutrition":4,"Religious Education (CRE/IRE)":4,"Creative Arts and Sports":4},
+};
+// ── Per-class subject availability (period numbers allowed for each subject) ─
+// Format: periods are 1-based. Blocked periods are excluded.
+// This encodes the school's official period-restriction rules.
+const DEFAULT_AVAIL_CLS = {
+  "Grade 4": {
+    "English":                          [1,2,3,4,5,6],
+    "Kiswahili":                        [1,2,3,4,5,6],
+    "Mathematics":                      [1,2,3,4,5,6],
+    "Integrated Science":               [1,2,3,4,5,6],
+    "Social Studies":                   [3,4,5,6,7,8],
+    "Religious Education (CRE/IRE)":    [3,4,5,6,7,8],
+    "Agriculture and Nutrition":        [3,4,5,6,7,8],
+    "Creative Arts and Sports":         [4,5,6,7,8],
+  },
+  "Grade 5": {
+    "English":                          [1,2,3,4,5,6],
+    "Kiswahili":                        [1,2,3,4,5,6],
+    "Mathematics":                      [1,2,3,4,5,6],
+    "Integrated Science":               [1,2,3,4,5,6],
+    "Social Studies":                   [3,4,5,6,7,8],
+    "Religious Education (CRE/IRE)":    [3,4,5,6,7,8],
+    "Agriculture and Nutrition":        [3,4,5,6,7,8],
+    "Creative Arts and Sports":         [4,5,6,7,8],
+  },
+  "Grade 6": {
+    "English":                          [1,2,3,4,5,6],
+    "Kiswahili":                        [1,2,3,4,5,6],
+    "Mathematics":                      [1,2,3,4,5,6],
+    "Integrated Science":               [1,2,3,4,5,6],
+    "Social Studies":                   [3,4,5,6,7,8],
+    "Religious Education (CRE/IRE)":    [3,4,5,6,7,8],
+    "Agriculture and Nutrition":        [3,4,5,6,7,8],
+    "Creative Arts and Sports":         [4,5,6,7,8],
+  },
+  "Grade 7": {
+    "English":                          [1,2,3,4,5,6],
+    "Kiswahili":                        [1,2,3,4,5,6],
+    "Mathematics":                      [1,2,3,4,5,6],
+    "Integrated Science":               [1,2,3,4,5,6],
+    "History":                          [3,4,5,6,7,8],
+    "Geography":                        [3,4,5,6,7,8],
+    "Pre-Technical and Pre-Career Studies": [3,4,5,6,7,8],
+    "Agriculture and Nutrition":        [3,4,5,6,7,8],
+    "Religious Education (CRE/IRE)":    [3,4,5,6,7,8],
+    "Creative Arts and Sports":         [4,5,6,7,8],
+  },
+  "Grade 8": {
+    "English":                          [1,2,3,4,5,6],
+    "Kiswahili":                        [1,2,3,4,5,6],
+    "Mathematics":                      [1,2,3,4,5,6],
+    "Integrated Science":               [1,2,3,4,5,6],
+    "History":                          [3,4,5,6,7,8],
+    "Geography":                        [3,4,5,6,7,8],
+    "Pre-Technical and Pre-Career Studies": [3,4,5,6,7,8],
+    "Agriculture and Nutrition":        [3,4,5,6,7,8],
+    "Religious Education (CRE/IRE)":    [3,4,5,6,7,8],
+    "Creative Arts and Sports":         [4,5,6,7,8],
+  },
+  "Grade 9": {
+    "English":                          [1,2,3,4,5,6],
+    "Kiswahili":                        [1,2,3,4,5,6],
+    "Mathematics":                      [1,2,3,4,5,6],
+    "Integrated Science":               [1,2,3,4,5,6],
+    "History":                          [3,4,5,6,7,8],
+    "Geography":                        [3,4,5,6,7,8],
+    "Pre-Technical and Pre-Career Studies": [3,4,5,6,7,8],
+    "Agriculture and Nutrition":        [3,4,5,6,7,8],
+    "Religious Education (CRE/IRE)":    [3,4,5,6,7,8],
+    "Creative Arts and Sports":         [4,5,6,7,8],
+  },
 };
 const PALETTE = ["#dbeafe","#d1fae5","#fef3c7","#fee2e2","#f3e8ff","#ccfbf1","#fce7f3","#e0f2fe","#fef9c3","#ffe4e6","#ecfdf5","#faf5ff","#fff7ed","#f0fdf4"];
 // Alias so new TimetablePage can use getTTSubs (matches App's TIMETABLE_SUBJECTS_MAP)
@@ -2210,13 +2292,23 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
   };
   const getAvail = (cls, sub) => {
     const key = `${cls}::${sub}`;
-    return (setupData.subjectAvailability||{})[key] || LESSON_SLOTS.map(s => s.period);
+    const all = LESSON_SLOTS.map(s => s.period);
+    // User-saved override takes highest priority
+    if((setupData.subjectAvailability||{})[key] !== undefined)
+      return (setupData.subjectAvailability||{})[key];
+    // Per-class school default (intersected with actual bell periods)
+    if(DEFAULT_AVAIL_CLS[cls]?.[sub] !== undefined)
+      return DEFAULT_AVAIL_CLS[cls][sub].filter(p => all.includes(p));
+    // Fall back to all periods
+    return all;
   };
 
   // LPW helpers
   const getClsLpw = (cls, sub) => {
     const key = `${cls}::${sub}`;
     if(customLpw[key] !== undefined) return customLpw[key];
+    // Check per-class defaults first, then fall back to group defaults
+    if(DEFAULT_LPW_CLS[cls]?.[sub] !== undefined) return DEFAULT_LPW_CLS[cls][sub];
     return (DEFAULT_LPW[cg(cls)]||{})[sub] || 2;
   };
   const setClsLpw = (cls, sub, val) => {
