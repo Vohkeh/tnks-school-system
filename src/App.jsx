@@ -20,8 +20,8 @@ const SCHOOL = {
   philosophy: "Investing in Children for Sustainability",
   website: "nyagakindikischools.sc.ke", founded: "7th January 2015",
 };
-// ── PASTE YOUR FREE GROQ KEY HERE (get one free at console.groq.com) ──────────
-const GROQ_API_KEY = "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";
+// ── GEMINI API KEY ──────────────────────────────────────────────────────────────
+const GEMINI_API_KEY = "AIzaSyAllyh5eeCacn6EgAXbh-dYISFpFy6A_4o";
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ALL_CLASSES = ["PP1","PP2","Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"];
@@ -3199,20 +3199,22 @@ DATA:${JSON.stringify(compactSetups)}`;
 
       setGenProgress(15);
 
-      const response = await fetch("/api/claude", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({
-          max_tokens: 4000,
-          messages:   [{role:"user", content:prompt}]
-        })
-      });
+      const geminiKey = GEMINI_API_KEY;
+      if (!geminiKey || geminiKey === "PASTE_YOUR_GEMINI_KEY_HERE") throw new Error("Gemini API key not set.");
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
+        {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        }
+      );
 
       if(!response.ok) throw new Error(`API ${response.status}: ${await response.text()}`);
       const data = await response.json();
       if(data.error) throw new Error(data.error.message);
 
-      const rawText = data.content?.find(b=>b.type==="text")?.text || "";
+      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
       setGenProgress(65);
 
       // Parse AI response
@@ -5589,31 +5591,27 @@ STAFF YOU CAN CONTACT: ${users.filter(u => u.contactRole && u.contactRole !== "a
 INSTRUCTIONS: Answer parents using the LIVE portal data above. Be warm, helpful, and specific. Give actual KES amounts for fees. List actual upcoming events by name and date. For private matters (individual child results, personal data), tell them to use the Direct Message or call the school. Keep answers concise and friendly.`;
 
       // Groq API key (free — set at top of file)
-      const aiKey = GROQ_API_KEY;
-      if (!aiKey || aiKey === "PASTE_YOUR_GROQ_KEY_HERE") {
+      const aiKey = GEMINI_API_KEY;
+      if (!aiKey || aiKey === "PASTE_YOUR_GEMINI_KEY_HERE") {
         setChatHistory(h => [...h, { role: "assistant", content: `⚠️ AI Assistant not configured yet. Please ask the school admin to add the Groq API key in the source code. Or call ${SCHOOL.phone}.` }]);
         setChatLoading(false);
         return;
       }
-      // Groq API — free tier, OpenAI-compatible format
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${aiKey}`,
-        },
-        body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
-          max_tokens: 600,
-          messages: [
-            { role: "system", content: systemPrompt },
-            ...newHistory,
-          ],
-        })
-      });
+      // Gemini API
+      const geminiMessages = [
+        { role: "user", parts: [{ text: systemPrompt + "\n\nConversation:\n" + newHistory.map(m => m.role+": "+m.content).join("\n") }] }
+      ];
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${aiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contents: geminiMessages })
+        }
+      );
       const data = await res.json();
       if (data.error) throw new Error(data.error.message || data.error);
-      const reply = data.choices?.[0]?.message?.content || `Please call the school at ${SCHOOL.phone}`;
+      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || `Please call the school at ${SCHOOL.phone}`;
       setChatHistory(h => [...h, { role: "assistant", content: reply }]);
     } catch(err) {
       const m = err?.message || "";
@@ -6867,17 +6865,20 @@ function AICommentAssistant({ students, results, comments, setComments, term, ye
     const subs = deduped.map(r => `${r.subject}: ${r.marks}%`).join(", ");
     const prompt = `You are a CBC teacher writing a ${tone.toLowerCase()} report card comment for ${student?.name}, a ${cls} student. ${term} ${year} ${examType}. Average: ${avg.toFixed(1)}%. Subjects: ${subs || "no results entered"}. Focus: ${focus}. Write a concise 2-3 sentence comment (max 60 words) that is professional, personal, and actionable. Do not start with the student's name. Do not use generic filler.`;
     try {
-      const aiKey = GROQ_API_KEY;
-      if (!aiKey || aiKey === "PASTE_YOUR_GROQ_KEY_HERE") { setDraft("AI key not set. Add your free Groq key at the top of App.jsx."); setLoading(false); return; }
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${aiKey}` },
-        body: JSON.stringify({ model: "llama-3.3-70b-versatile", max_tokens: 150, messages: [{ role: "user", content: prompt }] })
-      });
+      const aiKey = GEMINI_API_KEY;
+      if (!aiKey || aiKey === "PASTE_YOUR_GEMINI_KEY_HERE") { setDraft("AI key not set. Add your free Groq key at the top of App.jsx."); setLoading(false); return; }
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${aiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        }
+      );
       const data = await res.json();
       if (data.error) throw new Error(data.error.message || data.error);
-      setDraft(data.choices?.[0]?.message?.content || "Unable to generate comment.");
-    } catch(e) { setDraft("Could not connect to AI. Check your Groq key in ⚙️ Settings."); }
+      setDraft(data.candidates?.[0]?.content?.parts?.[0]?.text || "Unable to generate comment.");
+    } catch(e) { setDraft("Could not connect to Gemini AI. Check your API key."); }
     setLoading(false);
   }
 
