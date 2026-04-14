@@ -133,21 +133,20 @@ const LESSONS_PER_WEEK = {
     "Creative Activities":6,"Indigenous Language Activities":4,
   },
   Upper: {
-    "English":7,"Kiswahili":6,"Mathematics":7,"Integrated Science":5,
-    "Social Studies":4,"Religious Education (CRE/IRE)":3,
-    "Agriculture and Nutrition":4,"Creative Arts and Sports":3,
+    "English":5,"Kiswahili":5,"Mathematics":5,"Integrated Science":5,
+    "Social Studies":4,"Religious Education (CRE/IRE)":4,
+    "Agriculture and Nutrition":5,"Creative Arts and Sports":6,
   },
   JSS: {
-    "English":6,"Kiswahili":5,"Mathematics":6,"Integrated Science":5,
-    "History":3,"Geography":3,
-    "Pre-Technical and Pre-Career Studies":4,"Agriculture and Nutrition":3,
-    "Religious Education (CRE/IRE)":2,"Creative Arts and Sports":2,
+    "English":5,"Kiswahili":4,"Mathematics":5,"Integrated Science":5,
+    "History":2,"Geography":2,
+    "Pre-Technical and Pre-Career Studies":4,"Agriculture and Nutrition":4,
+    "Religious Education (CRE/IRE)":4,"Creative Arts and Sports":4,
   },
 };
 // Double-lesson subjects (one of their weekly lessons is a double/2-period block)
 const DOUBLE_LESSON_SUBJECTS = {
   JSS: ["Integrated Science"],
-  Upper: ["Integrated Science"],
 };
 function getLessonsPerWeek(cls) {
   const g = cg(cls);
@@ -340,14 +339,16 @@ const PRELOADED_TEACHERS = {
 const block78  = [1, 2, 3, 4, 5, 6];
 const block12  = [3, 4, 5, 6, 7, 8];
 const block123 = [4, 5, 6, 7, 8];
+const block    = [1, 2, 3, 4, 5, 6, 7, 8];
+const block8   = [1, 2, 3, 4, 5, 6, 7]
 
 const PRELOADED_AVAILABILITY = {
-  "Grade 4::English": block78, "Grade 4::Kiswahili": block78, "Grade 4::Mathematics": block78, "Grade 4::Integrated Science": block78, "Grade 4::Social Studies": block12, "Grade 4::Religious Education (CRE/IRE)": block12, "Grade 4::Agriculture and Nutrition": block12, "Grade 4::Creative Arts and Sports": block123,
-  "Grade 5::English": block78, "Grade 5::Kiswahili": block78, "Grade 5::Mathematics": block78, "Grade 5::Integrated Science": block78, "Grade 5::Social Studies": block12, "Grade 5::Religious Education (CRE/IRE)": block12, "Grade 5::Agriculture and Nutrition": block12, "Grade 5::Creative Arts and Sports": block123,
-  "Grade 6::English": block78, "Grade 6::Kiswahili": block78, "Grade 6::Mathematics": block78, "Grade 6::Integrated Science": block78, "Grade 6::Social Studies": block12, "Grade 6::Religious Education (CRE/IRE)": block12, "Grade 6::Agriculture and Nutrition": block12, "Grade 6::Creative Arts and Sports": block123,
-  "Grade 7::English": block78, "Grade 7::Kiswahili": block78, "Grade 7::Mathematics": block78, "Grade 7::Integrated Science": block78, "Grade 7::History": block12, "Grade 7::Geography": block12, "Grade 7::Pre-Technical and Pre-Career Studies": block12, "Grade 7::Agriculture and Nutrition": block12, "Grade 7::Religious Education (CRE/IRE)": block12, "Grade 7::Creative Arts and Sports": block123,
-  "Grade 8::English": block78, "Grade 8::Kiswahili": block78, "Grade 8::Mathematics": block78, "Grade 8::Integrated Science": block78, "Grade 8::History": block12, "Grade 8::Geography": block12, "Grade 8::Pre-Technical and Pre-Career Studies": block12, "Grade 8::Agriculture and Nutrition": block12, "Grade 8::Religious Education (CRE/IRE)": block12, "Grade 8::Creative Arts and Sports": block123,
-  "Grade 9::English": block78, "Grade 9::Kiswahili": block78, "Grade 9::Mathematics": block78, "Grade 9::Integrated Science": block78, "Grade 9::History": block12, "Grade 9::Geography": block12, "Grade 9::Pre-Technical and Pre-Career Studies": block12, "Grade 9::Agriculture and Nutrition": block12, "Grade 9::Religious Education (CRE/IRE)": block12, "Grade 9::Creative Arts and Sports": block123
+  "Grade 4::English": block78, "Grade 4::Kiswahili": block, "Grade 4::Mathematics": block78, "Grade 4::Integrated Science": block8, "Grade 4::Social Studies": block12, "Grade 4::Religious Education (CRE/IRE)": block12, "Grade 4::Agriculture and Nutrition": block12, "Grade 4::Creative Arts and Sports": block123,
+  "Grade 5::English": block78, "Grade 5::Kiswahili": block, "Grade 5::Mathematics": block78, "Grade 5::Integrated Science": block8, "Grade 5::Social Studies": block12, "Grade 5::Religious Education (CRE/IRE)": block12, "Grade 5::Agriculture and Nutrition": block12, "Grade 5::Creative Arts and Sports": block123,
+  "Grade 6::English": block78, "Grade 6::Kiswahili": block, "Grade 6::Mathematics": block78, "Grade 6::Integrated Science": block8, "Grade 6::Social Studies": block12, "Grade 6::Religious Education (CRE/IRE)": block12, "Grade 6::Agriculture and Nutrition": block12, "Grade 6::Creative Arts and Sports": block123,
+  "Grade 7::English": block78, "Grade 7::Kiswahili": block, "Grade 7::Mathematics": block78, "Grade 7::Integrated Science": block8, "Grade 7::History": block12, "Grade 7::Geography": block12, "Grade 7::Pre-Technical and Pre-Career Studies": block12, "Grade 7::Agriculture and Nutrition": block12, "Grade 7::Religious Education (CRE/IRE)": block12, "Grade 7::Creative Arts and Sports": block123,
+  "Grade 8::English": block78, "Grade 8::Kiswahili": block, "Grade 8::Mathematics": block78, "Grade 8::Integrated Science": block8, "Grade 8::History": block12, "Grade 8::Geography": block12, "Grade 8::Pre-Technical and Pre-Career Studies": block12, "Grade 8::Agriculture and Nutrition": block12, "Grade 8::Religious Education (CRE/IRE)": block12, "Grade 8::Creative Arts and Sports": block123,
+  "Grade 9::English": block78, "Grade 9::Kiswahili": block, "Grade 9::Mathematics": block78, "Grade 9::Integrated Science": block8, "Grade 9::History": block12, "Grade 9::Geography": block12, "Grade 9::Pre-Technical and Pre-Career Studies": block12, "Grade 9::Agriculture and Nutrition": block12, "Grade 9::Religious Education (CRE/IRE)": block12, "Grade 9::Creative Arts and Sports": block123
 };
 
 // ══════════════════════════════════════════════════════════
