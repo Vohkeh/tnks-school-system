@@ -2082,29 +2082,7 @@ function TimetableSetup({staff,setupData,setSetupData}) {
 // ══════════════════════════════════════════════════════════
 // TIMETABLE ADVANCED — Module-level helpers
 // ══════════════════════════════════════════════════════════
-const DEFAULT_LPW = {
-  PP:    {"Language Activities":8,"Mathematical Activities":8,"Environmental Activities":7,"Creative Activities":8,"Religious Education Activities":8},
-  Lower: {"English Language Activities":7,"Kiswahili Language Activities":6,"Mathematical Activities":7,"Environmental Activities":5,"Religious Education Activities":4,"Creative Activities":6,"Indigenous Language Activities":4},
-  // Upper Primary (Grade 4-6): strict CBC allocation — total 39 usable lessons/week
-  // English(5) + Math(5) + Kiswahili(5) + Integrated Science(5) + Agri & Nutrition(5)
-  // + Religious Education(4) + Social Studies(4) + Creative Arts & Sports(6) = 39
-  Upper: {"English":5,"Kiswahili":5,"Mathematics":5,"Integrated Science":5,"Social Studies":4,"Religious Education (CRE/IRE)":4,"Agriculture and Nutrition":5,"Creative Arts and Sports":6},
-  // JSS (Grade 7-9): strict CBC allocation — total 39 usable lessons/week
-  // English(5) + Math(5) + Integrated Science(5) + Kiswahili(4) + Pre-Technical(4)
-  // + Agri & Nutrition(4) + Creative Arts(4) + Religious Education(4)
-  // + History(2) + Geography(2) = 39
-  JSS:   {"English":5,"Kiswahili":4,"Mathematics":5,"Integrated Science":5,"History":2,"Geography":2,"Pre-Technical and Pre-Career Studies":4,"Agriculture and Nutrition":4,"Religious Education (CRE/IRE)":4,"Creative Arts and Sports":4},
-};
-// Default double-lesson rules per CBC:
-//  • JSS Integrated Science → 1 double + 2 singles (LPW=4: Science Double Rule)
-//  • Upper Creative Arts & Sports → LPW=6, non-consecutive extra (handled by CASE B)
-//  • All other subjects → singles only
-const DEFAULT_DOUBLE = {
-  JSS: {"Integrated Science": true},
-};
 // ── Per-class LPW overrides (exact lessons/week per subject per class) ─────
-// These override DEFAULT_LPW for specific classes. Values are sourced from
-// the school's official CBC timetable specification.
 const DEFAULT_LPW_CLS = {
   "Grade 4": {"English":5,"Kiswahili":5,"Mathematics":5,"Integrated Science":4,"Social Studies":5,"Religious Education (CRE/IRE)":4,"Agriculture and Nutrition":5,"Creative Arts and Sports":6},
   "Grade 5": {"English":5,"Kiswahili":5,"Mathematics":5,"Integrated Science":5,"Social Studies":4,"Religious Education (CRE/IRE)":4,"Agriculture and Nutrition":5,"Creative Arts and Sports":6},
@@ -2114,76 +2092,162 @@ const DEFAULT_LPW_CLS = {
   "Grade 9": {"English":5,"Kiswahili":4,"Mathematics":5,"Integrated Science":4,"History":2,"Geography":2,"Pre-Technical and Pre-Career Studies":4,"Agriculture and Nutrition":4,"Religious Education (CRE/IRE)":4,"Creative Arts and Sports":4},
 };
 // ── Per-class subject availability (period numbers allowed for each subject) ─
-// Format: periods are 1-based. Blocked periods are excluded.
-// This encodes the school's official period-restriction rules.
 const DEFAULT_AVAIL_CLS = {
   "Grade 4": {
-    "English":                          [1,2,3,4,5,6],
-    "Kiswahili":                        [1,2,3,4,5,6],
-    "Mathematics":                      [1,2,3,4,5,6],
-    "Integrated Science":               [1,2,3,4,5,6],
-    "Social Studies":                   [3,4,5,6,7,8],
-    "Religious Education (CRE/IRE)":    [3,4,5,6,7,8],
-    "Agriculture and Nutrition":        [3,4,5,6,7,8],
-    "Creative Arts and Sports":         [4,5,6,7,8],
+    "English":                              [1,2,3,4,5,6],
+    "Kiswahili":                            [1,2,3,4,5,6],
+    "Mathematics":                          [1,2,3,4,5,6],
+    "Integrated Science":                   [1,2,3,4,5,6],
+    "Social Studies":                       [3,4,5,6,7,8],
+    "Religious Education (CRE/IRE)":        [3,4,5,6,7,8],
+    "Agriculture and Nutrition":            [3,4,5,6,7,8],
+    "Creative Arts and Sports":             [4,5,6,7,8],
   },
   "Grade 5": {
-    "English":                          [1,2,3,4,5,6],
-    "Kiswahili":                        [1,2,3,4,5,6],
-    "Mathematics":                      [1,2,3,4,5,6],
-    "Integrated Science":               [1,2,3,4,5,6],
-    "Social Studies":                   [3,4,5,6,7,8],
-    "Religious Education (CRE/IRE)":    [3,4,5,6,7,8],
-    "Agriculture and Nutrition":        [3,4,5,6,7,8],
-    "Creative Arts and Sports":         [4,5,6,7,8],
+    "English":                              [1,2,3,4,5,6],
+    "Kiswahili":                            [1,2,3,4,5,6],
+    "Mathematics":                          [1,2,3,4,5,6],
+    "Integrated Science":                   [1,2,3,4,5,6],
+    "Social Studies":                       [3,4,5,6,7,8],
+    "Religious Education (CRE/IRE)":        [3,4,5,6,7,8],
+    "Agriculture and Nutrition":            [3,4,5,6,7,8],
+    "Creative Arts and Sports":             [4,5,6,7,8],
   },
   "Grade 6": {
-    "English":                          [1,2,3,4,5,6],
-    "Kiswahili":                        [1,2,3,4,5,6],
-    "Mathematics":                      [1,2,3,4,5,6],
-    "Integrated Science":               [1,2,3,4,5,6],
-    "Social Studies":                   [3,4,5,6,7,8],
-    "Religious Education (CRE/IRE)":    [3,4,5,6,7,8],
-    "Agriculture and Nutrition":        [3,4,5,6,7,8],
-    "Creative Arts and Sports":         [4,5,6,7,8],
+    "English":                              [1,2,3,4,5,6],
+    "Kiswahili":                            [1,2,3,4,5,6],
+    "Mathematics":                          [1,2,3,4,5,6],
+    "Integrated Science":                   [1,2,3,4,5,6],
+    "Social Studies":                       [3,4,5,6,7,8],
+    "Religious Education (CRE/IRE)":        [3,4,5,6,7,8],
+    "Agriculture and Nutrition":            [3,4,5,6,7,8],
+    "Creative Arts and Sports":             [4,5,6,7,8],
   },
   "Grade 7": {
-    "English":                          [1,2,3,4,5,6],
-    "Kiswahili":                        [1,2,3,4,5,6],
-    "Mathematics":                      [1,2,3,4,5,6],
-    "Integrated Science":               [1,2,3,4,5,6],
-    "History":                          [3,4,5,6,7,8],
-    "Geography":                        [3,4,5,6,7,8],
+    "English":                              [1,2,3,4,5,6],
+    "Kiswahili":                            [1,2,3,4,5,6],
+    "Mathematics":                          [1,2,3,4,5,6],
+    "Integrated Science":                   [1,2,3,4,5,6],
+    "History":                              [3,4,5,6,7,8],
+    "Geography":                            [3,4,5,6,7,8],
     "Pre-Technical and Pre-Career Studies": [3,4,5,6,7,8],
-    "Agriculture and Nutrition":        [3,4,5,6,7,8],
-    "Religious Education (CRE/IRE)":    [3,4,5,6,7,8],
-    "Creative Arts and Sports":         [4,5,6,7,8],
+    "Agriculture and Nutrition":            [3,4,5,6,7,8],
+    "Religious Education (CRE/IRE)":        [3,4,5,6,7,8],
+    "Creative Arts and Sports":             [4,5,6,7,8],
   },
   "Grade 8": {
-    "English":                          [1,2,3,4,5,6],
-    "Kiswahili":                        [1,2,3,4,5,6],
-    "Mathematics":                      [1,2,3,4,5,6],
-    "Integrated Science":               [1,2,3,4,5,6],
-    "History":                          [3,4,5,6,7,8],
-    "Geography":                        [3,4,5,6,7,8],
+    "English":                              [1,2,3,4,5,6],
+    "Kiswahili":                            [1,2,3,4,5,6],
+    "Mathematics":                          [1,2,3,4,5,6],
+    "Integrated Science":                   [1,2,3,4,5,6],
+    "History":                              [3,4,5,6,7,8],
+    "Geography":                            [3,4,5,6,7,8],
     "Pre-Technical and Pre-Career Studies": [3,4,5,6,7,8],
-    "Agriculture and Nutrition":        [3,4,5,6,7,8],
-    "Religious Education (CRE/IRE)":    [3,4,5,6,7,8],
-    "Creative Arts and Sports":         [4,5,6,7,8],
+    "Agriculture and Nutrition":            [3,4,5,6,7,8],
+    "Religious Education (CRE/IRE)":        [3,4,5,6,7,8],
+    "Creative Arts and Sports":             [4,5,6,7,8],
   },
   "Grade 9": {
-    "English":                          [1,2,3,4,5,6],
-    "Kiswahili":                        [1,2,3,4,5,6],
-    "Mathematics":                      [1,2,3,4,5,6],
-    "Integrated Science":               [1,2,3,4,5,6],
-    "History":                          [3,4,5,6,7,8],
-    "Geography":                        [3,4,5,6,7,8],
+    "English":                              [1,2,3,4,5,6],
+    "Kiswahili":                            [1,2,3,4,5,6],
+    "Mathematics":                          [1,2,3,4,5,6],
+    "Integrated Science":                   [1,2,3,4,5,6],
+    "History":                              [3,4,5,6,7,8],
+    "Geography":                            [3,4,5,6,7,8],
     "Pre-Technical and Pre-Career Studies": [3,4,5,6,7,8],
-    "Agriculture and Nutrition":        [3,4,5,6,7,8],
-    "Religious Education (CRE/IRE)":    [3,4,5,6,7,8],
-    "Creative Arts and Sports":         [4,5,6,7,8],
+    "Agriculture and Nutrition":            [3,4,5,6,7,8],
+    "Religious Education (CRE/IRE)":        [3,4,5,6,7,8],
+    "Creative Arts and Sports":             [4,5,6,7,8],
   },
 };
+// ── Per-class teacher assignments (used as defaults when none set in UI) ─────
+// Keys match TIMETABLE_SUBJECTS_MAP exactly.
+const DEFAULT_TEACHER_CLS = {
+  "Grade 4": {
+    "English":                              "Md Caroline 1",
+    "Kiswahili":                            "Md Caroline 1",
+    "Mathematics":                          "Md Caroline 1",
+    "Integrated Science":                   "Md Caroline 1",
+    "Social Studies":                       "Mr Mwangangi",
+    "Religious Education (CRE/IRE)":        "Md Caroline 1",
+    "Agriculture and Nutrition":            "Mr Mwandiki",
+    "Creative Arts and Sports":             "Mr Gitonga",
+  },
+  "Grade 5": {
+    "English":                              "Md Victoria",
+    "Kiswahili":                            "Md Caroline 2",
+    "Mathematics":                          "Mr Mwandiki",
+    "Integrated Science":                   "Mr Alex",
+    "Social Studies":                       "Md Caroline 1",
+    "Religious Education (CRE/IRE)":        "Md Caroline 1",
+    "Agriculture and Nutrition":            "Mr Gitonga",
+    "Creative Arts and Sports":             "Md Victoria",
+  },
+  "Grade 6": {
+    "English":                              "Md Victoria",
+    "Kiswahili":                            "Md Purity",
+    "Mathematics":                          "Mr Alex",
+    "Integrated Science":                   "Mr Mwandiki",
+    "Social Studies":                       "Mr Mwangangi",
+    "Religious Education (CRE/IRE)":        "Md Victoria",
+    "Agriculture and Nutrition":            "Mr Gitonga",
+    "Creative Arts and Sports":             "Md Caroline 2",
+  },
+  "Grade 7": {
+    "English":                              "Md Victoria",
+    "Kiswahili":                            "Md Caroline 2",
+    "Mathematics":                          "Mr Mwandiki",
+    "Integrated Science":                   "Mr Alex",
+    "History":                              "Mr Mwangangi",
+    "Geography":                            "Md Caroline 2",
+    "Pre-Technical and Pre-Career Studies": "Md Purity",
+    "Agriculture and Nutrition":            "Mr Gitonga",
+    "Religious Education (CRE/IRE)":        "Md Caroline 2",
+    "Creative Arts and Sports":             "Mr Mwangangi",
+  },
+  "Grade 8": {
+    "English":                              "Mr Gitonga",
+    "Kiswahili":                            "Md Purity",
+    "Mathematics":                          "Mr Alex",
+    "Integrated Science":                   "Mr Alex",
+    "History":                              "Mr Mwangangi",
+    "Geography":                            "Md Caroline 2",
+    "Pre-Technical and Pre-Career Studies": "Mr Mwandiki",
+    "Agriculture and Nutrition":            "Md Purity",
+    "Religious Education (CRE/IRE)":        "Mr Mwangangi",
+    "Creative Arts and Sports":             "Md Victoria",
+  },
+  "Grade 9": {
+    "English":                              "Mr Gitonga",
+    "Kiswahili":                            "Md Purity",
+    "Mathematics":                          "Mr Mwandiki",
+    "Integrated Science":                   "Mr Alex",
+    "History":                              "Mr Mwangangi",
+    "Geography":                            "Md Caroline 2",
+    "Pre-Technical and Pre-Career Studies": "Mr Mwangangi",
+    "Agriculture and Nutrition":            "Md Purity",
+    "Religious Education (CRE/IRE)":        "Md Purity",
+    "Creative Arts and Sports":             "Mr Alex",
+  },
+};
+// ── Per-class double-lesson flags ─────────────────────────────────────────────
+// Only JSS (Grade 7-9) Integrated Science gets a double period.
+const DEFAULT_DOUBLE_CLS = {
+  "Grade 7": {"Integrated Science": true},
+  "Grade 8": {"Integrated Science": true},
+  "Grade 9": {"Integrated Science": true},
+};
+// ── Group-level fallback defaults (used by PP, Lower, and any unspecified class) ─
+const DEFAULT_LPW = {
+  PP:    {"Language Activities":8,"Mathematical Activities":8,"Environmental Activities":7,"Creative Activities":8,"Religious Education Activities":8},
+  Lower: {"English Language Activities":7,"Kiswahili Language Activities":6,"Mathematical Activities":7,"Environmental Activities":5,"Religious Education Activities":4,"Creative Activities":6,"Indigenous Language Activities":4},
+  Upper: {"English":5,"Kiswahili":5,"Mathematics":5,"Integrated Science":5,"Social Studies":4,"Religious Education (CRE/IRE)":4,"Agriculture and Nutrition":5,"Creative Arts and Sports":6},
+  JSS:   {"English":5,"Kiswahili":4,"Mathematics":5,"Integrated Science":4,"History":2,"Geography":2,"Pre-Technical and Pre-Career Studies":4,"Agriculture and Nutrition":4,"Religious Education (CRE/IRE)":4,"Creative Arts and Sports":4},
+};
+// Keep DEFAULT_DOUBLE for group-level fallback (no longer used for Grades 4-9
+// which are fully covered by DEFAULT_DOUBLE_CLS above)
+const DEFAULT_DOUBLE = {};
+
 const PALETTE = ["#dbeafe","#d1fae5","#fef3c7","#fee2e2","#f3e8ff","#ccfbf1","#fce7f3","#e0f2fe","#fef9c3","#ffe4e6","#ecfdf5","#faf5ff","#fff7ed","#f0fdf4"];
 // Alias so new TimetablePage can use getTTSubs (matches App's TIMETABLE_SUBJECTS_MAP)
 function getTTSubs(cls) { return TIMETABLE_SUBJECTS_MAP[cg(cls)] || []; }
@@ -2277,7 +2341,14 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
   // ── Setup helpers ─────────────────────────────────────────────────────────
   const setSubTeacher = (cls, sub, t) =>
     setSetupData(p => ({...p, subjectTeachers:{...(p.subjectTeachers||{}), [`${cls}::${sub}`]:t}}));
-  const getSubTeacher = (cls, sub) => (setupData.subjectTeachers||{})[`${cls}::${sub}`]||"";
+  const getSubTeacher = (cls, sub) => {
+    // 1. User-assigned in UI (highest priority)
+    const ui = (setupData.subjectTeachers||{})[`${cls}::${sub}`];
+    if(ui) return ui;
+    // 2. Baked-in school data (DEFAULT_TEACHER_CLS)
+    if(DEFAULT_TEACHER_CLS[cls]?.[sub]) return DEFAULT_TEACHER_CLS[cls][sub];
+    return "";
+  };
   const setClsTeacher = (cls, t) =>
     setSetupData(p => ({...p, classTeachers:{...(p.classTeachers||{}), [cls]:t}}));
   const getClsTeacher = cls => (setupData.classTeachers||{})[cls]||"";
@@ -2319,8 +2390,11 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
   // Double lesson helpers
   const getClsDouble = (cls, sub) => {
     const key = `${cls}::${sub}`;
+    // 1. User manual toggle (highest priority)
     if(customDouble[key] !== undefined) return customDouble[key];
-    // CBC default: JSS Integrated Science always gets a double lesson
+    // 2. Per-class default (Grade 7/8/9 Integrated Science = true)
+    if(DEFAULT_DOUBLE_CLS[cls]?.[sub] !== undefined) return DEFAULT_DOUBLE_CLS[cls][sub];
+    // 3. Group-level fallback (empty by default now)
     const grp = cg(cls);
     return !!(DEFAULT_DOUBLE[grp]?.[sub]);
   };
@@ -2886,7 +2960,26 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // aSc AUTO-GENERATOR
+  // BACKTRACKING TIMETABLE GENERATOR
+  // Implements the exact algorithm from the Master Code Generation Prompt.
+  //
+  // For each class:
+  //   1. Build a flat list of lessons to place (singles + doubles)
+  //   2. Sort hardest constraints first (doubles > LPW=6 > LPW=5 > rest)
+  //   3. Backtrack through every (day, period) slot for each lesson,
+  //      enforcing ALL rules at every step — no relaxation fallbacks
+  //
+  // All 6 grades share a single globalTeacherSchedule so cross-class
+  // teacher conflicts are caught and backtracked immediately.
+  //
+  // Rules enforced inside the backtracker:
+  //   ✓ PPI — Friday Period 1 is locked before solving starts
+  //   ✓ AVAIL — only allowed periods per subject
+  //   ✓ ONCE-A-DAY — LPW=5: max 1 per day
+  //   ✓ NO-STACK — LPW≤4: max 1 per day
+  //   ✓ NON-CONSEC — LPW=6 CAS: 2nd lesson on same day must not be adjacent
+  //   ✓ SCIENCE DOUBLE — isDbl: place as adjacent pair (consecutive periods)
+  //   ✓ TEACHER CONFLICT — shared across all classes simultaneously
   // ══════════════════════════════════════════════════════════════════════════
   function autoGen() {
     if(LESSON_SLOTS.length < 1) {
@@ -2895,61 +2988,248 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
     setAiMode(false); setGenerating(true); setGenProgress(0);
     genStopRef.current = false;
 
-    const totalSlots = LESSON_SLOTS.length * workingDays.length
-                     - (workingDays.includes("Friday") ? 1 : 0);
+    const DAYS_LIST  = workingDays;           // ["Monday"…"Friday"]
+    const nPeriods   = LESSON_SLOTS.length;   // 8
+    const CONSEC     = getConsecPairs();       // adjacent slot-index pairs
     const startTime  = Date.now();
-    const CONSEC     = getConsecPairs();
 
-    // ── Shared utilities ─────────────────────────────────────────────────────
+    // ── Shuffle helper ────────────────────────────────────────────────────────
     const rnd = arr => {
-      const a=[...arr];
-      for(let i=a.length-1;i>0;i--){const j=0|Math.random()*(i+1);[a[i],a[j]]=[a[j],a[i]];}
+      const a = [...arr];
+      for(let i=a.length-1;i>0;i--){ const j=0|Math.random()*(i+1); [a[i],a[j]]=[a[j],a[i]]; }
       return a;
     };
 
-    // Fast teacher-conflict counter — O(classes × slots × days)
-    const countConflicts = g => {
-      let n = 0;
-      workingDays.forEach(day => {
-        for(let si=0;si<LESSON_SLOTS.length;si++) {
-          const seen = {};
-          ALL_CLASSES.forEach(cls => {
-            const cell = (g[cls]?.[day]||[])[si];
-            if(!cell?.teacher||cell.teacher==="TBD"||cell.ppi||
-               cell.teacher.includes("All Staff")) return;
-            if(seen[cell.teacher]) n++;
-            seen[cell.teacher] = true;
-          });
+    // ── Build subject list for a class ───────────────────────────────────────
+    // Returns array of lesson objects ready to feed into the backtracker.
+    const buildLessons = cls => {
+      const subs = getTTSubs(cls);
+      const lessons = [];
+      subs.forEach(sub => {
+        const lpw     = getClsLpw(cls, sub);
+        const isDbl   = getClsDouble(cls, sub);
+        const avail   = getAvail(cls, sub);  // period numbers (1-based)
+        const teacher = getSubTeacher(cls, sub) || "TBD";
+
+        if(isDbl) {
+          // One double-lesson token (counts as 2 slots) + remaining singles
+          lessons.push({sub, teacher, lpw, isDbl:true,  avail, cls});
+          for(let i = 0; i < lpw - 2; i++)
+            lessons.push({sub, teacher, lpw, isDbl:false, avail, cls});
+        } else {
+          for(let i = 0; i < lpw; i++)
+            lessons.push({sub, teacher, lpw, isDbl:false, avail, cls});
         }
       });
-      return n;
+      // Sort: doubles first → LPW=6 → LPW=5 → rest (hardest first)
+      lessons.sort((a,b) => {
+        if(a.isDbl !== b.isDbl) return a.isDbl ? -1 : 1;
+        return b.lpw - a.lpw;
+      });
+      return lessons;
     };
 
-    // ── Phase 1: Build a fully-filled grid ───────────────────────────────────
-    const buildGrid = () => {
-      const busyMap = {}, gen = {};
-      const allDays = [...DAYS, ...WEEKEND_DAYS];
-      ALL_CLASSES.forEach(cls => {
-        gen[cls] = {};
-        allDays.forEach(d => { gen[cls][d] = Array(LESSON_SLOTS.length).fill(null); });
+    // ── Convert period number (1-based) → slot-index (0-based) ──────────────
+    const periodToSi = p => LESSON_SLOTS.findIndex(s => s.period === p);
+
+    // ── Shared state across all classes ──────────────────────────────────────
+    // globalBusy[teacher][day][si] = true  →  teacher is occupied
+    const globalBusy = {};
+    const setTeacherBusy = (teacher, day, si, val) => {
+      if(teacher === "TBD") return;
+      if(!globalBusy[teacher]) globalBusy[teacher] = {};
+      if(!globalBusy[teacher][day]) globalBusy[teacher][day] = {};
+      globalBusy[teacher][day][si] = val;
+    };
+    const isTeacherBusy = (teacher, day, si) =>
+      teacher !== "TBD" && !!(globalBusy[teacher]?.[day]?.[si]);
+
+    // ── Per-class grid + daily-count tracking ─────────────────────────────────
+    const gen = {};
+    const allDays = [...DAYS, ...WEEKEND_DAYS];
+    ALL_CLASSES.forEach(cls => {
+      gen[cls] = {};
+      allDays.forEach(d => { gen[cls][d] = Array(nPeriods).fill(null); });
+    });
+
+    // Lock Friday Period 1 as PPI for all classes
+    const fridaySi = 0; // Period 1 is always slot-index 0
+    ALL_CLASSES.forEach(cls => {
+      if(DAYS_LIST.includes("Friday"))
+        gen[cls]["Friday"][fridaySi] = {subject:"PPI", teacher:"— All Staff —", period:1, ppi:true};
+    });
+
+    // dailyCount[cls][day][sub] = number of lessons placed so far
+    const dailyCount = {};
+    ALL_CLASSES.forEach(cls => {
+      dailyCount[cls] = {};
+      DAYS_LIST.forEach(d => { dailyCount[cls][d] = {}; });
+    });
+
+    const getDC = (cls,day,sub) => dailyCount[cls]?.[day]?.[sub] || 0;
+    const addDC = (cls,day,sub,n) => { dailyCount[cls][day][sub] = (dailyCount[cls][day][sub]||0)+n; };
+
+    // ── Check whether slot si on day is available (avail list is 1-based) ────
+    const slotOk = (si, avail) => {
+      const p = LESSON_SLOTS[si]?.period;
+      return p !== undefined && avail.includes(p);
+    };
+
+    // ── Are two slot-indices consecutive? ─────────────────────────────────────
+    const isConsec = (si1, si2) =>
+      CONSEC.some(([a,b]) => (a===si1&&b===si2)||(a===si2&&b===si1));
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // BACKTRACKING SOLVER for a single class
+    // Returns true if all lessons placed successfully, false if no solution.
+    // ══════════════════════════════════════════════════════════════════════════
+    const solveClass = (cls, lessons, idx) => {
+      if(genStopRef.current) return false;
+      if(idx >= lessons.length) return true; // all placed ✓
+
+      const {sub, teacher, lpw, isDbl, avail} = lessons[idx];
+
+      // Try days in random order to avoid always producing the same timetable
+      for(const day of rnd([...DAYS_LIST])) {
+        // Skip Friday slot-0 (PPI)
+        const slots = rnd(
+          Array.from({length:nPeriods},(_,i)=>i)
+            .filter(si => !(day==="Friday" && si===fridaySi))
+        );
+
+        for(const si of slots) {
+          // ── Basic checks ────────────────────────────────────────────────────
+          if(!slotOk(si, avail)) continue;               // period not allowed
+          if(gen[cls][day][si] !== null) continue;       // slot occupied
+
+          // ── Double-period (Science Double Rule) ─────────────────────────────
+          if(isDbl) {
+            // Find an adjacent slot si2 right after si
+            const si2 = CONSEC.find(([a,b]) => a===si)?.[1];
+            if(si2 === undefined) continue;              // no adjacent pair here
+            if(!slotOk(si2, avail)) continue;            // si2 not in avail
+            if(gen[cls][day][si2] !== null) continue;    // si2 occupied
+            if(isTeacherBusy(teacher,day,si))  continue; // teacher busy at si
+            if(isTeacherBusy(teacher,day,si2)) continue; // teacher busy at si2
+            // No-stack for doubles: can't put any Science on this day already
+            if(getDC(cls,day,sub) > 0) continue;
+
+            // PLACE double
+            gen[cls][day][si]  = {subject:sub, teacher, period:LESSON_SLOTS[si].period,  double:true};
+            gen[cls][day][si2] = {subject:sub, teacher, period:LESSON_SLOTS[si2].period, double:true, doublePart:2};
+            setTeacherBusy(teacher,day,si,true);
+            setTeacherBusy(teacher,day,si2,true);
+            addDC(cls,day,sub,2);
+
+            if(solveClass(cls,lessons,idx+1)) return true;
+
+            // BACKTRACK
+            gen[cls][day][si]  = null;
+            gen[cls][day][si2] = null;
+            setTeacherBusy(teacher,day,si,false);
+            setTeacherBusy(teacher,day,si2,false);
+            addDC(cls,day,sub,-2);
+            continue;
+          }
+
+          // ── Single lesson ────────────────────────────────────────────────────
+          if(isTeacherBusy(teacher,day,si)) continue;   // teacher conflict
+
+          const dc = getDC(cls,day,sub);
+
+          // NO-STACK rule: subjects with LPW≤5 — max 1 per day
+          if(lpw <= 5 && dc >= 1) continue;
+
+          // CAS (LPW=6) — max 2 per day; if already 1, must NOT be consecutive
+          if(lpw === 6) {
+            if(dc >= 2) continue;
+            if(dc === 1) {
+              // Find the slot-index of the existing CAS lesson on this day
+              const exSi = gen[cls][day].findIndex(c => c?.subject===sub);
+              if(exSi >= 0 && isConsec(si, exSi)) continue; // NON-CONSEC rule
+            }
+          }
+
+          // PLACE single
+          gen[cls][day][si] = {subject:sub, teacher, period:LESSON_SLOTS[si].period};
+          setTeacherBusy(teacher,day,si,true);
+          addDC(cls,day,sub,1);
+
+          if(solveClass(cls,lessons,idx+1)) return true;
+
+          // BACKTRACK
+          gen[cls][day][si] = null;
+          setTeacherBusy(teacher,day,si,false);
+          addDC(cls,day,sub,-1);
+        }
+      }
+      return false; // no valid placement found — trigger backtrack in parent
+    };
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // MAIN LOOP — solve grades 4–9 with backtracking, others with applyPlan
+    // ══════════════════════════════════════════════════════════════════════════
+    const BACKTRACK_GRADES = ["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"];
+    const OTHER_GRADES     = ALL_CLASSES.filter(c => !BACKTRACK_GRADES.includes(c));
+
+    let attempt = 0;
+    const MAX_ATTEMPTS = 50;
+
+    const runAttempt = () => {
+      if(genStopRef.current) { setGenerating(false); return; }
+      attempt++;
+      setGenProgress(Math.min(90, attempt * 2));
+
+      // Reset grids and counters for this attempt
+      allDays.forEach(d => {
+        ALL_CLASSES.forEach(cls => { gen[cls][d] = Array(nPeriods).fill(null); });
       });
-      const plan = buildDefaultPlan();
-      applyPlan(plan, gen, busyMap);
-      // Lock Friday P1 as PPI
+      // Re-lock PPI
       ALL_CLASSES.forEach(cls => {
-        if(workingDays.includes("Friday"))
-          gen[cls]["Friday"][0] = {subject:"PPI",teacher:"— All Staff —",period:1,ppi:true};
+        if(DAYS_LIST.includes("Friday"))
+          gen[cls]["Friday"][fridaySi] = {subject:"PPI", teacher:"— All Staff —", period:1, ppi:true};
       });
-      // Saturday
+      DAYS_LIST.forEach(d => {
+        ALL_CLASSES.forEach(cls => { dailyCount[cls][d] = {}; });
+      });
+      Object.keys(globalBusy).forEach(t => { delete globalBusy[t]; });
+
+      // ── Step 1: Backtrack-solve all Grade 4–9 classes ──────────────────────
+      let allSolved = true;
+      for(const cls of rnd([...BACKTRACK_GRADES])) {
+        const lessons = buildLessons(cls);
+        const ok = solveClass(cls, lessons, 0);
+        if(!ok) { allSolved = false; break; }
+      }
+
+      // ── Step 2: applyPlan for PP/Lower grades ──────────────────────────────
+      if(allSolved) {
+        const busyMap = {};
+        // Seed busyMap from globalBusy (teachers already placed in Gr4-9)
+        Object.entries(globalBusy).forEach(([t,days]) => {
+          Object.entries(days).forEach(([d,slots]) => {
+            Object.keys(slots).forEach(si => { busyMap[`${t}::${d}::${si}`] = true; });
+          });
+        });
+        const plan = buildDefaultPlan();
+        OTHER_GRADES.forEach(cls => {
+          workingDays.forEach(d => { gen[cls][d] = Array(nPeriods).fill(null); });
+          if(workingDays.includes("Friday"))
+            gen[cls]["Friday"][fridaySi] = {subject:"PPI", teacher:"— All Staff —", period:1, ppi:true};
+        });
+        applyPlan(plan, gen, busyMap);
+      }
+
+      // ── Saturday (all classes) ─────────────────────────────────────────────
       const satBusy = {};
       ALL_CLASSES.forEach(cls => {
-        const upper   = ["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].includes(cls);
+        const upper   = BACKTRACK_GRADES.includes(cls);
         const ct      = getClsTeacher(cls);
         const clsSubs = getTTSubs(cls);
         const rot     = [...clsSubs.slice(ALL_CLASSES.indexOf(cls)%clsSubs.length),
                           ...clsSubs.slice(0,ALL_CLASSES.indexOf(cls)%clsSubs.length)];
-        let cur=0;
-        const satSlots=Array(SAT_LESSON_SLOTS.length).fill(null);
+        let cur = 0;
+        const satSlots = Array(SAT_LESSON_SLOTS.length).fill(null);
         for(let si=0;si<SAT_LESSON_SLOTS.length;si++){
           let placed=false;
           for(let at=0;at<rot.length;at++){
@@ -2970,283 +3250,53 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
         }
         gen[cls]["Saturday"]=satSlots;
       });
-      return {gen, plan};
-    };
 
-    // ── Phase 2: Tabu Search repair ──────────────────────────────────────────
-    // aSc uses Tabu Search as its core conflict-resolution mechanism.
-    // Tabu list: set of (cls,day,si,tDay,tSi) swap keys tried recently.
-    // Each call does ONE swap — browser yields between calls.
-    const TABU_TENURE  = 20;  // how many rounds a swap stays "forbidden"
-    const tabuList     = [];  // circular tabu queue
+      // ── Report result ──────────────────────────────────────────────────────
+      const conflicts = buildConflicts(gen);
+      const cc = Object.keys(conflicts).length;
+      setConflictMap(conflicts);
+      setTt({...gen});
 
-    const isTabu = key => tabuList.some(t => t.key===key);
-    const addTabu = key => {
-      tabuList.push({key, age:0});
-      // Age all entries; evict old ones
-      for(let i=tabuList.length-1;i>=0;i--) {
-        tabuList[i].age++;
-        if(tabuList[i].age > TABU_TENURE) tabuList.splice(i,1);
-      }
-    };
-
-    // Returns list of conflicted {cls,day,si,cell}
-    const getConflicts = g => {
-      const out = [];
-      workingDays.forEach(day => {
-        for(let si=0;si<LESSON_SLOTS.length;si++) {
-          const tm = {};
-          ALL_CLASSES.forEach(cls => {
-            const cell=(g[cls]?.[day]||[])[si];
-            if(!cell?.teacher||cell.teacher==="TBD"||cell.ppi||
-               cell.teacher.includes("All Staff")) return;
-            if(!tm[cell.teacher]) tm[cell.teacher]=[];
-            tm[cell.teacher].push({cls,day,si,cell});
-          });
-          Object.values(tm).forEach(arr => {
-            if(arr.length>1) arr.forEach(e=>out.push(e));
-          });
-        }
-      });
-      return out;
-    };
-
-    // ONE tabu-search move — returns true if conflicts reach 0
-    const tabuMove = (gen, plan) => {
-      const conflicts = getConflicts(gen);
-      if(conflicts.length===0) return true;
-
-      // Pick a random conflicted cell to fix
-      const conflictItem = rnd(conflicts)[0];
-      if(!conflictItem) return false;
-      const {cls,day,si,cell} = conflictItem;
-      if(!cell || cell.ppi || !cell.teacher || cell.teacher==="TBD") return false;
-      const teacher = cell.teacher;
-      const subAvail = plan[cls]?.[cell.subject]?.avail || LESSON_SLOTS.map(s=>s.period);
-
-      let bestSwap=null, bestCC=countConflicts(gen)+1;
-
-      // Try all swaps of this lesson with any other lesson in the same class
-      for(const tDay of rnd([...workingDays])) {
-        const slots = gen[cls]?.[tDay]||[];
-        for(let tSi=0;tSi<slots.length;tSi++) {
-          if(tDay===day&&tSi===si) continue;
-          const target=slots[tSi];
-          if(!target||target.ppi) continue;
-          const tPeriod=LESSON_SLOTS[tSi]?.period;
-          if(!subAvail.includes(tPeriod)) continue; // respect availability
-
-          const swapKey=`${cls}:${day}:${si}:${tDay}:${tSi}`;
-          // Allow tabu moves if they're the best aspiration
-          const tabu = isTabu(swapKey);
-
-          // Simulate swap
-          const orig1=gen[cls][day][si], orig2=gen[cls][tDay][tSi];
-          gen[cls][day][si]  ={...target,  period:LESSON_SLOTS[si]?.period||(si+1)};
-          gen[cls][tDay][tSi]={...orig1,   period:LESSON_SLOTS[tSi]?.period||(tSi+1)};
-          const newCC=countConflicts(gen);
-          // Revert
-          gen[cls][day][si]  =orig1;
-          gen[cls][tDay][tSi]=orig2;
-
-          // Accept if: better than best AND not tabu, OR aspiration (zero conflicts)
-          if(newCC===0 || (!tabu && newCC<bestCC)) {
-            bestCC=newCC; bestSwap={cls,day,si,tDay,tSi,swapKey};
-          }
-        }
-      }
-
-      // Also try cross-class swaps for teacher conflicts
-      for(const otherCls of rnd(ALL_CLASSES.filter(c=>c!==cls))) {
-        for(const tDay of rnd([...workingDays])) {
-          const oSlots=gen[otherCls]?.[tDay]||[];
-          for(let tSi=0;tSi<oSlots.length;tSi++) {
-            const otherCell=oSlots[tSi];
-            if(!otherCell||otherCell.ppi||otherCell.teacher!==teacher) continue;
-            if((gen[cls]?.[tDay]||[])[tSi]!==null) continue;
-            if((gen[otherCls]?.[day]||[])[si]!==null) continue;
-
-            const swapKey=`X:${cls}:${otherCls}:${day}:${si}:${tDay}:${tSi}`;
-            if(isTabu(swapKey)) continue;
-
-            const orig1=gen[cls][day][si];
-            const orig2=gen[otherCls][tDay][tSi];
-            gen[cls][day][si]        =null;
-            gen[otherCls][tDay][tSi] =null;
-            gen[cls][tDay][tSi]      ={...orig1,   period:LESSON_SLOTS[tSi]?.period||(tSi+1)};
-            gen[otherCls][day][si]   ={...orig2,   period:LESSON_SLOTS[si]?.period||(si+1)};
-            const newCC=countConflicts(gen);
-            gen[cls][day][si]        =orig1;
-            gen[otherCls][tDay][tSi] =orig2;
-            gen[cls][tDay][tSi]      =null;
-            gen[otherCls][day][si]   =null;
-
-            if(newCC<bestCC){
-              bestCC=newCC;
-              bestSwap={cls,day,si,tDay,tSi,swapKey,otherCls,cross:true};
-            }
-          }
-        }
-      }
-
-      // Apply best swap found
-      if(bestSwap) {
-        addTabu(bestSwap.swapKey);
-        const {tDay:bTDay, tSi:bTSi, otherCls:bOtherCls, cross:bCross} = bestSwap;
-        if(bCross && bOtherCls) {
-          const orig1 = gen[cls]?.[day]?.[si];
-          const orig2 = gen[bOtherCls]?.[bTDay]?.[bTSi];
-          if(orig1 && orig2) {
-            gen[cls][day][si]              = null;
-            gen[bOtherCls][bTDay][bTSi]   = null;
-            gen[cls][bTDay][bTSi]         = {...orig1, period:LESSON_SLOTS[bTSi]?.period||(bTSi+1)};
-            gen[bOtherCls][day][si]       = {...orig2, period:LESSON_SLOTS[si]?.period||(si+1)};
-          }
-        } else {
-          const orig1 = gen[cls]?.[day]?.[si];
-          const orig2 = gen[cls]?.[bTDay]?.[bTSi];
-          if(orig1 && orig2) {
-            gen[cls][day][si]      = {...orig2, period:LESSON_SLOTS[si]?.period||(si+1)};
-            gen[cls][bTDay][bTSi]  = {...orig1, period:LESSON_SLOTS[bTSi]?.period||(bTSi+1)};
-          }
-        }
-      } else {
-        // No improvement possible — force a random non-tabu swap to escape
-        let escaped = false;
-        for(const d of rnd([...workingDays])) {
-          if(escaped) break;
-          const slots = gen[cls]?.[d]||[];
-          for(const tSi of rnd(slots.map((_,x)=>x).filter(x=>slots[x]&&!slots[x].ppi))) {
-            if(d===day&&tSi===si) continue;
-            const swapKey=`F:${cls}:${day}:${si}:${d}:${tSi}`;
-            if(isTabu(swapKey)) continue;
-            const orig1 = gen[cls]?.[day]?.[si];
-            const orig2 = gen[cls]?.[d]?.[tSi];
-            if(!orig1||!orig2) continue;
-            gen[cls][day][si] = {...orig2, period:LESSON_SLOTS[si]?.period||(si+1)};
-            gen[cls][d][tSi]  = {...orig1, period:LESSON_SLOTS[tSi]?.period||(tSi+1)};
-            addTabu(swapKey);
-            escaped = true; break;
-          }
-        }
-      }
-
-      return countConflicts(gen)===0;
-    };
-
-    // ── MAIN LOOP ─────────────────────────────────────────────────────────────
-    let gen=null, plan=null, bestGen=null, bestCC=Infinity;
-    let tick=0, noImproveTicks=0;
-    const MAX_NO_IMPROVE = 150;
-
-    const loop = () => {
-      // Check stop flag
-      if(genStopRef.current) {
-        const src = bestGen || gen;
-        if(!src) { setGenerating(false); return; }
-        const cc = Object.keys(buildConflicts(src)).length;
-        setConflictMap(buildConflicts(src));
-        setTt({...src});
+      if(allSolved && cc === 0) {
         setGenProgress(100); setGenerating(false);
-        flash(cc>0
-          ? `⏹ Stopped — ${cc} conflict(s) remain. Reassign teachers and regenerate.`
-          : `✅ Perfect timetable! All ${totalSlots} slots filled — zero conflicts!`,
-          cc>0?"warn":"ok");
+        const secs = Math.round((Date.now()-startTime)/1000);
+        flash(`✅ Perfect timetable! All rules enforced — zero conflicts! (attempt ${attempt}, ${secs}s)`, "ok");
+        // Auto-save snapshot
+        try {
+          const autoSnap = {
+            id: Date.now(),
+            name: `Auto-Save ${new Date().toLocaleDateString("en-KE")}`,
+            savedAt: new Date().toLocaleString(),
+            timetable: gen,
+            ttSetup: ttSetup,
+          };
+          const existing = JSON.parse(localStorage.getItem(SNAP_KEY)||"[]");
+          const updated = [autoSnap, ...existing.filter(s=>!s.name.startsWith("Auto-Save"))].slice(0,20);
+          localStorage.setItem(SNAP_KEY, JSON.stringify(updated));
+          setSavedTTs(updated);
+          supabase.from("app_data").upsert({
+            key: SNAP_KEY,
+            value: JSON.stringify(updated),
+            updated_at: new Date().toISOString(),
+          }, {onConflict:"key"}).catch(()=>{});
+        } catch{}
         return;
       }
 
-      try {
-        // Build a fresh grid if starting or stuck
-        if(!gen || noImproveTicks >= MAX_NO_IMPROVE) {
-          const built = buildGrid();
-          gen  = built.gen;
-          plan = built.plan;
-          noImproveTicks = 0;
-          tabuList.length = 0;
-          // Show Stage 1 result immediately
-          const initCC = countConflicts(gen);
-          if(initCC < bestCC || bestGen===null) {
-            bestCC  = initCC;
-            bestGen = JSON.parse(JSON.stringify(gen));
-            setConflictMap(buildConflicts(gen));
-            setTt({...gen});
-          }
-          if(initCC === 0) {
-            setConflictMap({}); setTt({...gen});
-            setGenProgress(100); setGenerating(false);
-            flash(`✅ Perfect timetable! All ${totalSlots} slots filled — zero conflicts!`, "ok");
-            return;
-          }
-        }
-
-        // ONE tabu-search move — safe, guarded
-        let done = false;
-        try { done = tabuMove(gen, plan); } catch(_) { /* ignore single-move errors */ }
-        const cc = countConflicts(gen);
-        tick++;
-
-        // Track best result
-        if(cc < bestCC) {
-          bestCC = cc;
-          bestGen = JSON.parse(JSON.stringify(gen));
-          setConflictMap(buildConflicts(gen));
-          setTt({...gen});
-          noImproveTicks = 0;
-        } else {
-          noImproveTicks++;
-        }
-
-        // Done?
-        if(done || cc === 0) {
-          setConflictMap({});
-          setTt({...gen});
-          setGenProgress(100); setGenerating(false);
-          const secs = Math.round((Date.now()-startTime)/1000);
-          flash(`✅ Perfect timetable! All ${totalSlots} slots filled — zero conflicts! (${tick} moves, ${secs}s)`, "ok");
-          // Auto-save to Supabase so timetable persists across sessions
-          try {
-            const autoSnap = {
-              id: Date.now(),
-              name: `Auto-Save ${new Date().toLocaleDateString("en-KE")}`,
-              savedAt: new Date().toLocaleString(),
-              timetable: gen,
-              ttSetup: ttSetup,
-            };
-            const existing = JSON.parse(localStorage.getItem(SNAP_KEY)||"[]");
-            const updated = [autoSnap, ...existing.filter(s=>!s.name.startsWith("Auto-Save"))].slice(0,20);
-            localStorage.setItem(SNAP_KEY, JSON.stringify(updated));
-            setSavedTTs(updated);
-            supabase.from("app_data").upsert({
-              key: SNAP_KEY,
-              value: JSON.stringify(updated),
-              updated_at: new Date().toISOString(),
-            }, { onConflict: "key" }).catch(()=>{});
-          } catch {}
-          return;
-        }
-
-        // Progress bar: reflects real reduction in conflicts
-        const prog = Math.min(95, Math.round(15 + (1 - cc/Math.max(bestCC,1)) * 75));
-        setGenProgress(prog);
-
-        setTimeout(loop, 0); // yield — never blocks browser
-
-      } catch(e) {
-        // On any error, try a fresh restart rather than crashing
-        console.warn("Generator tick error:", e.message);
-        gen = null; // forces fresh grid next tick
-        noImproveTicks = 0;
-        if(tick > 5000) {
-          setGenerating(false);
-          flash("Generator error: " + e.message, "error");
-          return;
-        }
-        setTimeout(loop, 50);
+      // Not perfect yet — retry if under limit
+      if(attempt < MAX_ATTEMPTS) {
+        setTimeout(runAttempt, 0);
+      } else {
+        setGenProgress(100); setGenerating(false);
+        flash(cc > 0
+          ? `⚠️ Best result after ${MAX_ATTEMPTS} attempts — ${cc} conflict(s). Try reassigning teachers.`
+          : `✅ Timetable generated! (${MAX_ATTEMPTS} attempts, ${Math.round((Date.now()-startTime)/1000)}s)`,
+          cc > 0 ? "warn" : "ok"
+        );
       }
     };
 
-    // Kick off with a small delay so UI renders first
-    setTimeout(loop, 50);
+    setTimeout(runAttempt, 50);
   }
 
 
