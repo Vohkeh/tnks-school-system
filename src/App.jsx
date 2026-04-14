@@ -2988,163 +2988,269 @@ function TimetablePage({students, staff, user, timetable:tt, setTimetable:setTt,
     setAiMode(false); setGenerating(true); setGenProgress(0);
     genStopRef.current = false;
 
-    const DAYS_LIST = workingDays;
-    const nPeriods  = LESSON_SLOTS.length;
-    const CONSEC    = getConsecPairs();
     const startTime = Date.now();
+    const DAYS_COUNT = workingDays.length;   // 5
+    const PER_COUNT  = LESSON_SLOTS.length;  // 8
     const BACKTRACK_GRADES = ["Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"];
-    const OTHER_GRADES     = ALL_CLASSES.filter(c => !BACKTRACK_GRADES.includes(c));
 
-    const rnd = arr => {
-      const a=[...arr];
-      for(let i=a.length-1;i>0;i--){const j=0|Math.random()*(i+1);[a[i],a[j]]=[a[j],a[i]];}
-      return a;
+    // Map workingDays index → day name, e.g. 4 → "Friday"
+    const dayName = i => workingDays[i];
+    // Map period number (1-based) → slot index (0-based)
+    const periodToSi = p => LESSON_SLOTS.findIndex(s => s.period === p);
+
+    // ── Shared teacher schedule across ALL grades ─────────────────────────────
+    // globalTeacherSchedule[teacher][dayIndex][periodIndex] = true/false
+    const globalTeacherSchedule = {};
+
+    const isTeacherBusy = (teacher, day, period) => {
+      if(!globalTeacherSchedule[teacher]) globalTeacherSchedule[teacher] = {};
+      if(!globalTeacherSchedule[teacher][day]) globalTeacherSchedule[teacher][day] = {};
+      return !!globalTeacherSchedule[teacher][day][period];
     };
-    const isCP = (si1,si2) => CONSEC.some(([a,b])=>(a===si1&&b===si2)||(a===si2&&b===si1));
+    const setTeacherBusy = (teacher, day, period, status) => {
+      if(!globalTeacherSchedule[teacher]) globalTeacherSchedule[teacher] = {};
+      if(!globalTeacherSchedule[teacher][day]) globalTeacherSchedule[teacher][day] = {};
+      globalTeacherSchedule[teacher][day][period] = status;
+    };
 
-    const runOneAttempt = () => {
-      const tBusy = {};
-      const tOk  = (t,d,si) => t==="TBD"||!tBusy[`${t}::${d}::${si}`];
-      const tSet = (t,d,si) => { if(t!=="TBD") tBusy[`${t}::${d}::${si}`]=true; };
+    // ── generateTimetable: the exact algorithm from the prompt ────────────────
+    function generateTimetable(className, classSubjects) {
+      // 5×8 grid of nulls
+      const timetable = Array.from({length: DAYS_COUNT}, () => Array(PER_COUNT).fill(null));
 
-      const gen = {};
-      const allDays = [...DAYS,...WEEKEND_DAYS];
-      ALL_CLASSES.forEach(cls => {
-        gen[cls]={};
-        allDays.forEach(d=>{ gen[cls][d]=Array(nPeriods).fill(null); });
+      // Friday Period 1 (day index 4, slot index 0) → PPI
+      const fridayIdx = workingDays.indexOf("Friday");
+      if(fridayIdx >= 0) {
+        timetable[fridayIdx][0] = {subject:"PPI", teacher:"— All Staff —", period:1, ppi:true};
+        setTeacherBusy("— All Staff —", fridayIdx, 0, true);
+      }
+
+      // Build flat lesson list
+      let lessonsToPlace = [];
+      classSubjects.forEach(sub => {
+        let remaining = sub.lessons;
+        if(sub.double) {
+          lessonsToPlace.push({...sub, isDouble:true});
+          remaining -= 2;
+        }
+        for(let i = 0; i < remaining; i++) {
+          lessonsToPlace.push({...sub, isDouble:false});
+        }
       });
-      ALL_CLASSES.forEach(cls => {
-        if(DAYS_LIST.includes("Friday"))
-          gen[cls]["Friday"][0]={subject:"PPI",teacher:"— All Staff —",period:1,ppi:true};
+
+      // Sort: doubles first → most lessons → rest (hardest constraints first)
+      lessonsToPlace.sort((a, b) => {
+        if(a.isDouble !== b.isDouble) return a.isDouble ? -1 : 1;
+        return b.lessons - a.lessons;
       });
 
-      for(const cls of rnd([...BACKTRACK_GRADES])) {
-        const subs = getTTSubs(cls);
-        const tasks = [];
-        subs.forEach(sub => {
-          const lpw=getClsLpw(cls,sub), isDbl=getClsDouble(cls,sub);
-          const avail=getAvail(cls,sub), t=getSubTeacher(cls,sub)||"TBD";
-          if(isDbl){ tasks.push({sub,t,lpw,avail,isDbl:true}); for(let i=0;i<lpw-2;i++) tasks.push({sub,t,lpw,avail,isDbl:false}); }
-          else { for(let i=0;i<lpw;i++) tasks.push({sub,t,lpw,avail,isDbl:false}); }
+      // Daily subject count tracker
+      const dailySubjectCount = Array.from({length: DAYS_COUNT}, () => ({}));
+
+      // ── Backtracking solver ───────────────────────────────────────────────
+      const solve = (lessonIndex) => {
+        if(lessonIndex >= lessonsToPlace.length) return true;
+
+        const cur = lessonsToPlace[lessonIndex];
+        const {subject, teacher, allowed, lessons: totalLessons, isDouble} = cur;
+
+        for(let day = 0; day < DAYS_COUNT; day++) {
+          for(let period = 0; period < PER_COUNT; period++) {
+
+            // 1. Slot must be free
+            if(timetable[day][period] !== null) continue;
+            // 2. Period must be in allowed list (allowed uses 1-based period numbers)
+            if(!allowed.includes(period + 1)) continue;
+            // 3. Teacher must be free
+            if(isTeacherBusy(teacher, day, period)) continue;
+
+            const dailyCount = dailySubjectCount[day][subject] || 0;
+
+            // 4. No-Stacking & Once-a-Day rules
+            if(totalLessons <= 5 && dailyCount >= (isDouble ? 2 : 1)) continue;
+            // CAS (6 lessons): max 2 per day
+            if(totalLessons === 6 && dailyCount >= 2) continue;
+
+            // 5. Non-Consecutive rule (CAS, when placing 2nd on same day)
+            if(totalLessons === 6 && dailyCount === 1) {
+              if(period > 0 && timetable[day][period-1]?.subject === subject) continue;
+              if(period < PER_COUNT-1 && timetable[day][period+1]?.subject === subject) continue;
+            }
+
+            // 6. Double period logic
+            if(isDouble) {
+              if(period >= PER_COUNT - 1) continue;
+              if(timetable[day][period+1] !== null) continue;
+              if(!allowed.includes(period + 2)) continue;
+              if(isTeacherBusy(teacher, day, period+1)) continue;
+
+              // PLACE double
+              timetable[day][period]   = {subject, teacher, period:period+1, double:true};
+              timetable[day][period+1] = {subject, teacher, period:period+2, double:true, doublePart:2};
+              setTeacherBusy(teacher, day, period,   true);
+              setTeacherBusy(teacher, day, period+1, true);
+              dailySubjectCount[day][subject] = dailyCount + 2;
+
+              if(solve(lessonIndex + 1)) return true;
+
+              // BACKTRACK
+              timetable[day][period]   = null;
+              timetable[day][period+1] = null;
+              setTeacherBusy(teacher, day, period,   false);
+              setTeacherBusy(teacher, day, period+1, false);
+              dailySubjectCount[day][subject] = dailyCount;
+            } else {
+              // PLACE single
+              timetable[day][period] = {subject, teacher, period:period+1};
+              setTeacherBusy(teacher, day, period, true);
+              dailySubjectCount[day][subject] = dailyCount + 1;
+
+              if(solve(lessonIndex + 1)) return true;
+
+              // BACKTRACK
+              timetable[day][period] = null;
+              setTeacherBusy(teacher, day, period, false);
+              dailySubjectCount[day][subject] = dailyCount;
+            }
+          }
+        }
+        return false; // no valid slot — backtrack
+      };
+
+      solve(0);
+      return timetable;
+    }
+
+    // ── Build classSubjects array from app data for each grade ────────────────
+    const buildClassSubjects = (cls) => {
+      return getTTSubs(cls).map(sub => ({
+        subject:  sub,
+        teacher:  getSubTeacher(cls, sub) || "TBD",
+        lessons:  getClsLpw(cls, sub),
+        allowed:  getAvail(cls, sub),   // already 1-based period numbers
+        double:   getClsDouble(cls, sub),
+      }));
+    };
+
+    // ── Convert the 5×8 timetable array → app grid format ────────────────────
+    const arrayToGrid = (cls, ttArray) => {
+      const grid = {};
+      workingDays.forEach((day, di) => {
+        grid[day] = Array(PER_COUNT).fill(null);
+        ttArray[di].forEach((cell, si) => {
+          if(!cell) return;
+          grid[day][si] = {
+            subject: cell.subject,
+            teacher: cell.teacher,
+            period:  LESSON_SLOTS[si]?.period || (si+1),
+            ...(cell.ppi    ? {ppi:true}        : {}),
+            ...(cell.double ? {double:true}      : {}),
+            ...(cell.doublePart===2 ? {doublePart:2} : {}),
+          };
         });
-        tasks.sort((a,b)=>{ if(a.isDbl!==b.isDbl) return a.isDbl?-1:1; return b.lpw-a.lpw; });
-
-        const dc={};
-        DAYS_LIST.forEach(d=>{dc[d]={};});
-        const getDC=(d,s)=>dc[d][s]||0;
-        const addDC=(d,s,n)=>{dc[d][s]=(dc[d][s]||0)+n;};
-
-        for(const {sub,t,lpw,avail,isDbl} of tasks) {
-          let placed=false;
-
-          if(isDbl) {
-            for(const relax of [false,true]) {
-              if(placed) break;
-              for(const day of rnd([...DAYS_LIST])) {
-                if(placed) break;
-                if(getDC(day,sub)>0) continue;
-                for(const [s1,s2] of rnd([...CONSEC])) {
-                  if(!LESSON_SLOTS[s1]||!LESSON_SLOTS[s2]) continue;
-                  if(!avail.includes(LESSON_SLOTS[s1].period)||!avail.includes(LESSON_SLOTS[s2].period)) continue;
-                  if(gen[cls][day][s1]!==null||gen[cls][day][s2]!==null) continue;
-                  if(!relax&&(!tOk(t,day,s1)||!tOk(t,day,s2))) continue;
-                  gen[cls][day][s1]={subject:sub,teacher:t,period:LESSON_SLOTS[s1].period,double:true};
-                  gen[cls][day][s2]={subject:sub,teacher:t,period:LESSON_SLOTS[s2].period,double:true,doublePart:2};
-                  tSet(t,day,s1); tSet(t,day,s2); addDC(day,sub,2); placed=true; break;
-                }
-              }
-            }
-            continue;
-          }
-
-          for(const relax of [false,true]) {
-            if(placed) break;
-            for(const day of rnd([...DAYS_LIST])) {
-              if(placed) break;
-              if(lpw<=5&&getDC(day,sub)>=1) continue;
-              if(lpw===6&&getDC(day,sub)>=2) continue;
-              for(const si of rnd(Array.from({length:nPeriods},(_,i)=>i))) {
-                if(day==="Friday"&&si===0) continue;
-                if(!avail.includes(LESSON_SLOTS[si]?.period)) continue;
-                if(gen[cls][day][si]!==null) continue;
-                if(!relax&&!tOk(t,day,si)) continue;
-                if(lpw===6&&getDC(day,sub)===1){
-                  const ex=gen[cls][day].findIndex(c=>c?.subject===sub);
-                  if(ex>=0&&isCP(si,ex)) continue;
-                }
-                gen[cls][day][si]={subject:sub,teacher:t,period:LESSON_SLOTS[si].period};
-                tSet(t,day,si); addDC(day,sub,1); placed=true; break;
-              }
-            }
-          }
-        }
-      }
-
-      const busyMap={};
-      Object.entries(tBusy).forEach(([k,v])=>{ if(v) busyMap[k]=true; });
-      const plan=buildDefaultPlan();
-      OTHER_GRADES.forEach(cls=>{
-        DAYS_LIST.forEach(d=>{gen[cls][d]=Array(nPeriods).fill(null);});
-        if(DAYS_LIST.includes("Friday")) gen[cls]["Friday"][0]={subject:"PPI",teacher:"— All Staff —",period:1,ppi:true};
       });
-      applyPlan(plan,gen,busyMap);
-
-      const satBusy={};
-      ALL_CLASSES.forEach(cls=>{
-        const upper=BACKTRACK_GRADES.includes(cls),ct=getClsTeacher(cls),clsSubs=getTTSubs(cls);
-        const rot=[...clsSubs.slice(ALL_CLASSES.indexOf(cls)%clsSubs.length),...clsSubs.slice(0,ALL_CLASSES.indexOf(cls)%clsSubs.length)];
-        let cur=0; const satSlots=Array(SAT_LESSON_SLOTS.length).fill(null);
-        for(let si=0;si<SAT_LESSON_SLOTS.length;si++){
-          let ok=false;
-          for(let at=0;at<rot.length;at++){
-            const sub=rot[(cur+at)%rot.length],t=upper?(getSubTeacher(cls,sub)||"TBD"):(ct||"TBD");
-            if(t==="TBD"||!satBusy[`${t}::${si}`]){ satSlots[si]={subject:sub,teacher:t,period:SAT_LESSON_SLOTS[si].period}; if(t!=="TBD")satBusy[`${t}::${si}`]=cls; cur=(cur+at+1)%rot.length; ok=true; break; }
-          }
-          if(!ok){ const sub=rot[cur%rot.length],t=upper?(getSubTeacher(cls,sub)||"TBD"):(ct||"TBD"); satSlots[si]={subject:sub,teacher:t,period:SAT_LESSON_SLOTS[si].period}; cur=(cur+1)%rot.length; }
-        }
-        gen[cls]["Saturday"]=satSlots;
-      });
-      return gen;
+      return grid;
     };
 
-    let bestGen=null, bestCC=Infinity, attempt=0;
-    const MAX_ATTEMPTS=30;
+    // ── Run all grades, yielding between each so the UI stays responsive ──────
+    const gen = {};
+    const allDays = [...DAYS, ...WEEKEND_DAYS];
+    ALL_CLASSES.forEach(cls => {
+      gen[cls] = {};
+      allDays.forEach(d => { gen[cls][d] = Array(PER_COUNT).fill(null); });
+    });
 
-    const loop=()=>{
-      if(genStopRef.current){
+    // Handle non-Gr4-9 classes with applyPlan as before
+    const OTHER_GRADES = ALL_CLASSES.filter(c => !BACKTRACK_GRADES.includes(c));
+    const busyMapOther = {};
+    const plan = buildDefaultPlan();
+    OTHER_GRADES.forEach(cls => {
+      workingDays.forEach(d => { gen[cls][d] = Array(PER_COUNT).fill(null); });
+      if(workingDays.includes("Friday"))
+        gen[cls]["Friday"][0] = {subject:"PPI",teacher:"— All Staff —",period:1,ppi:true};
+    });
+    applyPlan(plan, gen, busyMapOther);
+
+    // Saturday for all classes
+    const satBusy = {};
+    ALL_CLASSES.forEach(cls => {
+      const upper = BACKTRACK_GRADES.includes(cls), ct = getClsTeacher(cls);
+      const clsSubs = getTTSubs(cls);
+      const rot = [...clsSubs.slice(ALL_CLASSES.indexOf(cls)%clsSubs.length),
+                   ...clsSubs.slice(0, ALL_CLASSES.indexOf(cls)%clsSubs.length)];
+      let cur = 0;
+      const satSlots = Array(SAT_LESSON_SLOTS.length).fill(null);
+      for(let si = 0; si < SAT_LESSON_SLOTS.length; si++) {
+        let ok = false;
+        for(let at = 0; at < rot.length; at++) {
+          const sub = rot[(cur+at)%rot.length];
+          const t   = upper ? (getSubTeacher(cls,sub)||"TBD") : (ct||"TBD");
+          if(t==="TBD"||!satBusy[`${t}::${si}`]) {
+            satSlots[si]={subject:sub,teacher:t,period:SAT_LESSON_SLOTS[si].period};
+            if(t!=="TBD") satBusy[`${t}::${si}`]=cls;
+            cur=(cur+at+1)%rot.length; ok=true; break;
+          }
+        }
+        if(!ok) {
+          const sub=rot[cur%rot.length], t=upper?(getSubTeacher(cls,sub)||"TBD"):(ct||"TBD");
+          satSlots[si]={subject:sub,teacher:t,period:SAT_LESSON_SLOTS[si].period};
+          cur=(cur+1)%rot.length;
+        }
+      }
+      gen[cls]["Saturday"] = satSlots;
+    });
+
+    // Solve Grade 4-9 one at a time, yielding between each
+    const gradeQueue = [...BACKTRACK_GRADES];
+    let gradeIdx = 0;
+
+    const solveNextGrade = () => {
+      if(genStopRef.current) { setGenerating(false); return; }
+      if(gradeIdx >= gradeQueue.length) {
+        // All done — display result
+        const conflicts = buildConflicts(gen);
+        const cc = Object.keys(conflicts).length;
+        setConflictMap(conflicts);
+        setTt({...gen});
+        setGenProgress(100);
         setGenerating(false);
-        if(bestGen){ setConflictMap(buildConflicts(bestGen)); setTt({...bestGen}); const cc=Object.keys(buildConflicts(bestGen)).length; flash(cc>0?`⏹ Stopped — ${cc} conflict(s).`:`✅ Done!`,cc>0?"warn":"ok"); }
+        const secs = Math.round((Date.now()-startTime)/1000);
+        flash(cc===0
+          ? `✅ Perfect timetable — zero conflicts! (${secs}s)`
+          : `⚠️ Timetable done — ${cc} conflict(s). Try reassigning a teacher.`,
+          cc===0 ? "ok" : "warn");
+        if(cc===0) {
+          try {
+            const snap={id:Date.now(),name:`Auto-Save ${new Date().toLocaleDateString("en-KE")}`,
+              savedAt:new Date().toLocaleString(),timetable:gen,ttSetup};
+            const existing=JSON.parse(localStorage.getItem(SNAP_KEY)||"[]");
+            const updated=[snap,...existing.filter(s=>!s.name.startsWith("Auto-Save"))].slice(0,20);
+            localStorage.setItem(SNAP_KEY,JSON.stringify(updated)); setSavedTTs(updated);
+            supabase.from("app_data").upsert({key:SNAP_KEY,value:JSON.stringify(updated),
+              updated_at:new Date().toISOString()},{onConflict:"key"}).catch(()=>{});
+          } catch{}
+        }
         return;
       }
-      attempt++;
-      setGenProgress(Math.min(92,Math.round((attempt/MAX_ATTEMPTS)*90)));
-      const gen=runOneAttempt();
-      const conflicts=buildConflicts(gen);
-      const cc=Object.keys(conflicts).length;
-      if(cc<bestCC){ bestCC=cc; bestGen=gen; setConflictMap(conflicts); setTt({...gen}); }
-      if(cc===0){
-        setGenProgress(100); setGenerating(false);
-        const secs=Math.round((Date.now()-startTime)/1000);
-        flash(`✅ Perfect timetable — zero conflicts! (attempt ${attempt}, ${secs}s)`,"ok");
-        try{
-          const snap={id:Date.now(),name:`Auto-Save ${new Date().toLocaleDateString("en-KE")}`,savedAt:new Date().toLocaleString(),timetable:gen,ttSetup};
-          const existing=JSON.parse(localStorage.getItem(SNAP_KEY)||"[]");
-          const updated=[snap,...existing.filter(s=>!s.name.startsWith("Auto-Save"))].slice(0,20);
-          localStorage.setItem(SNAP_KEY,JSON.stringify(updated)); setSavedTTs(updated);
-          supabase.from("app_data").upsert({key:SNAP_KEY,value:JSON.stringify(updated),updated_at:new Date().toISOString()},{onConflict:"key"}).catch(()=>{});
-        }catch{}
-        return;
-      }
-      if(attempt>=MAX_ATTEMPTS){
-        setGenProgress(100); setGenerating(false);
-        const secs=Math.round((Date.now()-startTime)/1000);
-        flash(bestCC>0?`⚠️ Best after ${MAX_ATTEMPTS} tries — ${bestCC} conflict(s). Reassign teachers if needed.`:`✅ Done! (${secs}s)`,bestCC>0?"warn":"ok");
-        return;
-      }
-      setTimeout(loop,0);
+
+      const cls = gradeQueue[gradeIdx];
+      gradeIdx++;
+      setGenProgress(Math.round((gradeIdx / gradeQueue.length) * 85));
+
+      const classSubjects = buildClassSubjects(cls);
+      const ttArray       = generateTimetable(cls, classSubjects);
+      const grid          = arrayToGrid(cls, ttArray);
+      workingDays.forEach(d => { gen[cls][d] = grid[d]; });
+
+      // Show partial progress after each grade
+      setTt({...gen});
+
+      setTimeout(solveNextGrade, 0); // yield to browser
     };
-    setTimeout(loop,50);
+
+    setTimeout(solveNextGrade, 50);
   }
+
 
 
   // ══════════════════════════════════════════════════════════════════════════
