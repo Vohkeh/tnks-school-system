@@ -42,24 +42,50 @@ async function callGroq(prompt, maxTokens = 4000) {
   return data.choices?.[0]?.message?.content || "";
 }
 
-// Helper: OpenRouter — Parent Chat (Llama 3.1 8B — fast conversational, free)
-async function callOpenRouter(prompt, maxTokens = 1000) {
+// Helper: OpenRouter — Parent Chat
+// systemPrompt and conversationMessages are passed separately so the model
+// receives a proper system role (required for instruction-following).
+async function callOpenRouter(systemPrompt, conversationMessages, maxTokens = 1000) {
+  const messages = [
+    { role: "system", content: systemPrompt },
+    ...conversationMessages
+  ];
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
-      "HTTP-Referer": "https://tnks-school-system.vercel.app"
+      "HTTP-Referer": "https://tnks-school-system.vercel.app",
+      "X-Title": "TNKS Parent Portal"
     },
     body: JSON.stringify({
       model: "meta-llama/llama-3.1-8b-instruct:free",
       max_tokens: maxTokens,
-      messages: [{ role: "user", content: prompt }]
+      messages
     })
   });
   const data = await res.json();
   if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-  return data.choices?.[0]?.message?.content || "";
+  const reply = data.choices?.[0]?.message?.content || "";
+  if (!reply) throw new Error("Empty response from OpenRouter");
+  return reply;
+}
+
+// Fallback: Anthropic API — used when OpenRouter fails or returns empty
+async function callAnthropicParentChat(systemPrompt, conversationMessages, maxTokens = 1000) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: maxTokens,
+      system: systemPrompt,
+      messages: conversationMessages
+    })
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+  return data.content?.[0]?.text || "";
 }
 
 // Helper: Gemini — AI Comments (gemini-2.0-flash — best for short professional writing)
@@ -962,7 +988,37 @@ function buildHTMLDoc(title, bodyHTML, logo) {
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>${title}</title><style>
     *{box-sizing:border-box;}
     body{margin:0;padding:16px;font-family:Georgia,serif;background:white;}
-    @media print{@page{margin:12mm;size:A4;} .no-print{display:none!important;} body{padding:0;}}
+    @media print{
+      @page{margin:8mm;size:A4 landscape;}
+      .no-print{display:none!important;}
+      body{padding:0;margin:0;}
+      .print-fit-wrap{
+        width:100%;
+        overflow:visible;
+      }
+      .results-table, .grade-table{
+        width:100% !important;
+        table-layout:fixed;
+        font-size:8px !important;
+      }
+      .results-table td, .results-table th,
+      .grade-table td, .grade-table th{
+        padding:3px 2px !important;
+        font-size:8px !important;
+      }
+      .results-table th div, .grade-table th div{
+        height:60px !important;
+        font-size:7px !important;
+      }
+      div[style*="margin-bottom:32px"]{
+        transform-origin: top left;
+        width: 100%;
+      }
+      /* Force each class table onto its own landscape page */
+      div[style*="page-break-after:always"]{
+        page-break-after: always !important;
+      }
+    }
     table{border-collapse:collapse;}
     table td,table th{border:1px solid #cbd5e1;}
     table tr:nth-child(even) td{background:rgba(240,249,255,0.55);}
@@ -973,9 +1029,36 @@ function buildHTMLDoc(title, bodyHTML, logo) {
     .mean-row td{background:#eff6ff!important;font-weight:bold;}
     .rank-row td{background:#f0f9ff!important;font-weight:bold;}
     .teacher-row td{background:#f0fdf4!important;font-weight:bold;color:#15803d;}
-  </style></head><body>
+  </style>
+  <script>
+    window.addEventListener('load', function() {
+      // Auto-scale each results/grades table to fit the page width on print
+      var style = document.createElement('style');
+      style.media = 'print';
+      document.head.appendChild(style);
+      // Scale tables dynamically to fit page
+      function scaleTables() {
+        var pageW = 277; // A4 landscape printable width in mm (~277mm with 8mm margins each side)
+        var pxPerMm = 96 / 25.4;
+        var maxPx = pageW * pxPerMm;
+        var tables = document.querySelectorAll('.results-table, .grade-table');
+        tables.forEach(function(tbl) {
+          var wrap = tbl.closest('div[style*="overflow-x"]') || tbl.parentElement;
+          var naturalW = tbl.scrollWidth;
+          if (naturalW > maxPx) {
+            var scale = maxPx / naturalW;
+            wrap.style.transformOrigin = 'top left';
+            wrap.style.transform = 'scaleX(' + scale + ')';
+            wrap.style.width = (100 / scale) + '%';
+          }
+        });
+      }
+      window.addEventListener('beforeprint', scaleTables);
+    });
+  </script>
+  </head><body>
   ${logoWm}
-  <div style="position:relative;z-index:1;">${bodyHTML}</div>
+  <div style="position:relative;z-index:1;" class="print-fit-wrap">${bodyHTML}</div>
   </body></html>`;
 }
 
@@ -1102,7 +1185,11 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
     // Try subjectTeachers map first
     const key = `${className}::${subject}`;
     const tid = (sd.subjectTeachers||{})[key];
-    if(tid) { const u=(users||[]).find(u=>u.id===tid); return u?u.name:""; }
+    if(tid) {
+      // Could be a user ID or a plain name string (PRELOADED_TEACHERS stores names directly)
+      const u=(users||[]).find(u=>u.id===tid);
+      return u ? u.name : tid; // fall back to using the stored value as a name
+    }
     // Try classes.subjects
     const cls=(sd.classes||[]).find(c=>c.name===className);
     if(cls) { const sub=(cls.subjects||[]).find(s=>s.subject===subject); if(sub?.teacherName) return sub.teacherName; }
@@ -1112,7 +1199,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
     const sd = ttSetup?.setupData;
     if(!sd) return "";
     const tid=(sd.classTeachers||{})[className];
-    if(tid){ const u=(users||[]).find(u=>u.id===tid); return u?u.name:""; }
+    if(tid){ const u=(users||[]).find(u=>u.id===tid); return u?u.name:tid; }
     const cls=(sd.classes||[]).find(c=>c.name===className);
     return cls?.classTeacherName||"";
   }
@@ -1525,7 +1612,7 @@ function ReportCard({student,results,comments,term,year,examType,isParent,logo,s
   function getClsTeacher(){
     const sd=ttSetup?.setupData; if(!sd) return "";
     const tid=(sd.classTeachers||{})[student.class];
-    if(tid){const u=(users||[]).find(u=>u.id===tid);return u?u.name:"";}
+    if(tid){const u=(users||[]).find(u=>u.id===tid);return u?u.name:tid;}
     const cls=(sd.classes||[]).find(c=>c.name===student.class);
     return cls?.classTeacherName||"";
   }
@@ -1535,14 +1622,14 @@ function ReportCard({student,results,comments,term,year,examType,isParent,logo,s
     if(parts){
       return parts.map(p=>{
         const tid2=(sd.subjectTeachers||{})[`${student.class}::${p}`];
-        if(tid2){const u=(users||[]).find(u=>u.id===tid2);return u?u.name:"";}
+        if(tid2){const u=(users||[]).find(u=>u.id===tid2);return u?u.name:tid2;}
         const cls2=(sd.classes||[]).find(c=>c.name===student.class);
         if(cls2){const sub2=(cls2.subjects||[]).find(s=>s.subject===p);if(sub2?.teacherName)return sub2.teacherName;}
         return "";
       }).filter(Boolean);
     }
     const tid=(sd.subjectTeachers||{})[`${student.class}::${subject}`];
-    if(tid){const u=(users||[]).find(u=>u.id===tid);return u?[u.name]:[];}
+    if(tid){const u=(users||[]).find(u=>u.id===tid);return u?[u.name]:[tid];}
     const cls=(sd.classes||[]).find(c=>c.name===student.class);
     if(cls){const sub=(cls.subjects||[]).find(s=>s.subject===subject);if(sub?.teacherName)return [sub.teacherName];}
     return [];
@@ -5644,21 +5731,40 @@ STAFF YOU CAN CONTACT: ${users.filter(u => u.contactRole && u.contactRole !== "a
 
 INSTRUCTIONS: Answer parents using the LIVE portal data above. Be warm, helpful, and specific. Give actual KES amounts for fees. List actual upcoming events by name and date. For private matters (individual child results, personal data), tell them to use the Direct Message or call the school. Keep answers concise and friendly.`;
 
-      // OpenRouter — Parent Chat
-      if (!OPENROUTER_API_KEY) {
-        setChatHistory(h => [...h, { role: "assistant", content: `⚠️ AI Assistant not configured. Please call ${SCHOOL.phone}.` }]);
-        setChatLoading(false);
-        return;
+      // Build conversation messages (exclude the opening assistant greeting to keep it clean)
+      const convMessages = newHistory.filter(m => !(m.role === "assistant" && m.content.startsWith("Hello! I am the AI")));
+
+      // Try OpenRouter first, fall back to Anthropic API if it fails
+      let reply = "";
+      let lastErr = null;
+      if (OPENROUTER_API_KEY) {
+        try {
+          reply = await callOpenRouter(systemPrompt, convMessages, 1000);
+        } catch(e) {
+          lastErr = e;
+          console.warn("OpenRouter failed, trying Anthropic fallback:", e.message);
+        }
       }
-      const fullPrompt = systemPrompt + "\n\nConversation:\n" + newHistory.map(m => m.role + ": " + m.content).join("\n");
-      const reply = await callOpenRouter(fullPrompt, 1000);
-      setChatHistory(h => [...h, { role: "assistant", content: reply || `Please call the school at ${SCHOOL.phone}` }]);
+      // Anthropic fallback
+      if (!reply) {
+        try {
+          reply = await callAnthropicParentChat(systemPrompt, convMessages, 1000);
+        } catch(e) {
+          lastErr = e;
+          console.warn("Anthropic fallback also failed:", e.message);
+        }
+      }
+      if (reply) {
+        setChatHistory(h => [...h, { role: "assistant", content: reply }]);
+      } else {
+        const m = lastErr?.message || "";
+        const errMsg = m.includes("invalid") || m.includes("401")
+          ? `❌ AI configuration error. Please call ${SCHOOL.phone} for assistance.`
+          : `Sorry, I’m having trouble connecting right now. Please call ${SCHOOL.phone} or try again shortly.`;
+        setChatHistory(h => [...h, { role: "assistant", content: errMsg }]);
+      }
     } catch(err) {
-      const m = err?.message || "";
-      const errMsg = m.includes("invalid") || m.includes("401")
-        ? "❌ AI key error. Please ask admin to check the OpenRouter key in App.jsx."
-        : "Connectivity issue. Please call " + SCHOOL.phone;
-      setChatHistory(h => [...h, { role: "assistant", content: errMsg }]);
+      setChatHistory(h => [...h, { role: "assistant", content: `Sorry, something went wrong. Please call ${SCHOOL.phone}.` }]);
     }
     setChatLoading(false);
     setTimeout(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight; }, 100);
