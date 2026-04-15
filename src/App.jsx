@@ -71,21 +71,27 @@ async function callOpenRouter(systemPrompt, conversationMessages, maxTokens = 10
   return reply;
 }
 
-// Fallback: Anthropic API — used when OpenRouter fails or returns empty
-async function callAnthropicParentChat(systemPrompt, conversationMessages, maxTokens = 1000) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: maxTokens,
-      system: systemPrompt,
-      messages: conversationMessages
-    })
-  });
+// Fallback: Gemini — used when OpenRouter fails (same key already used for AI Comments)
+async function callGeminiParentChat(systemPrompt, conversationMessages) {
+  // Build a single prompt from system + conversation history
+  const historyText = conversationMessages
+    .map(m => (m.role === "user" ? "Parent: " : "Assistant: ") + m.content)
+    .join("\n");
+  const fullPrompt = systemPrompt + "\n\nConversation so far:\n" + historyText +
+    "\n\nNow reply as the school AI assistant to the parent's last message. Be warm, helpful and concise.";
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contents: [{ parts: [{ text: fullPrompt }] }] })
+    }
+  );
   const data = await res.json();
   if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-  return data.content?.[0]?.text || "";
+  const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  if (!reply) throw new Error("Empty response from Gemini");
+  return reply;
 }
 
 // Helper: Gemini — AI Comments (gemini-2.0-flash — best for short professional writing)
@@ -5734,24 +5740,22 @@ INSTRUCTIONS: Answer parents using the LIVE portal data above. Be warm, helpful,
       // Build conversation messages (exclude the opening assistant greeting to keep it clean)
       const convMessages = newHistory.filter(m => !(m.role === "assistant" && m.content.startsWith("Hello! I am the AI")));
 
-      // Try OpenRouter first, fall back to Anthropic API if it fails
+      // Try Gemini first (proven working in this app), then OpenRouter as secondary
       let reply = "";
       let lastErr = null;
-      if (OPENROUTER_API_KEY) {
+      try {
+        reply = await callGeminiParentChat(systemPrompt, convMessages);
+      } catch(e) {
+        lastErr = e;
+        console.warn("Gemini failed, trying OpenRouter:", e.message);
+      }
+      // OpenRouter secondary attempt
+      if (!reply && OPENROUTER_API_KEY) {
         try {
           reply = await callOpenRouter(systemPrompt, convMessages, 1000);
         } catch(e) {
           lastErr = e;
-          console.warn("OpenRouter failed, trying Anthropic fallback:", e.message);
-        }
-      }
-      // Anthropic fallback
-      if (!reply) {
-        try {
-          reply = await callAnthropicParentChat(systemPrompt, convMessages, 1000);
-        } catch(e) {
-          lastErr = e;
-          console.warn("Anthropic fallback also failed:", e.message);
+          console.warn("OpenRouter also failed:", e.message);
         }
       }
       if (reply) {
