@@ -1018,7 +1018,7 @@ function StudentsPage({students,setStudents,results,setResults,comments,setComme
     setFees(p=>(p||[]).filter(f=>f.studentId!==id));
     setMonitoring(p=>(p||[]).filter(m=>m.studentId!==id));
   }
-  const filtered=students.filter(s=>{const q=search.toLowerCase(); return (s.name.toLowerCase().includes(q)||s.admNo.toLowerCase().includes(q))&&(filterCls==="All"||s.class===filterCls);});
+  const filtered=students.filter(s=>{const q=search.toLowerCase(); const ex=s.status==="transferred"||s.status==="completed"||s.status==="alumni"; return !ex&&(s.name.toLowerCase().includes(q)||s.admNo.toLowerCase().includes(q))&&(filterCls==="All"||s.class===filterCls);});
   const th={textAlign:"left",padding:"10px 12px",fontWeight:"bold",fontSize:11,color:"#7c3aed",background:"#f5f3ff",letterSpacing:.5};
   const td={padding:"9px 12px",fontSize:12,color:"#374151",borderTop:"1px solid #f1f5f9"};
   return (
@@ -1045,50 +1045,74 @@ function StudentIDCards({students, filterCls, setFilterCls}) {
   );
 
   function printIDCard(s) {
-    // Simple barcode-style visual using student admNo chars
-    const barsHTML = (s.admNo||"NKS/0000/001").split("").map(c =>
-      `<div style="display:inline-block;width:${2+Math.floor(Math.random()*2)}px;height:28px;background:#3b0764;margin-right:1px;vertical-align:middle;"></div>`
+    const barsHTML = (s.admNo||"NKS/0000/001").split("").map((ch,i) =>
+      `<div style="display:inline-block;width:${i%3===0?3:2}px;height:28px;background:#3b0764;margin-right:1px;vertical-align:middle;"></div>`
     ).join("");
 
-    const cardHTML = `
-      <div style="width:85mm;min-height:54mm;border-radius:8px;background:linear-gradient(135deg,#3b0764,#6d28d9);color:white;font-family:Georgia,serif;padding:0;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.3);page-break-inside:avoid;display:inline-block;margin:6px;vertical-align:top;">
-        <!-- FRONT TOP HEADER -->
-        <div style="background:rgba(255,255,255,.12);padding:7px 10px;display:flex;align-items:center;gap:8px;border-bottom:2px solid rgba(255,255,255,.2);">
-          <div style="width:30px;height:30px;border-radius:50%;background:white;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            ${s.photo?`<img src="${s.photo}" style="width:30px;height:30px;border-radius:50%;object-fit:cover;"/>` : `<span style="font-size:14px;color:#3b0764;font-weight:bold;">${getInitials(s.name)}</span>`}
+    // ── FRONT ────────────────────────────────────────────────────────────────────
+    const front = `
+      <div style="width:85mm;min-height:54mm;border-radius:8px;background:linear-gradient(135deg,#3b0764,#6d28d9);color:white;font-family:Georgia,serif;padding:0;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.3);display:inline-block;margin:4px;vertical-align:top;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
+        <div style="background:rgba(255,255,255,.15);padding:7px 10px;display:flex;align-items:center;gap:8px;border-bottom:2px solid rgba(255,255,255,.25);">
+          <div style="width:30px;height:30px;border-radius:50%;background:white;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;">
+            ${s.photo?`<img src="${s.photo}" style="width:30px;height:30px;object-fit:cover;"/>` : `<span style="font-size:13px;color:#3b0764;font-weight:bold;">${getInitials(s.name)}</span>`}
           </div>
           <div>
-            <div style="font-size:9px;font-weight:bold;letter-spacing:1px;opacity:.8;">THE NYAGA KINDIKI SCHOOLS</div>
-            <div style="font-size:7px;opacity:.65;">Tharaka North · Education Liberates</div>
+            <div style="font-size:9px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;">The Nyaga Kindiki Schools</div>
+            <div style="font-size:7px;opacity:.7;">Tharaka North · <i>Education Liberates</i></div>
           </div>
         </div>
-        <!-- BODY -->
         <div style="padding:8px 10px;display:flex;gap:10px;align-items:flex-start;">
-          <!-- Photo box -->
-          <div style="flex-shrink:0;width:44px;height:52px;border-radius:5px;background:rgba(255,255,255,.15);border:2px solid rgba(255,255,255,.35);overflow:hidden;display:flex;align-items:center;justify-content:center;">
-            ${s.photo ? `<img src="${s.photo}" style="width:44px;height:52px;object-fit:cover;"/>` : `<span style="font-size:20px;color:white;">${getInitials(s.name)}</span>`}
+          <div style="flex-shrink:0;width:44px;height:52px;border-radius:5px;background:rgba(255,255,255,.15);border:2px solid rgba(255,255,255,.4);overflow:hidden;display:flex;align-items:center;justify-content:center;">
+            ${s.photo?`<img src="${s.photo}" style="width:44px;height:52px;object-fit:cover;"/>` : `<span style="font-size:20px;">${getInitials(s.name)}</span>`}
           </div>
-          <!-- Info -->
           <div style="flex:1;">
             <div style="font-size:11px;font-weight:bold;line-height:1.3;margin-bottom:4px;">${s.name}</div>
-            <div style="font-size:8.5px;opacity:.8;margin-bottom:2px;">Adm: <b>${s.admNo||"—"}</b></div>
-            <div style="font-size:8.5px;opacity:.8;margin-bottom:2px;">Class: <b>${s.class}</b> · ${s.gender||"—"}</div>
-            ${s.dob?`<div style="font-size:8px;opacity:.7;">DOB: ${s.dob}</div>`:""}
-            <div style="font-size:8px;opacity:.7;margin-top:2px;">Year: ${idYear}</div>
+            <div style="font-size:8.5px;opacity:.85;margin-bottom:2px;">Adm: <b>${s.admNo||"—"}</b></div>
+            <div style="font-size:8.5px;opacity:.85;margin-bottom:2px;">Class: <b>${s.class}</b> &nbsp;·&nbsp; ${s.gender||"—"}</div>
+            ${s.dob?`<div style="font-size:8px;opacity:.75;">DOB: ${s.dob}</div>`:""}
+            ${s.studentType?`<div style="font-size:8px;opacity:.75;">${s.studentType}</div>`:""}
+            <div style="font-size:8px;opacity:.7;margin-top:2px;">A/Y: ${idYear}</div>
           </div>
         </div>
-        <!-- BARCODE STRIP -->
-        <div style="background:white;margin:0 8px 8px;border-radius:4px;padding:4px 6px;text-align:center;">
+        <div style="background:white;margin:0 8px 6px;border-radius:4px;padding:4px 6px;text-align:center;">
           ${barsHTML}
-          <div style="font-size:7px;color:#3b0764;margin-top:2px;letter-spacing:1px;">${s.admNo||"NKS/0000/001"}</div>
+          <div style="font-size:7px;color:#3b0764;margin-top:2px;letter-spacing:1.2px;">${s.admNo||"NKS/0000/001"}</div>
         </div>
-        <!-- FOOTER -->
-        <div style="background:rgba(0,0,0,.2);padding:4px 10px;display:flex;justify-content:space-between;align-items:center;">
-          <div style="font-size:7px;opacity:.7;">${SCHOOL.phone}</div>
-          <div style="font-size:7px;opacity:.7;">If found, please return to school</div>
+        <div style="background:rgba(0,0,0,.25);padding:4px 10px;display:flex;justify-content:space-between;">
+          <span style="font-size:6.5px;opacity:.8;">LEARNER ID CARD</span>
+          <span style="font-size:6.5px;opacity:.8;">If found, return to school</span>
         </div>
       </div>`;
-    return cardHTML;
+
+    // ── BACK ─────────────────────────────────────────────────────────────────────
+    const back = `
+      <div style="width:85mm;min-height:54mm;border-radius:8px;background:linear-gradient(135deg,#15803d,#166534);color:white;font-family:Georgia,serif;padding:0;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.3);display:inline-block;margin:4px;vertical-align:top;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
+        <!-- Back Header -->
+        <div style="background:rgba(255,255,255,.12);padding:6px 10px;border-bottom:2px solid rgba(255,255,255,.2);text-align:center;">
+          <div style="font-size:9px;font-weight:bold;letter-spacing:1px;">SCHOOL CONTACTS &amp; DETAILS</div>
+        </div>
+        <!-- School details body -->
+        <div style="padding:7px 10px;font-size:8px;line-height:1.7;">
+          <div style="font-weight:bold;font-size:9px;margin-bottom:3px;">🏫 ${SCHOOL.name}</div>
+          <div>📍 ${SCHOOL.address}</div>
+          <div>🏙️ ${SCHOOL.location}</div>
+          <div>📬 ${SCHOOL.poBox}</div>
+          <div>📞 ${SCHOOL.phone}</div>
+          <div>✉️ ${SCHOOL.email}</div>
+          <div>🌐 ${SCHOOL.website}</div>
+        </div>
+        <!-- Motto strip -->
+        <div style="background:rgba(255,255,255,.12);margin:0 8px 6px;border-radius:4px;padding:4px 8px;text-align:center;">
+          <div style="font-size:7.5px;font-style:italic;opacity:.95;">"${SCHOOL.motto}"</div>
+          <div style="font-size:6.5px;opacity:.7;margin-top:2px;">${SCHOOL.vision}</div>
+        </div>
+        <!-- Lost & found -->
+        <div style="background:rgba(0,0,0,.25);padding:4px 10px;text-align:center;">
+          <span style="font-size:7px;opacity:.85;">🔍 If found, please contact school on ${SCHOOL.phone.split("/")[0].trim()}</span>
+        </div>
+      </div>`;
+
+    return `<div style="display:inline-block;">${front}${back}</div>`;
   }
 
   function doPrintAll() {
@@ -1096,6 +1120,7 @@ function StudentIDCards({students, filterCls, setFilterCls}) {
     const cards = toShow.map(s => printIDCard(s)).join("");
     const w = window.open("","_blank");
     w.document.write(`<html><head><title>Student ID Cards</title><style>
+      * { -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; color-adjust:exact !important; }
       @media print { body{margin:0;} .no-print{display:none;} }
       body{background:#e5e7eb;padding:16px;font-family:Georgia,serif;}
       .controls{margin-bottom:16px;padding:12px;background:white;border-radius:8px;}
@@ -1109,7 +1134,7 @@ function StudentIDCards({students, filterCls, setFilterCls}) {
   function doPrintOne(s) {
     const card = printIDCard(s);
     const w = window.open("","_blank");
-    w.document.write(`<html><head><title>ID Card — ${s.name}</title><style>@media print{body{margin:0;}.no-print{display:none;}}body{background:#e5e7eb;padding:24px;display:flex;justify-content:center;font-family:Georgia,serif;}</style></head><body>
+    w.document.write(`<html><head><title>ID Card — ${s.name}</title><style>*{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important;}@media print{body{margin:0;}.no-print{display:none;}}body{background:#e5e7eb;padding:24px;display:flex;justify-content:center;font-family:Georgia,serif;}</style></head><body>
       <div><div class="no-print" style="margin-bottom:12px;"><button onclick="window.print()" style="background:#3b0764;color:white;border:none;padding:6px 18px;border-radius:6px;cursor:pointer;">🖨 Print</button></div>${card}</div>
     </body></html>`);
     w.document.close();
@@ -7708,6 +7733,11 @@ function AlumniPage({ students, setStudents, user }) {
     setStudents(p => p.map(s => s.id === id ? { ...s, ...data } : s));
     setEditId(null); flash("✅ Record updated!");
   }
+  function deleteAlumni(id) {
+    if(!confirm("Permanently delete this alumni/leaver record? This cannot be undone.")) return;
+    setStudents(p => p.filter(s => s.id !== id));
+    flash("🗑️ Record deleted.");
+  }
 
   const filtered = alumni.filter(s => {
     const q = search.toLowerCase();
@@ -7759,7 +7789,7 @@ function AlumniPage({ students, setStudents, user }) {
               <td style={td}><span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 20, fontWeight: "bold", background: s.status === "completed" ? "#dcfce7" : "#fef3c7", color: s.status === "completed" ? "#15803d" : "#b45309" }}>{s.status === "completed" ? "Graduate" : "Transferred"}</span></td>
               <td style={td}>{editId === s.id ? <input value={editData.transferDest || ""} onChange={e => setEditData(d => ({ ...d, transferDest: e.target.value }))} style={{ border: "1.5px solid #c4b5fd", borderRadius: 6, padding: "4px 8px", fontSize: 12, fontFamily: "Georgia,serif", width: 140 }} /> : (s.transferDest || "—")}</td>
               <td style={td}>{editId === s.id ? <input value={editData.currentCareer || ""} onChange={e => setEditData(d => ({ ...d, currentCareer: e.target.value }))} placeholder="e.g. University" style={{ border: "1.5px solid #c4b5fd", borderRadius: 6, padding: "4px 8px", fontSize: 12, fontFamily: "Georgia,serif", width: 140 }} /> : (s.currentCareer || <span style={{ color: "#94a3b8" }}>Unknown</span>)}</td>
-              {user.role === "admin" && <td style={td}>{editId === s.id ? <><button onClick={() => updateAlumni(s.id, editData)} style={{ background: "#15803d", color: "white", border: "none", borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontSize: 11, fontFamily: "Georgia,serif", marginRight: 4 }}>✓</button><button onClick={() => setEditId(null)} style={{ background: "#f1f5f9", border: "none", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontSize: 11, fontFamily: "Georgia,serif" }}>✕</button></> : <button onClick={() => { setEditId(s.id); setEditData({ transferDest: s.transferDest || "", currentCareer: s.currentCareer || "" }); }} style={{ color: "#7c3aed", background: "none", border: "none", cursor: "pointer", fontSize: 12 }}>Edit</button>}</td>}
+              {user.role === "admin" && <td style={td}>{editId === s.id ? <><button onClick={() => updateAlumni(s.id, editData)} style={{ background: "#15803d", color: "white", border: "none", borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontSize: 11, fontFamily: "Georgia,serif", marginRight: 4 }}>✓</button><button onClick={() => setEditId(null)} style={{ background: "#f1f5f9", border: "none", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontSize: 11, fontFamily: "Georgia,serif" }}>✕</button></> : <><button onClick={() => { setEditId(s.id); setEditData({ transferDest: s.transferDest || "", currentCareer: s.currentCareer || "" }); }} style={{ color: "#7c3aed", background: "none", border: "none", cursor: "pointer", fontSize: 12, marginRight:6 }}>Edit</button><button onClick={()=>deleteAlumni(s.id)} style={{color:"#b91c1c",background:"none",border:"none",cursor:"pointer",fontSize:12}}>Delete</button></> }</td>}
             </tr>) : <tr><td colSpan={9} style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>No alumni records yet.</td></tr>}
           </tbody>
         </table>
@@ -10924,8 +10954,11 @@ export default function App(){
     const gName=gFonts[font];
     if(gName){const id="tnks-gfont";let el=document.getElementById(id);if(!el){el=document.createElement("link");el.id=id;el.rel="stylesheet";document.head.appendChild(el);}el.href=`https://fonts.googleapis.com/css2?family=${gName}:wght@400;600;700&display=swap`;}
   },[]);
-  const [user,setUser]=useState(null);
-  const [view,setView]=useState("dashboard");
+  // Restore session on refresh
+  const [user,setUser]=useState(()=>{try{const s=localStorage.getItem("tnks_user");return s?JSON.parse(s):null;}catch{return null;}});
+  const [view,setView]=useState(()=>localStorage.getItem("tnks_view")||"dashboard");
+  useEffect(()=>{if(user){localStorage.setItem("tnks_user",JSON.stringify(user));}else{localStorage.removeItem("tnks_user");localStorage.removeItem("tnks_view");}},[user]);
+  useEffect(()=>{if(user)localStorage.setItem("tnks_view",view);},[view,user]);
   const [users,setUsers]=useState(DEFAULT_USERS);
   const [students,setStudents]=useState([]);
   const [results,setResults]=useState([]);
