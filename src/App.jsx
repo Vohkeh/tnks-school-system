@@ -549,60 +549,247 @@ function Logo({size=60,src}) {
 // SIDEBAR
 // ══════════════════════════════════════════════════════════
 function Sidebar({view,setView,user,onLogout,logo}) {
-  const adminLinks=[
-    {id:"schoolinfo",icon:"🏫",label:"School Info"},
-    {id:"dashboard",icon:"📊",label:"Dashboard"},{id:"students",icon:"👥",label:"Students"},
-    {id:"admissions",icon:"📋",label:"Admissions"},{id:"results",icon:"📝",label:"Results Entry"},
-    {id:"analytics",icon:"📈",label:"Analytics"},{id:"reports",icon:"🖨️",label:"Report Forms"},
-    {id:"fees",icon:"💰",label:"Fees Manager"},{id:"feestructure",icon:"📑",label:"Fee Structure"},
-    {id:"exams",icon:"✍️",label:"Exam Management"},
-    {id:"timetable",icon:"📅",label:"Timetable"},{id:"monitoring",icon:"🏥",label:"Learner Monitoring"},
-    {id:"attendance",icon:"✅",label:"Attendance"},{id:"timeinout",icon:"🕐",label:"Time In/Out"},
-    {id:"staff",icon:"👨‍🏫",label:"Staff Manager"},{id:"duty",icon:"🛡️",label:"Teachers on Duty"},
-    {id:"council",icon:"🎖️",label:"Student Council"},{id:"clubs",icon:"🏆",label:"Clubs & Activities"},
-    {id:"transport",icon:"🚌",label:"Transport"},{id:"library",icon:"📚",label:"Library"},
-    {id:"alumni",icon:"🎓",label:"Alumni"},{id:"calendar",icon:"📅",label:"Calendar"},
-    {id:"events",icon:"🎉",label:"Events"},{id:"noticeboard",icon:"📌",label:"Notice Board"},
-    {id:"parentcomms",icon:"📞",label:"Parent Comms"},{id:"notifications",icon:"💬",label:"Notifications"},
-    {id:"messages",icon:"📨",label:"Messages"},
-    {id:"ai_comments",icon:"🤖",label:"AI Comments"},{id:"bulk",icon:"📦",label:"Bulk Operations"},
-    {id:"payroll",icon:"💼",label:"Payroll"},
-    {id:"pocketmoney",icon:"🪙",label:"Pocket Money"},
-    {id:"inventory",icon:"🏪",label:"Inventory"},
-    {id:"settings",icon:"⚙️",label:"Settings"},
+  // Track which groups are open — default open the group containing the active view
+  const ADMIN_GROUPS = [
+    {
+      id:"dashboard", label:"Dashboard", icon:"▣", single:true, view:"dashboard"
+    },
+    {
+      id:"students_grp", label:"Students Manager", icon:"🎓",
+      items:[
+        {id:"dashboard",    label:"Overview",          icon:"▣"},
+        {id:"students",     label:"Students List",     icon:"👥"},
+        {id:"admissions",   label:"Admissions",        icon:"📋"},
+        {id:"alumni",       label:"Former Students",   icon:"🎓"},
+        {id:"monitoring",   label:"Health Monitoring", icon:"🏥"},
+        {id:"attendance",   label:"Attendance Sheet",  icon:"✅"},
+      ]
+    },
+    {
+      id:"staff_grp", label:"Staff Manager", icon:"👤",
+      items:[
+        {id:"staff",      label:"Staff List",       icon:"👨‍🏫"},
+        {id:"timeinout",  label:"Attendance Sheet", icon:"🕐"},
+        {id:"duty",       label:"Duty Roster",      icon:"🛡️"},
+      ]
+    },
+    {
+      id:"academic_grp", label:"Academic Manager", icon:"📖",
+      items:[
+        {id:"exams",       label:"Exam Management",  icon:"✍️"},
+        {id:"results",     label:"Record Marks",     icon:"📝"},
+        {id:"analytics",   label:"Exam Analysis",    icon:"📈"},
+        {id:"reports",     label:"Report Forms",     icon:"🖨️"},
+        {id:"ai_comments", label:"AI Comments",      icon:"🤖"},
+        {id:"bulk",        label:"Bulk Operations",  icon:"📦"},
+      ]
+    },
+    {
+      id:"timetable_grp", label:"Timetable", icon:"▦",
+      items:[
+        {id:"timetable", label:"Setup & Generate",  icon:"⚙️"},
+      ]
+    },
+    {
+      id:"library_grp", label:"Library Manager", icon:"📚",
+      items:[
+        {id:"library", label:"Books & Circulation", icon:"📖"},
+      ]
+    },
+    {
+      id:"finance_grp", label:"Finance", icon:"💳",
+      items:[
+        {id:"feestructure", label:"Fee Structure",    icon:"📑"},
+        {id:"fees",         label:"Fees / Invoicing", icon:"💰"},
+      ]
+    },
+    {
+      id:"pocket_grp", label:"Pocket Money", icon:"🪙",
+      items:[
+        {id:"pocketmoney", label:"Accounts & Transactions", icon:"🪙"},
+      ]
+    },
+    {
+      id:"payroll_grp", label:"Payroll", icon:"💼",
+      items:[
+        {id:"payroll", label:"Process Payslips", icon:"💼"},
+      ]
+    },
+    {
+      id:"inventory_grp", label:"Inventory", icon:"📦",
+      items:[
+        {id:"inventory", label:"Stock Manager", icon:"🏪"},
+      ]
+    },
+    {
+      id:"transport_grp", label:"Transport", icon:"🚌",
+      items:[
+        {id:"transport", label:"Routes & Vehicles", icon:"🚌"},
+      ]
+    },
+    {
+      id:"school_life_grp", label:"School Life", icon:"🌟",
+      items:[
+        {id:"council",  label:"Student Council",  icon:"🎖️"},
+        {id:"clubs",    label:"Clubs & Activities",icon:"🏆"},
+        {id:"events",   label:"Events",            icon:"🎉"},
+        {id:"calendar", label:"Calendar",          icon:"📅"},
+      ]
+    },
+    {
+      id:"comms_grp", label:"Communication", icon:"💬",
+      items:[
+        {id:"noticeboard",  label:"Notice Board",   icon:"📌"},
+        {id:"parentcomms",  label:"Parent Comms",   icon:"📞"},
+        {id:"notifications",label:"Notifications",  icon:"🔔"},
+        {id:"messages",     label:"Messages",       icon:"📨"},
+      ]
+    },
+    {
+      id:"settings_grp", label:"System Settings", icon:"⚙️",
+      items:[
+        {id:"settings",   label:"Settings & Users", icon:"⚙️"},
+        {id:"schoolinfo", label:"School Profile",   icon:"🏫"},
+      ]
+    },
   ];
-  const teacherLinks=[
-    {id:"schoolinfo",icon:"🏫",label:"School Info"},
-    {id:"dashboard",icon:"📊",label:"Dashboard"},{id:"students",icon:"👥",label:"Students"},
-    {id:"results",icon:"📝",label:"Results Entry"},{id:"analytics",icon:"📈",label:"Analytics"},
-    {id:"reports",icon:"🖨️",label:"Report Forms"},{id:"timetable",icon:"📅",label:"Timetable"},
-    {id:"monitoring",icon:"🏥",label:"Learner Monitoring"},
-    {id:"attendance",icon:"✅",label:"Attendance"},{id:"timeinout",icon:"🕐",label:"Time In/Out"},
-    {id:"duty",icon:"🛡️",label:"Teachers on Duty"},{id:"council",icon:"🎖️",label:"Student Council"},
-    {id:"library",icon:"📚",label:"Library"},{id:"noticeboard",icon:"📌",label:"Notice Board"},
-    {id:"messages",icon:"📨",label:"Messages"},
+
+  const TEACHER_GROUPS = [
+    {id:"dashboard",  label:"Dashboard",        icon:"▣",  single:true, view:"dashboard"},
+    {
+      id:"students_grp", label:"Students Manager", icon:"🎓",
+      items:[
+        {id:"students",    label:"Students List",     icon:"👥"},
+        {id:"monitoring",  label:"Health Monitoring", icon:"🏥"},
+        {id:"attendance",  label:"Attendance",        icon:"✅"},
+        {id:"timeinout",   label:"Time In/Out",       icon:"🕐"},
+      ]
+    },
+    {
+      id:"academic_grp", label:"Academic Manager", icon:"📖",
+      items:[
+        {id:"results",   label:"Record Marks",  icon:"📝"},
+        {id:"analytics", label:"Exam Analysis", icon:"📈"},
+        {id:"reports",   label:"Report Forms",  icon:"🖨️"},
+      ]
+    },
+    {id:"timetable", label:"Timetable",   icon:"▦", single:true, view:"timetable"},
+    {id:"library",   label:"Library",     icon:"📚", single:true, view:"library"},
+    {id:"duty",      label:"Duty Roster", icon:"🛡️", single:true, view:"duty"},
+    {id:"council",   label:"Student Council", icon:"🎖️", single:true, view:"council"},
+    {
+      id:"comms_grp", label:"Communication", icon:"💬",
+      items:[
+        {id:"noticeboard", label:"Notice Board", icon:"📌"},
+        {id:"messages",    label:"Messages",     icon:"📨"},
+      ]
+    },
+    {id:"schoolinfo", label:"School Info", icon:"🏫", single:true, view:"schoolinfo"},
   ];
-  const parentLinks=[{id:"schoolinfo",icon:"🏫",label:"School Info"},{id:"parent_report",icon:"🖨️",label:"My Child's Report"},{id:"parent_fees",icon:"💰",label:"Fee Statement"},{id:"noticeboard",icon:"📌",label:"Notice Board"},{id:"dashboard",icon:"💬",label:"Chat & Messages"}];
-  const links=user.role==="admin"?adminLinks:user.role==="parent"?parentLinks:teacherLinks;
+
+  const PARENT_GROUPS = [
+    {id:"schoolinfo",    label:"School Info",       icon:"🏫", single:true, view:"schoolinfo"},
+    {id:"dashboard",     label:"Chat & Messages",   icon:"💬", single:true, view:"dashboard"},
+    {id:"parent_report", label:"My Child's Report", icon:"🖨️", single:true, view:"parent_report"},
+    {id:"parent_fees",   label:"Fee Statement",     icon:"💰", single:true, view:"parent_fees"},
+    {id:"noticeboard",   label:"Notice Board",      icon:"📌", single:true, view:"noticeboard"},
+  ];
+
+  const groups = user.role==="admin"?ADMIN_GROUPS : user.role==="parent"?PARENT_GROUPS : TEACHER_GROUPS;
+
+  // Find which group contains the active view, open it by default
+  function findGroupId(v) {
+    for(const g of groups){
+      if(g.single && g.view===v) return g.id;
+      if(g.items && g.items.some(i=>i.id===v)) return g.id;
+    }
+    return null;
+  }
+  const [openGroup, setOpenGroup] = useState(()=>findGroupId(view)||"dashboard");
+
+  // When view changes externally, open the matching group
+  useEffect(()=>{
+    const gid = findGroupId(view);
+    if(gid) setOpenGroup(gid);
+  },[view]);
+
+  function toggleGroup(gid) {
+    setOpenGroup(prev => prev===gid ? null : gid);
+  }
+
+  const activeViews = groups.flatMap(g=>g.single?[g.view||g.id]:(g.items||[]).map(i=>i.id));
+  const isActive = (v) => view===v;
+  const groupHasActive = (g) => g.single ? isActive(g.view||g.id) : (g.items||[]).some(i=>isActive(i.id));
+
   return (
-    <div style={{width:215,background:"#3b0764",color:"white",display:"flex",flexDirection:"column",flexShrink:0,overflowY:"auto",position:"relative",height:"100vh",minHeight:0}}>
-      <div style={{padding:"16px 14px 12px",borderBottom:"1px solid rgba(255,255,255,0.1)",textAlign:"center"}}>
-        <Logo size={54} src={logo} />
-        <div style={{fontSize:11,fontWeight:"bold",lineHeight:1.3,marginTop:8}}>{SCHOOL.name}</div>
-        <div style={{fontSize:9,color:"rgba(255,255,255,0.5)",marginTop:2,letterSpacing:1}}>{user.role==="admin"?"ADMIN PORTAL":user.role==="teacher"?"STAFF PORTAL":"PARENT PORTAL"}</div>
+    <div style={{width:230,background:"#3b0764",color:"white",display:"flex",flexDirection:"column",flexShrink:0,overflowY:"auto",position:"relative",height:"100vh",minHeight:0}}>
+      {/* Header */}
+      <div style={{padding:"16px 14px 12px",borderBottom:"1px solid rgba(255,255,255,0.12)",textAlign:"center",flexShrink:0}}>
+        <Logo size={50} src={logo}/>
+        <div style={{fontSize:10.5,fontWeight:"bold",lineHeight:1.3,marginTop:8,opacity:.95}}>{SCHOOL.name}</div>
+        <div style={{fontSize:9,color:"rgba(255,255,255,0.45)",marginTop:3,letterSpacing:1.2,textTransform:"uppercase"}}>
+          {user.role==="admin"?"Admin Portal":user.role==="teacher"?"Staff Portal":"Parent Portal"}
+        </div>
       </div>
-      <nav style={{flex:1,padding:"10px 0"}}>
-        {links.map(l=>(
-          <button key={l.id} onClick={()=>setView(l.id)} style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"9px 16px",border:"none",cursor:"pointer",fontFamily:F,fontSize:12,fontWeight:view===l.id?"bold":"normal",background:view===l.id?"rgba(255,255,255,0.15)":"transparent",color:view===l.id?"white":"rgba(255,255,255,0.75)",borderLeft:view===l.id?"3px solid #a78bfa":"3px solid transparent",transition:"all .15s",justifyContent:"flex-start"}}>
-            <span style={{fontSize:14}}>{l.icon}</span>
-            {l.label}
-          </button>
-        ))}
+
+      {/* Nav label */}
+      <div style={{padding:"10px 14px 4px",fontSize:10,fontWeight:"bold",color:"rgba(255,255,255,.35)",letterSpacing:1.5,textTransform:"uppercase",flexShrink:0}}>Main Navigation</div>
+
+      {/* Groups */}
+      <nav style={{flex:1,paddingBottom:8}}>
+        {groups.map(g=>{
+          const isOpen = openGroup===g.id;
+          const hasActive = groupHasActive(g);
+
+          if(g.single){
+            // Single-item group — just a nav button, no accordion
+            const active = isActive(g.view||g.id);
+            return (
+              <button key={g.id} onClick={()=>setView(g.view||g.id)}
+                style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"10px 16px",border:"none",cursor:"pointer",fontFamily:F,fontSize:12.5,fontWeight:active?"bold":"normal",background:active?"rgba(255,255,255,0.18)":"transparent",color:active?"white":"rgba(255,255,255,0.78)",borderLeft:active?"3px solid #a78bfa":"3px solid transparent",transition:"all .15s",justifyContent:"flex-start",textAlign:"left"}}>
+                <span style={{fontSize:15,opacity:.85}}>{g.icon}</span>
+                {g.label}
+              </button>
+            );
+          }
+
+          // Accordion group
+          return (
+            <div key={g.id}>
+              {/* Group header */}
+              <button onClick={()=>toggleGroup(g.id)}
+                style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px 10px 16px",border:"none",cursor:"pointer",fontFamily:F,fontSize:12.5,fontWeight:hasActive||isOpen?"bold":"normal",background:hasActive?"rgba(255,255,255,0.1)":isOpen?"rgba(255,255,255,0.06)":"transparent",color:hasActive||isOpen?"white":"rgba(255,255,255,0.78)",borderLeft:hasActive?"3px solid #a78bfa":"3px solid transparent",transition:"all .15s",textAlign:"left"}}>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <span style={{fontSize:15,opacity:.85}}>{g.icon}</span>
+                  {g.label}
+                </div>
+                <span style={{fontSize:10,opacity:.6,transition:"transform .2s",display:"inline-block",transform:isOpen?"rotate(180deg)":"rotate(0deg)"}}>▾</span>
+              </button>
+              {/* Sub-items */}
+              {isOpen&&(
+                <div style={{background:"rgba(0,0,0,0.15)"}}>
+                  {(g.items||[]).map(item=>{
+                    const active = isActive(item.id);
+                    return (
+                      <button key={item.id} onClick={()=>setView(item.id)}
+                        style={{width:"100%",display:"flex",alignItems:"center",gap:9,padding:"8px 14px 8px 36px",border:"none",cursor:"pointer",fontFamily:F,fontSize:12,fontWeight:active?"bold":"normal",background:active?"rgba(255,255,255,0.18)":"transparent",color:active?"white":"rgba(255,255,255,0.68)",borderLeft:active?"3px solid #a78bfa":"3px solid transparent",transition:"all .12s",textAlign:"left"}}>
+                        <span style={{fontSize:13,opacity:.75}}>{item.icon}</span>
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </nav>
-      <div style={{padding:"12px 14px",borderTop:"1px solid rgba(255,255,255,0.1)"}}>
-        <div style={{fontSize:11,fontWeight:"bold",color:"rgba(255,255,255,.9)",marginBottom:1}}>{user.name}</div>
-        <div style={{fontSize:10,color:"rgba(255,255,255,.5)",marginBottom:8,textTransform:"capitalize"}}>{user.role}</div>
-        <button onClick={onLogout} style={{width:"100%",background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.2)",borderRadius:8,padding:"6px 8px",cursor:"pointer",color:"rgba(255,255,255,.8)",fontSize:11,fontFamily:F,display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
+
+      {/* Footer */}
+      <div style={{padding:"12px 14px",borderTop:"1px solid rgba(255,255,255,0.12)",flexShrink:0}}>
+        <div style={{fontSize:11.5,fontWeight:"bold",color:"rgba(255,255,255,.9)",marginBottom:1}}>{user.name}</div>
+        <div style={{fontSize:10,color:"rgba(255,255,255,.45)",marginBottom:8,textTransform:"capitalize"}}>{user.role}</div>
+        <button onClick={onLogout} style={{width:"100%",background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.2)",borderRadius:8,padding:"6px 8px",cursor:"pointer",color:"rgba(255,255,255,.8)",fontSize:11,fontFamily:F,display:"flex",alignItems:"center",justifyContent:"center",gap:4,transition:"background .15s"}}>
           🔓 Logout
         </button>
       </div>
@@ -779,9 +966,162 @@ function StudentsPage({students,setStudents,results,setResults,comments,setComme
   const td={padding:"9px 12px",fontSize:12,color:"#374151",borderTop:"1px solid #f1f5f9"};
   return (
     <div style={{padding:24}}>
-      <PageH title="Students" sub="Manage all learners"><div style={{display:"flex",gap:6}}>{["list","add"].map(t=><Btn key={t} onClick={()=>{setTab(t);if(t==="add"&&!editId)setForm(blank);}} v={tab===t?"primary":"ghost"} style={{fontSize:12}}>{t==="list"?"📋 List":"➕ Add"}</Btn>)}</div></PageH>
+      <PageH title="Students" sub="Manage all learners"><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{[["list","📋 List"],["add","➕ Add"],["idcards","🪪 ID Cards"]].map(([t,l])=><Btn key={t} onClick={()=>{setTab(t);if(t==="add"&&!editId)setForm(blank);}} v={tab===t?"primary":"ghost"} style={{fontSize:12}}>{l}</Btn>)}</div></PageH>
       {tab==="add"&&<Card style={{marginBottom:20}}><div style={{fontWeight:"bold",color:"#1e293b",marginBottom:14,fontSize:14}}>{editId?"Edit Learner":"Add New Learner"}</div><div style={{marginBottom:14}}><PhotoUp value={form.photo} onChange={v=>setForm({...form,photo:v})}/></div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}><Inp label="FULL NAME *" value={form.name} onChange={v=>setForm({...form,name:v})} placeholder="Full name"/><Inp label="ADM. NUMBER *" value={form.admNo} onChange={v=>setForm({...form,admNo:v})} placeholder="NKS/2025/001"/><Sel label="CLASS" value={form.class} onChange={v=>setForm({...form,class:v})} options={ALL_CLASSES}/><Sel label="GENDER" value={form.gender} onChange={v=>setForm({...form,gender:v})} options={["Male","Female"]}/><Inp label="DATE OF BIRTH" value={form.dob} onChange={v=>setForm({...form,dob:v})} placeholder="DD/MM/YYYY"/><Inp label="PARENT/GUARDIAN" value={form.parentName} onChange={v=>setForm({...form,parentName:v})} placeholder="Parent full name"/><Inp label="PARENT PHONE" value={form.parentPhone} onChange={v=>setForm({...form,parentPhone:v})} placeholder="+254 7..."/><Inp label="HOME ADDRESS" value={form.address} onChange={v=>setForm({...form,address:v})} placeholder="Village/Location"/></div><div style={{marginTop:12,paddingTop:12,borderTop:"1px dashed #e2e8f0"}}><div style={{fontSize:12,fontWeight:"bold",color:"#3b0764",marginBottom:10}}>👨‍👩‍👧 Parent Portal Access</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="LEARNER EMAIL (parent login)" value={form.email} onChange={v=>setForm({...form,email:v})} placeholder="john@gmail.com" type="email"/><Inp label="PARENT PASSWORD" value={form.parentPassword} onChange={v=>setForm({...form,parentPassword:v})} placeholder="Set password" type="password"/></div></div>{msg.t&&<div style={{marginTop:10,fontSize:13,color:msg.ok?"#15803d":"#b91c1c",fontWeight:"bold"}}>{msg.t}</div>}<div style={{display:"flex",gap:8,marginTop:14}}><Btn onClick={doSave} v="primary">{editId?"Update":"Add Learner"}</Btn>{editId&&<Btn onClick={()=>{setEditId(null);setForm(blank);setTab("list");}} v="ghost">Cancel</Btn>}</div></Card>}
       {tab==="list"&&<><div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by name or adm. no..." style={{flex:1,minWidth:200,border:"1.5px solid #e2e8f0",borderRadius:9,padding:"8px 12px",fontSize:13,fontFamily:F,outline:"none"}}/><Sel value={filterCls} onChange={setFilterCls} options={["All",...ALL_CLASSES]}/><span style={{fontSize:12,color:"#64748b"}}>{filtered.length} learner(s)</span></div><Card style={{padding:0}}><div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}><thead><tr>{["","#","Adm.No","Name","Class","Gender","Parent","Portal","Actions"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>{filtered.length?filtered.map((s,i)=><tr key={s.id} style={{background:i%2===0?"white":"#fafafa"}}><td style={{...td,width:46}}><Avatar name={s.name} photo={s.photo} size={34}/></td><td style={{...td,color:"#94a3b8"}}>{i+1}</td><td style={{...td,fontFamily:"monospace",fontSize:11}}>{s.admNo}</td><td style={{...td,fontWeight:"bold"}}>{s.name}</td><td style={td}><span style={{background:"#f5f3ff",color:"#7c3aed",fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:"bold"}}>{s.class}</span></td><td style={td}>{s.gender||"—"}</td><td style={{...td,fontSize:11}}>{s.parentName||"—"}</td><td style={td}>{s.email?<span style={{fontSize:10,color:"#15803d"}}>✅</span>:<span style={{fontSize:10,color:"#94a3b8"}}>—</span>}</td><td style={td}><button onClick={()=>doEdit(s)} style={{color:"#7c3aed",background:"none",border:"none",cursor:"pointer",fontSize:12,marginRight:8}}>Edit</button><button onClick={()=>doDel(s.id)} style={{color:"#b91c1c",background:"none",border:"none",cursor:"pointer",fontSize:12}}>Del</button></td></tr>):<tr><td colSpan={9} style={{padding:40,textAlign:"center",color:"#94a3b8"}}>No learners found.</td></tr>}</tbody></table></div></Card></>}
+      {tab==="idcards"&&<StudentIDCards students={students} filterCls={filterCls} setFilterCls={setFilterCls}/>}
+    </div>
+  );
+}
+
+// ── STUDENT ID CARD PRINTER ──────────────────────────────
+function StudentIDCards({students, filterCls, setFilterCls}) {
+  const F = getAppFont();
+  const [selStu, setSelStu] = useState("All");
+  const [idYear, setIdYear] = useState(String(new Date().getFullYear()));
+  const [layout, setLayout] = useState("grid"); // grid | single
+
+  const toShow = students.filter(s =>
+    (filterCls==="All" || s.class===filterCls) &&
+    (selStu==="All" || s.id===selStu) &&
+    s.status !== "transferred"
+  );
+
+  function printIDCard(s) {
+    // Simple barcode-style visual using student admNo chars
+    const barsHTML = (s.admNo||"NKS/0000/001").split("").map(c =>
+      `<div style="display:inline-block;width:${2+Math.floor(Math.random()*2)}px;height:28px;background:#3b0764;margin-right:1px;vertical-align:middle;"></div>`
+    ).join("");
+
+    const cardHTML = `
+      <div style="width:85mm;min-height:54mm;border-radius:8px;background:linear-gradient(135deg,#3b0764,#6d28d9);color:white;font-family:Georgia,serif;padding:0;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.3);page-break-inside:avoid;display:inline-block;margin:6px;vertical-align:top;">
+        <!-- FRONT TOP HEADER -->
+        <div style="background:rgba(255,255,255,.12);padding:7px 10px;display:flex;align-items:center;gap:8px;border-bottom:2px solid rgba(255,255,255,.2);">
+          <div style="width:30px;height:30px;border-radius:50%;background:white;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            ${s.photo?`<img src="${s.photo}" style="width:30px;height:30px;border-radius:50%;object-fit:cover;"/>` : `<span style="font-size:14px;color:#3b0764;font-weight:bold;">${getInitials(s.name)}</span>`}
+          </div>
+          <div>
+            <div style="font-size:9px;font-weight:bold;letter-spacing:1px;opacity:.8;">THE NYAGA KINDIKI SCHOOLS</div>
+            <div style="font-size:7px;opacity:.65;">Tharaka North · Education Liberates</div>
+          </div>
+        </div>
+        <!-- BODY -->
+        <div style="padding:8px 10px;display:flex;gap:10px;align-items:flex-start;">
+          <!-- Photo box -->
+          <div style="flex-shrink:0;width:44px;height:52px;border-radius:5px;background:rgba(255,255,255,.15);border:2px solid rgba(255,255,255,.35);overflow:hidden;display:flex;align-items:center;justify-content:center;">
+            ${s.photo ? `<img src="${s.photo}" style="width:44px;height:52px;object-fit:cover;"/>` : `<span style="font-size:20px;color:white;">${getInitials(s.name)}</span>`}
+          </div>
+          <!-- Info -->
+          <div style="flex:1;">
+            <div style="font-size:11px;font-weight:bold;line-height:1.3;margin-bottom:4px;">${s.name}</div>
+            <div style="font-size:8.5px;opacity:.8;margin-bottom:2px;">Adm: <b>${s.admNo||"—"}</b></div>
+            <div style="font-size:8.5px;opacity:.8;margin-bottom:2px;">Class: <b>${s.class}</b> · ${s.gender||"—"}</div>
+            ${s.dob?`<div style="font-size:8px;opacity:.7;">DOB: ${s.dob}</div>`:""}
+            <div style="font-size:8px;opacity:.7;margin-top:2px;">Year: ${idYear}</div>
+          </div>
+        </div>
+        <!-- BARCODE STRIP -->
+        <div style="background:white;margin:0 8px 8px;border-radius:4px;padding:4px 6px;text-align:center;">
+          ${barsHTML}
+          <div style="font-size:7px;color:#3b0764;margin-top:2px;letter-spacing:1px;">${s.admNo||"NKS/0000/001"}</div>
+        </div>
+        <!-- FOOTER -->
+        <div style="background:rgba(0,0,0,.2);padding:4px 10px;display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-size:7px;opacity:.7;">${SCHOOL.phone}</div>
+          <div style="font-size:7px;opacity:.7;">If found, please return to school</div>
+        </div>
+      </div>`;
+    return cardHTML;
+  }
+
+  function doPrintAll() {
+    if (!toShow.length) return;
+    const cards = toShow.map(s => printIDCard(s)).join("");
+    const w = window.open("","_blank");
+    w.document.write(`<html><head><title>Student ID Cards</title><style>
+      @media print { body{margin:0;} .no-print{display:none;} }
+      body{background:#e5e7eb;padding:16px;font-family:Georgia,serif;}
+      .controls{margin-bottom:16px;padding:12px;background:white;border-radius:8px;}
+    </style></head><body>
+      <div class="controls no-print"><b>Student ID Cards — ${filterCls==="All"?"All Classes":filterCls}</b> (${toShow.length} cards) <button onclick="window.print()" style="margin-left:12px;background:#3b0764;color:white;border:none;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:13px;">🖨 Print All</button></div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;">${cards}</div>
+    </body></html>`);
+    w.document.close();
+  }
+
+  function doPrintOne(s) {
+    const card = printIDCard(s);
+    const w = window.open("","_blank");
+    w.document.write(`<html><head><title>ID Card — ${s.name}</title><style>@media print{body{margin:0;}.no-print{display:none;}}body{background:#e5e7eb;padding:24px;display:flex;justify-content:center;font-family:Georgia,serif;}</style></head><body>
+      <div><div class="no-print" style="margin-bottom:12px;"><button onclick="window.print()" style="background:#3b0764;color:white;border:none;padding:6px 18px;border-radius:6px;cursor:pointer;">🖨 Print</button></div>${card}</div>
+    </body></html>`);
+    w.document.close();
+  }
+
+  return (
+    <div>
+      <Card style={{marginBottom:16}}>
+        <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
+          <Sel label="FILTER BY CLASS" value={filterCls} onChange={setFilterCls} options={["All",...ALL_CLASSES]}/>
+          <div>
+            <label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:4}}>STUDENT</label>
+            <select value={selStu} onChange={e=>setSelStu(e.target.value)} style={{border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px",fontSize:13,fontFamily:F,minWidth:180}}>
+              <option value="All">All Students</option>
+              {students.filter(s=>filterCls==="All"||s.class===filterCls).map(s=><option key={s.id} value={s.id}>{s.name} ({s.admNo})</option>)}
+            </select>
+          </div>
+          <Inp label="ACADEMIC YEAR" value={idYear} onChange={setIdYear} placeholder="2025"/>
+          <div style={{marginTop:18,display:"flex",gap:8}}>
+            <Btn onClick={doPrintAll} v="purple">🖨 Print {toShow.length} Card{toShow.length!==1?"s":""}</Btn>
+          </div>
+        </div>
+      </Card>
+      {!toShow.length && <Empty icon="🪪" text="No students match the filter."/>}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14}}>
+        {toShow.map(s=>(
+          <Card key={s.id} style={{padding:0,overflow:"hidden",border:"2px solid #ede9fe"}}>
+            {/* Card Preview */}
+            <div style={{background:"linear-gradient(135deg,#3b0764,#6d28d9)",color:"white",padding:0}}>
+              {/* Header */}
+              <div style={{background:"rgba(255,255,255,.12)",padding:"8px 12px",display:"flex",alignItems:"center",gap:8,borderBottom:"2px solid rgba(255,255,255,.2)"}}>
+                <Avatar name={s.name} photo={s.photo} size={32}/>
+                <div>
+                  <div style={{fontSize:9,fontWeight:"bold",letterSpacing:1,opacity:.9}}>THE NYAGA KINDIKI SCHOOLS</div>
+                  <div style={{fontSize:7,opacity:.65}}>Tharaka North · Education Liberates</div>
+                </div>
+              </div>
+              {/* Body */}
+              <div style={{padding:"10px 12px",display:"flex",gap:10}}>
+                <div style={{width:48,height:56,borderRadius:5,background:"rgba(255,255,255,.15)",border:"2px solid rgba(255,255,255,.35)",overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                  {s.photo?<img src={s.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<span style={{fontSize:20}}>{getInitials(s.name)}</span>}
+                </div>
+                <div>
+                  <div style={{fontWeight:"bold",fontSize:12,marginBottom:4}}>{s.name}</div>
+                  <div style={{fontSize:9,opacity:.8}}>Adm: <b>{s.admNo||"—"}</b></div>
+                  <div style={{fontSize:9,opacity:.8}}>Class: <b>{s.class}</b> · {s.gender||"—"}</div>
+                  {s.dob&&<div style={{fontSize:8.5,opacity:.7}}>DOB: {s.dob}</div>}
+                  <div style={{fontSize:8.5,opacity:.7}}>Year: {idYear}</div>
+                </div>
+              </div>
+              {/* Barcode strip */}
+              <div style={{background:"white",margin:"0 8px 8px",borderRadius:4,padding:"3px 6px",textAlign:"center"}}>
+                <div style={{display:"flex",justifyContent:"center",gap:"1px",marginBottom:2}}>
+                  {(s.admNo||"NKS/001").split("").map((c,i)=><div key={i} style={{width:i%3===0?3:2,height:20,background:"#3b0764"}}/>)}
+                </div>
+                <div style={{fontSize:7,color:"#3b0764",letterSpacing:1}}>{s.admNo||"—"}</div>
+              </div>
+              <div style={{background:"rgba(0,0,0,.2)",padding:"3px 10px",display:"flex",justifyContent:"space-between"}}>
+                <span style={{fontSize:7,opacity:.7}}>{SCHOOL.phone.split("/")[0].trim()}</span>
+                <span style={{fontSize:7,opacity:.7}}>If found, return to school</span>
+              </div>
+            </div>
+            {/* Print button */}
+            <div style={{padding:"8px 12px",display:"flex",justifyContent:"flex-end",background:"#fafafa"}}>
+              <button onClick={()=>doPrintOne(s)} style={{background:"#f5f3ff",border:"1px solid #ddd6fe",borderRadius:6,padding:"4px 12px",cursor:"pointer",fontSize:11,color:"#7c3aed",fontFamily:F,fontWeight:"bold"}}>🖨 Print This Card</button>
+            </div>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1858,6 +2198,8 @@ function FeesPage({students,fees,setFees,user,logo}) {
           {user.role==="admin"&&<Btn onClick={()=>setTab(tab==="add"?"list":"add")} v={tab==="add"?"ghost":"primary"} style={{fontSize:12}}>{tab==="add"?"📋 Records":"➕ Add Record"}</Btn>}
           <Btn onClick={()=>setTab("summary")} v={tab==="summary"?"primary":"ghost"} style={{fontSize:12}}>👥 By Student</Btn>
           <Btn onClick={()=>setTab("defaulters")} v={tab==="defaulters"?"red":"ghost"} style={{fontSize:12}}>⚠️ Defaulters</Btn>
+          <Btn onClick={()=>setTab("expenses")} v={tab==="expenses"?"purple":"ghost"} style={{fontSize:12}}>📉 Expenses</Btn>
+          <Btn onClick={()=>setTab("govalloc")} v={tab==="govalloc"?"purple":"ghost"} style={{fontSize:12}}>🏛️ Gov. Allocations</Btn>
           {user.role==="admin"&&<div style={{position:"relative"}}>
             <Btn onClick={()=>setShowDlMenu(s=>!s)} v="teal" style={{fontSize:12}}>🖨️ Print Statements ▾</Btn>
             {showDlMenu&&<div style={{position:"absolute",top:"100%",right:0,zIndex:200,background:"white",border:"1px solid #e2e8f0",borderRadius:12,boxShadow:"0 8px 24px rgba(0,0,0,.12)",padding:8,minWidth:260,marginTop:4,maxHeight:400,overflowY:"auto"}}>
@@ -2036,6 +2378,123 @@ function FeesPage({students,fees,setFees,user,logo}) {
           </table></div>
         </Card></>
       )}
+
+      {tab==="expenses"&&(()=>{
+        const [expenses,setExpenses]=React.useState([]);
+        const [expForm,setExpForm]=React.useState({category:"Utilities",description:"",amount:"",date:new Date().toLocaleDateString("en-KE"),payMethod:"Cash",receipt:"",approvedBy:""});
+        const [expMsg,setExpMsg]=React.useState("");
+        React.useEffect(()=>{load("tnks_expenses").then(d=>{if(d)setExpenses(d);});},[]);
+        React.useEffect(()=>{save("tnks_expenses",expenses);},[expenses]);
+        const EXP_CATS=["Utilities","Maintenance","Stationery","Salaries","Transport","Food & Catering","Cleaning","Events","Equipment","Other"];
+        const totalExp=expenses.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+        function addExp(){if(!expForm.description||!expForm.amount)return setExpMsg("❌ Description and amount required."); setExpenses(p=>[...p,{...expForm,id:Date.now().toString(),recordedBy:user.name}]); setExpMsg("✅ Expense recorded!"); setExpForm({category:"Utilities",description:"",amount:"",date:new Date().toLocaleDateString("en-KE"),payMethod:"Cash",receipt:"",approvedBy:""}); setTimeout(()=>setExpMsg(""),2000);}
+        const expTh={textAlign:"left",padding:"9px 12px",fontWeight:"bold",fontSize:11,color:"#7c3aed",background:"#f5f3ff"};
+        const expTd={padding:"8px 12px",fontSize:12,borderBottom:"1px solid #f1f5f9"};
+        const byCat=EXP_CATS.map(c=>({cat:c,total:expenses.filter(e=>e.category===c).reduce((s,e)=>s+(parseFloat(e.amount)||0),0)})).filter(x=>x.total>0);
+        return(
+          <div>
+            {user.role==="admin"&&<Card style={{marginBottom:16}}>
+              <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>📉 Record Expense</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,marginBottom:12}}>
+                <Sel label="CATEGORY" value={expForm.category} onChange={v=>setExpForm({...expForm,category:v})} options={EXP_CATS}/>
+                <Inp label="DESCRIPTION *" value={expForm.description} onChange={v=>setExpForm({...expForm,description:v})} placeholder="e.g. KPLC bill"/>
+                <Inp label="AMOUNT (KES) *" value={expForm.amount} onChange={v=>setExpForm({...expForm,amount:v})} placeholder="0" type="number"/>
+                <Inp label="DATE" value={expForm.date} onChange={v=>setExpForm({...expForm,date:v})} placeholder="DD/MM/YYYY"/>
+                <Sel label="PAYMENT METHOD" value={expForm.payMethod} onChange={v=>setExpForm({...expForm,payMethod:v})} options={["Cash","M-Pesa","Bank","Cheque"]}/>
+                <Inp label="RECEIPT NO." value={expForm.receipt} onChange={v=>setExpForm({...expForm,receipt:v})} placeholder="e.g. RCP-001"/>
+                <Inp label="APPROVED BY" value={expForm.approvedBy} onChange={v=>setExpForm({...expForm,approvedBy:v})} placeholder="Approver name"/>
+              </div>
+              {expMsg&&<div style={{marginBottom:10,fontSize:13,fontWeight:"bold",color:expMsg.includes("❌")?"#b91c1c":"#15803d"}}>{expMsg}</div>}
+              <Btn onClick={addExp} v="red">📉 Record Expense</Btn>
+            </Card>}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,marginBottom:14}}>
+              <Stat icon="📉" label="Total Expenses" value={`KES ${totalExp.toLocaleString()}`} color="#b91c1c"/>
+              <Stat icon="📋" label="Records" value={expenses.length} color="#7c3aed"/>
+            </div>
+            {byCat.length>0&&<Card style={{marginBottom:14}}>
+              <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:12}}>Expenses by Category</div>
+              {byCat.map(x=>(
+                <div key={x.cat} style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+                  <div style={{width:100,fontSize:11,color:"#374151"}}>{x.cat}</div>
+                  <div style={{flex:1,height:12,background:"#f1f5f9",borderRadius:6}}><div style={{width:`${Math.min(100,(x.total/totalExp)*100)}%`,height:"100%",background:"#b91c1c",borderRadius:6}}/></div>
+                  <div style={{fontSize:11,fontWeight:"bold",color:"#b91c1c",minWidth:90,textAlign:"right"}}>KES {x.total.toLocaleString()}</div>
+                </div>
+              ))}
+            </Card>}
+            <Card style={{padding:0}}><div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:700}}>
+              <thead><tr>{["#","Date","Category","Description","Amount","Method","Receipt","Approved By","By"].map(h=><th key={h} style={expTh}>{h}</th>)}</tr></thead>
+              <tbody>{expenses.slice().reverse().map((e,i)=>(
+                <tr key={e.id} style={{background:i%2===0?"white":"#fafafa"}}>
+                  <td style={{...expTd,color:"#94a3b8"}}>{i+1}</td>
+                  <td style={expTd}>{e.date}</td>
+                  <td style={expTd}><span style={{fontSize:10,padding:"2px 8px",borderRadius:20,background:"#fee2e2",color:"#b91c1c",fontWeight:"bold"}}>{e.category}</span></td>
+                  <td style={{...expTd,fontWeight:"bold"}}>{e.description}</td>
+                  <td style={{...expTd,fontWeight:"bold",color:"#b91c1c"}}>KES {Number(e.amount).toLocaleString()}</td>
+                  <td style={expTd}>{e.payMethod}</td>
+                  <td style={{...expTd,fontFamily:"monospace",fontSize:11}}>{e.receipt||"—"}</td>
+                  <td style={expTd}>{e.approvedBy||"—"}</td>
+                  <td style={{...expTd,fontSize:11,color:"#94a3b8"}}>{e.recordedBy}</td>
+                </tr>
+              ))}
+              {!expenses.length&&<tr><td colSpan={9} style={{padding:40,textAlign:"center",color:"#94a3b8"}}>No expenses recorded.</td></tr>}
+              </tbody>
+            </table></div></Card>
+          </div>
+        );
+      })()}
+
+      {tab==="govalloc"&&(()=>{
+        const [allocs,setAllocs]=React.useState([]);
+        const [aForm,setAForm]=React.useState({source:"National Government",type:"Capitation",term:"Term 1",year:String(new Date().getFullYear()),amount:"",date:new Date().toLocaleDateString("en-KE"),reference:"",notes:""});
+        const [aMsg,setAMsg]=React.useState("");
+        React.useEffect(()=>{load("tnks_gov_allocs").then(d=>{if(d)setAllocs(d);});},[]);
+        React.useEffect(()=>{save("tnks_gov_allocs",allocs);},[allocs]);
+        const totalAlloc=allocs.reduce((s,a)=>s+(parseFloat(a.amount)||0),0);
+        function addAlloc(){if(!aForm.amount)return setAMsg("❌ Amount required."); setAllocs(p=>[...p,{...aForm,id:Date.now().toString(),recordedBy:user.name}]); setAMsg("✅ Allocation recorded!"); setAForm({...aForm,amount:"",reference:"",notes:""}); setTimeout(()=>setAMsg(""),2000);}
+        const aTh={textAlign:"left",padding:"9px 12px",fontWeight:"bold",fontSize:11,color:"#7c3aed",background:"#f5f3ff"};
+        const aTd={padding:"8px 12px",fontSize:12,borderBottom:"1px solid #f1f5f9"};
+        return(
+          <div>
+            {user.role==="admin"&&<Card style={{marginBottom:16}}>
+              <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>🏛️ Record Government Allocation</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,marginBottom:12}}>
+                <Sel label="SOURCE" value={aForm.source} onChange={v=>setAForm({...aForm,source:v})} options={["National Government","County Government","NG-CDF","Donor/NGO","Other"]}/>
+                <Sel label="TYPE" value={aForm.type} onChange={v=>setAForm({...aForm,type:v})} options={["Capitation","Infrastructure","Bursary","Special Needs","Other"]}/>
+                <Inp label="AMOUNT (KES) *" value={aForm.amount} onChange={v=>setAForm({...aForm,amount:v})} placeholder="0" type="number"/>
+                <Sel label="TERM" value={aForm.term} onChange={v=>setAForm({...aForm,term:v})} options={["Term 1","Term 2","Term 3"]}/>
+                <Sel label="YEAR" value={aForm.year} onChange={v=>setAForm({...aForm,year:v})} options={getYears().slice(-5)}/>
+                <Inp label="DATE RECEIVED" value={aForm.date} onChange={v=>setAForm({...aForm,date:v})} placeholder="DD/MM/YYYY"/>
+                <Inp label="REFERENCE NO." value={aForm.reference} onChange={v=>setAForm({...aForm,reference:v})} placeholder="Ref. number"/>
+                <Inp label="NOTES" value={aForm.notes} onChange={v=>setAForm({...aForm,notes:v})} placeholder="Additional notes"/>
+              </div>
+              {aMsg&&<div style={{marginBottom:10,fontSize:13,fontWeight:"bold",color:aMsg.includes("❌")?"#b91c1c":"#15803d"}}>{aMsg}</div>}
+              <Btn onClick={addAlloc} v="green">🏛️ Record Allocation</Btn>
+            </Card>}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,marginBottom:14}}>
+              <Stat icon="🏛️" label="Total Received" value={`KES ${totalAlloc.toLocaleString()}`} color="#15803d"/>
+              <Stat icon="📋" label="Records" value={allocs.length} color="#7c3aed"/>
+            </div>
+            <Card style={{padding:0}}><div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:700}}>
+              <thead><tr>{["#","Date","Source","Type","Term","Year","Amount","Reference","Recorded By"].map(h=><th key={h} style={aTh}>{h}</th>)}</tr></thead>
+              <tbody>{allocs.slice().reverse().map((a,i)=>(
+                <tr key={a.id} style={{background:i%2===0?"white":"#fafafa"}}>
+                  <td style={{...aTd,color:"#94a3b8"}}>{i+1}</td>
+                  <td style={aTd}>{a.date}</td>
+                  <td style={aTd}><span style={{fontSize:10,padding:"2px 8px",borderRadius:20,background:"#f0fdf4",color:"#15803d",fontWeight:"bold"}}>{a.source}</span></td>
+                  <td style={aTd}>{a.type}</td>
+                  <td style={aTd}>{a.term}</td>
+                  <td style={aTd}>{a.year}</td>
+                  <td style={{...aTd,fontWeight:"bold",color:"#15803d"}}>KES {Number(a.amount).toLocaleString()}</td>
+                  <td style={{...aTd,fontFamily:"monospace",fontSize:11}}>{a.reference||"—"}</td>
+                  <td style={{...aTd,fontSize:11,color:"#94a3b8"}}>{a.recordedBy}</td>
+                </tr>
+              ))}
+              {!allocs.length&&<tr><td colSpan={9} style={{padding:40,textAlign:"center",color:"#94a3b8"}}>No allocations recorded.</td></tr>}
+              </tbody>
+            </table></div></Card>
+          </div>
+        );
+      })()}
 
       {/* PAYMENT MODAL */}
       {payModal&&(()=>{
@@ -4772,10 +5231,42 @@ function StaffPage({staff,setStaff,users,setUsers}) {
   const td={padding:"8px 12px",fontSize:12,borderTop:"1px solid #f1f5f9"};
   return (
     <div style={{padding:24}}>
-      <PageH title="Staff Manager" sub="Teaching and non-teaching staff records"><div style={{display:"flex",gap:6}}>{["list","add"].map(t=><Btn key={t} onClick={()=>{setTab(t);if(t==="add"&&!editId)setForm(blank);}} v={tab===t?"primary":"ghost"} style={{fontSize:12}}>{t==="list"?"📋 Staff List":"➕ Add Staff"}</Btn>)}</div></PageH>
+      <PageH title="Staff Manager" sub="Teaching and non-teaching staff records"><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{[["list","📋 Staff List"],["add","➕ Add Staff"],["former","🚪 Former Staff"]].map(([t,l])=><Btn key={t} onClick={()=>{setTab(t);if(t==="add"&&!editId)setForm(blank);}} v={tab===t?"primary":"ghost"} style={{fontSize:12}}>{l}</Btn>)}</div></PageH>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12,marginBottom:18}}><Stat icon="👨‍🏫" label="Teaching" value={(staff||[]).filter(s=>s.staffType==="teaching").length} color="#7c3aed"/><Stat icon="👷" label="Non-Teaching" value={(staff||[]).filter(s=>s.staffType==="non-teaching").length} color="#b45309"/><Stat icon="👥" label="Total Staff" value={(staff||[]).length} color="#7c3aed"/></div>
       {tab==="add"&&<Card style={{marginBottom:20}}><div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>{editId?"Edit Staff Member":"Add New Staff Member"}</div><div style={{marginBottom:14}}><PhotoUp value={form.photo} onChange={v=>setForm({...form,photo:v})}/></div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}><Inp label="FULL NAME *" value={form.name} onChange={v=>setForm({...form,name:v})} placeholder="Full name"/><Inp label="STAFF ID *" value={form.staffId} onChange={v=>setForm({...form,staffId:v})} placeholder="NKS/S/001"/><Sel label="STAFF TYPE" value={form.staffType} onChange={v=>setForm({...form,staffType:v})} options={["teaching","non-teaching"]}/><Sel label="SYSTEM ROLE" value={form.role} onChange={v=>setForm({...form,role:v})} options={["teacher","admin"]}/><Inp label="SUBJECT/DEPT *" value={form.subject} onChange={v=>setForm({...form,subject:v})} placeholder="e.g. Mathematics"/><Inp label="PHONE" value={form.phone} onChange={v=>setForm({...form,phone:v})} placeholder="+254 7..."/><Inp label="EMAIL" value={form.email} onChange={v=>setForm({...form,email:v})} placeholder="email@tnks.sc.ke" type="email"/><Inp label="DATE OF BIRTH" value={form.dob} onChange={v=>setForm({...form,dob:v})} placeholder="DD/MM/YYYY"/><Inp label="DATE JOINED" value={form.joinDate} onChange={v=>setForm({...form,joinDate:v})} placeholder="DD/MM/YYYY"/><Inp label="QUALIFICATION" value={form.qualification} onChange={v=>setForm({...form,qualification:v})} placeholder="e.g. B.Ed"/></div><div style={{marginTop:12,paddingTop:12,borderTop:"1px dashed #e2e8f0"}}><div style={{fontSize:12,fontWeight:"bold",color:"#3b0764",marginBottom:10}}>🔐 System Login Credentials</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="USERNAME" value={form.username} onChange={v=>setForm({...form,username:v})} placeholder="e.g. purity"/><Inp label="PASSWORD" value={form.password} onChange={v=>setForm({...form,password:v})} placeholder="Set password" type="password"/></div></div>{msg.t&&<div style={{marginTop:10,fontSize:13,color:msg.ok?"#15803d":"#b91c1c",fontWeight:"bold"}}>{msg.t}</div>}<div style={{display:"flex",gap:8,marginTop:14}}><Btn onClick={doSave} v="primary">{editId?"Update Staff":"Add Staff"}</Btn>{editId&&<Btn onClick={()=>{setEditId(null);setForm(blank);setTab("list");}} v="ghost">Cancel</Btn>}</div></Card>}
-      {tab==="list"&&<><div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search staff..." style={{flex:1,minWidth:200,border:"1.5px solid #e2e8f0",borderRadius:9,padding:"8px 12px",fontSize:13,fontFamily:F,outline:"none"}}/><Sel value={filterType} onChange={setFilterType} options={["All","teaching","non-teaching"]}/></div><Card style={{padding:0}}><div style={{padding:"10px 16px",background:"#fef3c7",borderBottom:"1px solid #fde68a",fontSize:12,color:"#92400e"}}>🔑 <b>Admin view:</b> Usernames and passwords shown so you can share login credentials with staff. Keep this page confidential.</div><div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:900}}><thead><tr>{["","#","Staff ID","Name","Type","Subject","Username","Password","Phone","Qual","Actions"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>{filtered.length?filtered.map((s,i)=>{const acct=users.find(u=>u.username===s.username);const pw=acct?.password||s.password||"—";return(<tr key={s.id} style={{background:i%2===0?"white":"#fafafa"}}><td style={{...td,width:44}}><Avatar name={s.name} photo={s.photo} size={32}/></td><td style={{...td,color:"#94a3b8"}}>{i+1}</td><td style={{...td,fontFamily:"monospace",fontSize:11}}>{s.staffId}</td><td style={{...td,fontWeight:"bold"}}>{s.name}</td><td style={td}><span style={{background:s.staffType==="teaching"?"#f5f3ff":"#f0fdf4",color:s.staffType==="teaching"?"#7c3aed":"#15803d",fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:"bold"}}>{s.staffType}</span></td><td style={td}>{s.subject||"—"}</td><td style={{...td,fontFamily:"monospace",fontSize:11,color:"#7c3aed"}}>{s.username||"—"}</td><td style={{...td,fontFamily:"monospace",fontSize:12,color:"#7c3aed",fontWeight:"bold"}}>{pw}</td><td style={td}>{s.phone||"—"}</td><td style={{...td,fontSize:11}}>{s.qualification||"—"}</td><td style={td}><button onClick={()=>doEdit(s)} style={{color:"#7c3aed",background:"none",border:"none",cursor:"pointer",fontSize:12,marginRight:8}}>Edit</button><button onClick={()=>doDel(s.id)} style={{color:"#b91c1c",background:"none",border:"none",cursor:"pointer",fontSize:12}}>Del</button></td></tr>);}):<tr><td colSpan={11} style={{padding:40,textAlign:"center",color:"#94a3b8"}}>No staff records.</td></tr>}</tbody></table></div></Card><div style={{marginTop:10,padding:"10px 14px",background:"#f5f3ff",borderRadius:10,fontSize:12,color:"#7c3aed"}}>💡 <b>Tip:</b> For pre-loaded/default staff accounts, go to <b>⚙️ Settings → Staff Accounts</b> to view their passwords too.</div></>}
+      {tab==="list"&&<><div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search staff..." style={{flex:1,minWidth:200,border:"1.5px solid #e2e8f0",borderRadius:9,padding:"8px 12px",fontSize:13,fontFamily:F,outline:"none"}}/><Sel value={filterType} onChange={setFilterType} options={["All","teaching","non-teaching"]}/></div><Card style={{padding:0}}><div style={{padding:"10px 16px",background:"#fef3c7",borderBottom:"1px solid #fde68a",fontSize:12,color:"#92400e"}}>🔑 <b>Admin view:</b> Usernames and passwords shown so you can share login credentials with staff. Keep this page confidential.</div><div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:900}}><thead><tr>{["","#","Staff ID","Name","Type","Subject","Username","Password","Phone","Qual","Actions"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>{filtered.length?filtered.map((s,i)=>{const acct=users.find(u=>u.username===s.username);const pw=acct?.password||s.password||"—";return(<tr key={s.id} style={{background:i%2===0?"white":"#fafafa"}}><td style={{...td,width:44}}><Avatar name={s.name} photo={s.photo} size={32}/></td><td style={{...td,color:"#94a3b8"}}>{i+1}</td><td style={{...td,fontFamily:"monospace",fontSize:11}}>{s.staffId}</td><td style={{...td,fontWeight:"bold"}}>{s.name}</td><td style={td}><span style={{background:s.staffType==="teaching"?"#f5f3ff":"#f0fdf4",color:s.staffType==="teaching"?"#7c3aed":"#15803d",fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:"bold"}}>{s.staffType}</span></td><td style={td}>{s.subject||"—"}</td><td style={{...td,fontFamily:"monospace",fontSize:11,color:"#7c3aed"}}>{s.username||"—"}</td><td style={{...td,fontFamily:"monospace",fontSize:12,color:"#7c3aed",fontWeight:"bold"}}>{pw}</td><td style={td}>{s.phone||"—"}</td><td style={{...td,fontSize:11}}>{s.qualification||"—"}</td><td style={td}><button onClick={()=>doEdit(s)} style={{color:"#7c3aed",background:"none",border:"none",cursor:"pointer",fontSize:12,marginRight:8}}>Edit</button><button onClick={()=>{if(confirm(`Mark ${s.name} as former staff?`)) setStaff(p=>p.map(x=>x.id===s.id?{...x,status:"former",exitDate:new Date().toLocaleDateString("en-KE")}:x));}} style={{color:"#b45309",background:"none",border:"none",cursor:"pointer",fontSize:12,marginRight:8}}>Exit</button><button onClick={()=>doDel(s.id)} style={{color:"#b91c1c",background:"none",border:"none",cursor:"pointer",fontSize:12}}>Del</button></td></tr>);}):<tr><td colSpan={11} style={{padding:40,textAlign:"center",color:"#94a3b8"}}>No staff records.</td></tr>}</tbody></table></div></Card><div style={{marginTop:10,padding:"10px 14px",background:"#f5f3ff",borderRadius:10,fontSize:12,color:"#7c3aed"}}>💡 <b>Tip:</b> For pre-loaded/default staff accounts, go to <b>⚙️ Settings → Staff Accounts</b> to view their passwords too.</div></>}
+      {tab==="former"&&(()=>{
+        const formerStaff=(staff||[]).filter(s=>s.status==="former");
+        const thF={textAlign:"left",padding:"9px 12px",fontWeight:"bold",fontSize:11,color:"#7c3aed",background:"#f5f3ff"};
+        const tdF={padding:"9px 12px",fontSize:12,borderBottom:"1px solid #f1f5f9"};
+        return(<>
+          <div style={{background:"#fef3c7",border:"1px solid #fde68a",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:13,color:"#92400e"}}>
+            🚪 <b>{formerStaff.length} Former Staff Member{formerStaff.length!==1?"s":""}</b> — Staff who have left the school. Their records are retained for reference.
+          </div>
+          <Card style={{padding:0}}>
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}>
+                <thead><tr>{["#","Staff ID","Name","Type","Subject","Exit Date","Actions"].map(h=><th key={h} style={thF}>{h}</th>)}</tr></thead>
+                <tbody>{formerStaff.length?formerStaff.map((s,i)=>(
+                  <tr key={s.id} style={{background:i%2===0?"white":"#fafafa"}}>
+                    <td style={{...tdF,color:"#94a3b8"}}>{i+1}</td>
+                    <td style={{...tdF,fontFamily:"monospace",fontSize:11}}>{s.staffId}</td>
+                    <td style={{...tdF,fontWeight:"bold"}}>{s.name}</td>
+                    <td style={tdF}><span style={{fontSize:10,background:"#fef3c7",color:"#92400e",padding:"2px 8px",borderRadius:20,fontWeight:"bold"}}>{s.staffType}</span></td>
+                    <td style={tdF}>{s.subject||"—"}</td>
+                    <td style={tdF}>{s.exitDate||"—"}</td>
+                    <td style={tdF}>
+                      <button onClick={()=>setStaff(p=>p.map(x=>x.id===s.id?{...x,status:"active",exitDate:""}:x))} style={{color:"#15803d",background:"none",border:"none",cursor:"pointer",fontSize:12,marginRight:8}}>↩ Reinstate</button>
+                      <button onClick={()=>doDel(s.id)} style={{color:"#b91c1c",background:"none",border:"none",cursor:"pointer",fontSize:12}}>Del</button>
+                    </td>
+                  </tr>
+                )):<tr><td colSpan={7} style={{padding:40,textAlign:"center",color:"#94a3b8"}}>No former staff records.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </>);
+      })()}
     </div>
   );
 }
@@ -5041,23 +5532,57 @@ function CouncilPage({students,user,council,setCouncil,stuDuties,setStuDuties}) 
 // LIBRARY
 // ══════════════════════════════════════════════════════════
 function LibraryPage({books,setBooks,borrows,setBorrows}) {
-  const [tab,setTab]=useState("catalogue");
-  const blank={title:"",author:"",isbn:"",category:"Textbook",copies:1,available:1};
+  const [tab,setTab]=useState("dashboard");
+  const blank={title:"",author:"",isbn:"",category:"Textbook",copies:1,available:1,shelf:"",publisher:"",year:""};
   const [form,setForm]=useState(blank); const [msg,setMsg]=useState({t:"",ok:true});
   const [bbId,setBbId]=useState(""); const [bStu,setBStu]=useState(""); const [bDue,setBDue]=useState("");
+  const [fineId,setFineId]=useState(""); const [reserves,setReserves]=useState([]);
+  const [acqForm,setAcqForm]=useState({title:"",author:"",isbn:"",copies:"",cost:"",supplier:"",date:new Date().toLocaleDateString("en-KE"),category:"Textbook"});
+  const [acquisitions,setAcquisitions]=useState([]);
   const flash=(t,ok=true)=>{setMsg({t,ok});setTimeout(()=>setMsg({t:"",ok:true}),2500);};
+  useEffect(()=>{load("tnks_lib_reserves").then(d=>{if(d)setReserves(d);});load("tnks_lib_acquisitions").then(d=>{if(d)setAcquisitions(d);});},[]);
+  useEffect(()=>{save("tnks_lib_reserves",reserves);},[reserves]);
+  useEffect(()=>{save("tnks_lib_acquisitions",acquisitions);},[acquisitions]);
   function doAdd(){if(!form.title) return flash("Title required.",false); setBooks(p=>[...p,{...form,id:Date.now().toString(),copies:parseInt(form.copies)||1,available:parseInt(form.copies)||1}]); flash("✅ Book added!"); setForm(blank);}
-  function doBorrow(){if(!bbId||!bStu) return flash("Select book and enter student ID.",false); const b=books.find(x=>x.id===bbId); if(!b||b.available<1) return flash("Book not available.",false); setBooks(p=>p.map(x=>x.id===bbId?{...x,available:x.available-1}:x)); setBorrows(p=>[...p,{id:Date.now().toString(),bookId:bbId,bookTitle:b.title,studentId:bStu,issueDate:new Date().toLocaleDateString("en-KE"),dueDate:bDue,status:"issued"}]); flash("✅ Book issued!"); setBbId("");setBStu("");setBDue("");}
-  function retBook(id){const b=borrows.find(x=>x.id===id); if(b){setBorrows(p=>p.map(x=>x.id===id?{...x,status:"returned"}:x)); setBooks(p=>p.map(bk=>bk.id===b.bookId?{...bk,available:bk.available+1}:bk));}}
+  function doBorrow(){if(!bbId||!bStu) return flash("Select book and enter student ID.",false); const b=books.find(x=>x.id===bbId); if(!b||b.available<1) return flash("Book not available.",false); setBooks(p=>p.map(x=>x.id===bbId?{...x,available:x.available-1}:x)); setBorrows(p=>[...p,{id:Date.now().toString(),bookId:bbId,bookTitle:b.title,studentId:bStu,issueDate:new Date().toLocaleDateString("en-KE"),dueDate:bDue,status:"issued",fine:0}]); flash("✅ Book issued!"); setBbId("");setBStu("");setBDue("");}
+  function retBook(id){const b=borrows.find(x=>x.id===id); if(b){const due=b.dueDate?new Date(b.dueDate):null;const now=new Date();const overdue=due&&now>due?Math.ceil((now-due)/(1000*60*60*24)):0;const fine=overdue*10; setBorrows(p=>p.map(x=>x.id===id?{...x,status:"returned",returnDate:now.toLocaleDateString("en-KE"),fine}:x)); setBooks(p=>p.map(bk=>bk.id===b.bookId?{...bk,available:bk.available+1}:bk));}}
+  function doReserve(){if(!bbId||!bStu) return flash("Select book and student.",false); const b=books.find(x=>x.id===bbId); setReserves(p=>[...p,{id:Date.now().toString(),bookId:bbId,bookTitle:b?.title||"",studentId:bStu,date:new Date().toLocaleDateString("en-KE"),status:"pending"}]); flash("✅ Reservation recorded!"); setBbId("");setBStu("");}
+  function doAcq(){if(!acqForm.title) return flash("Title required.",false); const newBook={...acqForm,id:Date.now().toString(),copies:parseInt(acqForm.copies)||1,available:parseInt(acqForm.copies)||1}; setBooks(p=>[...p,newBook]); setAcquisitions(p=>[...p,{...acqForm,id:Date.now().toString(),addedOn:new Date().toLocaleDateString("en-KE")}]); flash("✅ Acquisition recorded and book added!"); setAcqForm({title:"",author:"",isbn:"",copies:"",cost:"",supplier:"",date:new Date().toLocaleDateString("en-KE"),category:"Textbook"});}
   const th={textAlign:"left",padding:"9px 12px",fontWeight:"bold",fontSize:11,color:"#7c3aed",background:"#f5f3ff"};
   const td={padding:"8px 12px",fontSize:12,borderTop:"1px solid #f1f5f9"};
+  const overdueList=borrows.filter(b=>b.status==="issued"&&b.dueDate&&new Date(b.dueDate)<new Date());
+  const totalFines=borrows.filter(b=>b.fine>0).reduce((s,b)=>s+(b.fine||0),0);
   return (
     <div style={{padding:24}}>
-      <PageH title="Library" sub="Book catalogue, issuing and returns"><div style={{display:"flex",gap:6}}>{[["catalogue","📚 Catalogue"],["add","➕ Add Book"],["issue","📤 Issue"],["issued","📋 Issued"]].map(([t,l])=><Btn key={t} onClick={()=>setTab(t)} v={tab===t?"primary":"ghost"} style={{fontSize:11}}>{l}</Btn>)}</div></PageH>
-      {tab==="add"&&<Card style={{marginBottom:18}}><div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14}}>Add New Book</div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}><Inp label="TITLE *" value={form.title} onChange={v=>setForm({...form,title:v})} placeholder="Book title"/><Inp label="AUTHOR" value={form.author} onChange={v=>setForm({...form,author:v})} placeholder="Author name"/><Inp label="ISBN" value={form.isbn} onChange={v=>setForm({...form,isbn:v})} placeholder="ISBN number"/><Sel label="CATEGORY" value={form.category} onChange={v=>setForm({...form,category:v})} options={["Reference","Novel","Textbook","Science","History","Religious","Arts","Biography","Other"]}/><Inp label="COPIES" value={form.copies} onChange={v=>setForm({...form,copies:v})} placeholder="1" type="number"/></div>{msg.t&&<div style={{marginTop:10,fontSize:13,color:msg.ok?"#15803d":"#b91c1c",fontWeight:"bold"}}>{msg.t}</div>}<div style={{marginTop:14}}><Btn onClick={doAdd} v="green">➕ Add Book</Btn></div></Card>}
-      {tab==="catalogue"&&<Card style={{padding:0}}><div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}><thead><tr>{["#","Title","Author","ISBN","Category","Copies","Available"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>{books.length?books.map((b,i)=><tr key={b.id} style={{background:i%2===0?"white":"#fafafa"}}><td style={{...td,color:"#94a3b8"}}>{i+1}</td><td style={{...td,fontWeight:"bold"}}>{b.title}</td><td style={td}>{b.author||"—"}</td><td style={{...td,fontFamily:"monospace",fontSize:11}}>{b.isbn||"—"}</td><td style={td}>{b.category}</td><td style={td}>{b.copies}</td><td style={td}><span style={{fontWeight:"bold",color:b.available>0?"#15803d":"#b91c1c"}}>{b.available}</span></td></tr>):<tr><td colSpan={7} style={{padding:30,textAlign:"center",color:"#94a3b8"}}>No books added yet.</td></tr>}</tbody></table></div></Card>}
-      {tab==="issue"&&<Card><div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14}}>Issue Book to Student</div><div style={{display:"grid",gap:12}}><div><label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:3}}>SELECT BOOK</label><select value={bbId} onChange={e=>setBbId(e.target.value)} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px",fontSize:13,fontFamily:F}}><option value="">-- Select book --</option>{books.filter(b=>b.available>0).map(b=><option key={b.id} value={b.id}>{b.title} — {b.author} (Avail: {b.available})</option>)}</select></div><Inp label="STUDENT ID (Adm. No)" value={bStu} onChange={setBStu} placeholder="e.g. NKS/001"/><Inp label="DUE DATE" value={bDue} onChange={setBDue} type="date"/></div>{msg.t&&<div style={{marginTop:10,fontSize:13,color:msg.ok?"#15803d":"#b91c1c",fontWeight:"bold"}}>{msg.t}</div>}<div style={{marginTop:14}}><Btn onClick={doBorrow} v="green">📤 Issue Book</Btn></div></Card>}
-      {tab==="issued"&&<Card style={{padding:0}}><div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}><thead><tr>{["#","Book","Student","Issued","Due","Status","Action"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>{borrows.length?borrows.map((b,i)=><tr key={b.id} style={{background:i%2===0?"white":"#fafafa"}}><td style={{...td,color:"#94a3b8"}}>{i+1}</td><td style={{...td,fontWeight:"bold"}}>{b.bookTitle}</td><td style={td}>{b.studentId}</td><td style={td}>{b.issueDate}</td><td style={td}>{b.dueDate||"—"}</td><td style={td}><span style={{fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:"bold",background:b.status==="returned"?"#f0fdf4":"#fef3c7",color:b.status==="returned"?"#15803d":"#b45309"}}>{b.status}</span></td><td style={td}>{b.status==="issued"&&<button onClick={()=>retBook(b.id)} style={{background:"#15803d",color:"white",border:"none",borderRadius:6,padding:"3px 10px",fontSize:11,cursor:"pointer",fontFamily:F}}>Return</button>}</td></tr>):<tr><td colSpan={7} style={{padding:30,textAlign:"center",color:"#94a3b8"}}>No books issued.</td></tr>}</tbody></table></div></Card>}
+      <PageH title="📚 Library Manager" sub="Books, circulation, stocktake, acquisitions & reports">
+        <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+          {[["dashboard","📊 Dashboard"],["catalogue","📚 Catalogue"],["add","➕ Add Book"],["issue","📤 Circulate"],["issued","📋 Issued"],["reservations","🔖 Reservations"],["fines","💰 Fines"],["acquisitions","🛒 Acquisitions"],["stocktake","📋 Stocktake"],["reports","📊 Reports"]].map(([t,l])=>(
+            <Btn key={t} onClick={()=>setTab(t)} v={tab===t?"primary":"ghost"} style={{fontSize:10.5}}>{l}</Btn>
+          ))}
+        </div>
+      </PageH>
+      {tab==="dashboard"&&(
+        <>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12,marginBottom:16}}>
+            <Stat icon="📚" label="Total Titles" value={books.length} color="#7c3aed"/>
+            <Stat icon="📖" label="Books Issued" value={borrows.filter(b=>b.status==="issued").length} color="#b45309"/>
+            <Stat icon="✅" label="Returned" value={borrows.filter(b=>b.status==="returned").length} color="#15803d"/>
+            <Stat icon="⚠️" label="Overdue" value={overdueList.length} color="#b91c1c"/>
+            <Stat icon="🔖" label="Reservations" value={reserves.filter(r=>r.status==="pending").length} color="#7c3aed"/>
+            <Stat icon="💰" label="Total Fines" value={`KES ${totalFines.toLocaleString()}`} color="#b45309"/>
+          </div>
+          {overdueList.length>0&&<Card style={{borderLeft:"4px solid #b91c1c",marginBottom:12}}><div style={{fontWeight:"bold",color:"#b91c1c",marginBottom:8}}>⚠️ Overdue Books ({overdueList.length})</div>{overdueList.slice(0,5).map(b=><div key={b.id} style={{fontSize:12,color:"#374151",marginBottom:4}}>• <b>{b.bookTitle}</b> — {b.studentId} (Due: {b.dueDate})</div>)}</Card>}
+        </>
+      )}
+      {tab==="add"&&<Card style={{marginBottom:18}}><div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14}}>Add New Book to Inventory</div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}><Inp label="TITLE *" value={form.title} onChange={v=>setForm({...form,title:v})} placeholder="Book title"/><Inp label="AUTHOR" value={form.author} onChange={v=>setForm({...form,author:v})} placeholder="Author name"/><Inp label="ISBN" value={form.isbn} onChange={v=>setForm({...form,isbn:v})} placeholder="ISBN number"/><Sel label="CATEGORY" value={form.category} onChange={v=>setForm({...form,category:v})} options={["Reference","Novel","Textbook","Science","History","Religious","Arts","Biography","Other"]}/><Inp label="COPIES" value={form.copies} onChange={v=>setForm({...form,copies:v})} placeholder="1" type="number"/><Inp label="SHELF LOCATION" value={form.shelf} onChange={v=>setForm({...form,shelf:v})} placeholder="e.g. A-3"/><Inp label="PUBLISHER" value={form.publisher} onChange={v=>setForm({...form,publisher:v})} placeholder="Publisher"/><Inp label="YEAR" value={form.year} onChange={v=>setForm({...form,year:v})} placeholder="2024"/></div>{msg.t&&<div style={{marginTop:10,fontSize:13,color:msg.ok?"#15803d":"#b91c1c",fontWeight:"bold"}}>{msg.t}</div>}<div style={{marginTop:14}}><Btn onClick={doAdd} v="green">➕ Add Book</Btn></div></Card>}
+      {tab==="catalogue"&&<Card style={{padding:0}}><div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:700}}><thead><tr>{["#","Title","Author","ISBN","Category","Shelf","Copies","Available"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>{books.length?books.map((b,i)=><tr key={b.id} style={{background:i%2===0?"white":"#fafafa"}}><td style={{...td,color:"#94a3b8"}}>{i+1}</td><td style={{...td,fontWeight:"bold"}}>{b.title}</td><td style={td}>{b.author||"—"}</td><td style={{...td,fontFamily:"monospace",fontSize:11}}>{b.isbn||"—"}</td><td style={td}>{b.category}</td><td style={td}>{b.shelf||"—"}</td><td style={td}>{b.copies}</td><td style={td}><span style={{fontWeight:"bold",color:b.available>0?"#15803d":"#b91c1c"}}>{b.available}</span></td></tr>):<tr><td colSpan={8} style={{padding:30,textAlign:"center",color:"#94a3b8"}}>No books added yet.</td></tr>}</tbody></table></div></Card>}
+      {tab==="issue"&&<Card><div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14}}>Book Circulation — Issue / Reserve</div><div style={{display:"grid",gap:12}}><div><label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:3}}>SELECT BOOK</label><select value={bbId} onChange={e=>setBbId(e.target.value)} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px",fontSize:13,fontFamily:F}}><option value="">-- Select book --</option>{books.map(b=><option key={b.id} value={b.id}>{b.title} — {b.author||"—"} (Avail: {b.available}/{b.copies})</option>)}</select></div><Inp label="STUDENT ADM. NO" value={bStu} onChange={setBStu} placeholder="e.g. NKS/2025/001"/><Inp label="DUE DATE" value={bDue} onChange={setBDue} type="date"/></div>{msg.t&&<div style={{marginTop:10,fontSize:13,color:msg.ok?"#15803d":"#b91c1c",fontWeight:"bold"}}>{msg.t}</div>}<div style={{marginTop:14,display:"flex",gap:8}}><Btn onClick={doBorrow} v="green">📤 Issue Book</Btn><Btn onClick={doReserve} v="purple">🔖 Reserve Instead</Btn></div></Card>}
+      {tab==="issued"&&<Card style={{padding:0}}><div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:650}}><thead><tr>{["#","Book","Student","Issued","Due","Status","Fine","Action"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>{borrows.length?borrows.map((b,i)=>{const overdue=b.status==="issued"&&b.dueDate&&new Date(b.dueDate)<new Date();return(<tr key={b.id} style={{background:overdue?"#fef9f9":i%2===0?"white":"#fafafa"}}><td style={{...td,color:"#94a3b8"}}>{i+1}</td><td style={{...td,fontWeight:"bold"}}>{b.bookTitle}</td><td style={td}>{b.studentId}</td><td style={td}>{b.issueDate}</td><td style={{...td,color:overdue?"#b91c1c":"inherit",fontWeight:overdue?"bold":"normal"}}>{b.dueDate||"—"}</td><td style={td}><span style={{fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:"bold",background:b.status==="returned"?"#f0fdf4":overdue?"#fee2e2":"#fef3c7",color:b.status==="returned"?"#15803d":overdue?"#b91c1c":"#b45309"}}>{overdue?"OVERDUE":b.status}</span></td><td style={td}>{b.fine>0?<span style={{color:"#b91c1c",fontWeight:"bold"}}>KES {b.fine}</span>:"—"}</td><td style={td}>{b.status==="issued"&&<button onClick={()=>retBook(b.id)} style={{background:"#15803d",color:"white",border:"none",borderRadius:6,padding:"3px 10px",fontSize:11,cursor:"pointer",fontFamily:F}}>Return</button>}</td></tr>);}):<tr><td colSpan={8} style={{padding:30,textAlign:"center",color:"#94a3b8"}}>No books issued.</td></tr>}</tbody></table></div></Card>}
+      {tab==="reservations"&&<Card style={{padding:0}}><div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:500}}><thead><tr>{["#","Book","Student","Date","Status","Action"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>{reserves.length?reserves.map((r,i)=><tr key={r.id} style={{background:i%2===0?"white":"#fafafa"}}><td style={{...td,color:"#94a3b8"}}>{i+1}</td><td style={{...td,fontWeight:"bold"}}>{r.bookTitle}</td><td style={td}>{r.studentId}</td><td style={td}>{r.date}</td><td style={td}><span style={{fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:"bold",background:r.status==="pending"?"#fef3c7":"#f0fdf4",color:r.status==="pending"?"#b45309":"#15803d"}}>{r.status}</span></td><td style={td}><button onClick={()=>setReserves(p=>p.map(x=>x.id===r.id?{...x,status:"fulfilled"}:x))} style={{color:"#15803d",background:"none",border:"none",cursor:"pointer",fontSize:12,marginRight:8}}>Fulfill</button><button onClick={()=>setReserves(p=>p.filter(x=>x.id!==r.id))} style={{color:"#b91c1c",background:"none",border:"none",cursor:"pointer",fontSize:12}}>Cancel</button></td></tr>):<tr><td colSpan={6} style={{padding:30,textAlign:"center",color:"#94a3b8"}}>No reservations.</td></tr>}</tbody></table></div></Card>}
+      {tab==="fines"&&<><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,marginBottom:14}}><Stat icon="💰" label="Total Fines" value={`KES ${totalFines.toLocaleString()}`} color="#b91c1c"/><Stat icon="⚠️" label="Overdue Books" value={overdueList.length} color="#b45309"/></div><Card style={{padding:0}}><div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:500}}><thead><tr>{["Book","Student","Due Date","Days Overdue","Fine (KES)","Status"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>{borrows.filter(b=>b.fine>0||b.dueDate&&b.status==="issued"&&new Date(b.dueDate)<new Date()).map((b,i)=>{const days=b.dueDate?Math.max(0,Math.ceil((new Date()-new Date(b.dueDate))/(1000*60*60*24))):0;return(<tr key={b.id} style={{background:i%2===0?"white":"#fafafa"}}><td style={{...td,fontWeight:"bold"}}>{b.bookTitle}</td><td style={td}>{b.studentId}</td><td style={{...td,color:"#b91c1c"}}>{b.dueDate||"—"}</td><td style={{...td,color:"#b91c1c",fontWeight:"bold"}}>{days} days</td><td style={{...td,fontWeight:"bold",color:"#b91c1c"}}>KES {b.fine||days*10}</td><td style={td}><span style={{fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:"bold",background:b.status==="returned"?"#f0fdf4":"#fee2e2",color:b.status==="returned"?"#15803d":"#b91c1c"}}>{b.status==="returned"?"Paid":b.status.toUpperCase()}</span></td></tr>);})} {borrows.filter(b=>b.fine>0||b.dueDate&&b.status==="issued"&&new Date(b.dueDate)<new Date()).length===0&&<tr><td colSpan={6} style={{padding:30,textAlign:"center",color:"#94a3b8"}}>No fines recorded.</td></tr>}</tbody></table></div></Card><div style={{marginTop:10,fontSize:12,color:"#64748b"}}>💡 Fines are calculated at <b>KES 10 per day</b> overdue and recorded automatically on book return.</div></>}
+      {tab==="acquisitions"&&<><Card style={{marginBottom:14}}><div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14}}>🛒 Record New Acquisition</div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}><Inp label="TITLE *" value={acqForm.title} onChange={v=>setAcqForm({...acqForm,title:v})} placeholder="Book title"/><Inp label="AUTHOR" value={acqForm.author} onChange={v=>setAcqForm({...acqForm,author:v})} placeholder="Author"/><Inp label="ISBN" value={acqForm.isbn} onChange={v=>setAcqForm({...acqForm,isbn:v})} placeholder="ISBN"/><Sel label="CATEGORY" value={acqForm.category} onChange={v=>setAcqForm({...acqForm,category:v})} options={["Reference","Novel","Textbook","Science","History","Religious","Arts","Biography","Other"]}/><Inp label="COPIES" value={acqForm.copies} onChange={v=>setAcqForm({...acqForm,copies:v})} placeholder="1" type="number"/><Inp label="COST (KES)" value={acqForm.cost} onChange={v=>setAcqForm({...acqForm,cost:v})} placeholder="0" type="number"/><Inp label="SUPPLIER" value={acqForm.supplier} onChange={v=>setAcqForm({...acqForm,supplier:v})} placeholder="Supplier name"/><Inp label="DATE" value={acqForm.date} onChange={v=>setAcqForm({...acqForm,date:v})} placeholder="DD/MM/YYYY"/></div>{msg.t&&<div style={{marginTop:10,fontSize:13,color:msg.ok?"#15803d":"#b91c1c",fontWeight:"bold"}}>{msg.t}</div>}<div style={{marginTop:14}}><Btn onClick={doAcq} v="green">✅ Record Acquisition</Btn></div></Card><Card style={{padding:0}}><div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}><thead><tr>{["#","Title","Copies","Cost","Supplier","Date"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>{acquisitions.length?acquisitions.map((a,i)=><tr key={a.id} style={{background:i%2===0?"white":"#fafafa"}}><td style={{...td,color:"#94a3b8"}}>{i+1}</td><td style={{...td,fontWeight:"bold"}}>{a.title}</td><td style={td}>{a.copies||"—"}</td><td style={{...td,color:"#15803d",fontWeight:"bold"}}>{a.cost?`KES ${Number(a.cost).toLocaleString()}`:"—"}</td><td style={td}>{a.supplier||"—"}</td><td style={td}>{a.date}</td></tr>):<tr><td colSpan={6} style={{padding:30,textAlign:"center",color:"#94a3b8"}}>No acquisitions recorded.</td></tr>}</tbody></table></div></Card></>}
+      {tab==="stocktake"&&<><div style={{background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:10,padding:"12px 16px",marginBottom:14,fontSize:13,color:"#15803d"}}>📋 <b>Stocktake</b> — Verify physical book counts against records. Mark any discrepancies below.</div><Card style={{padding:0}}><div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}><thead><tr>{["#","Title","Author","Category","Shelf","System Count","Available","Issued","Condition"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>{books.length?books.map((b,i)=>{const issued=borrows.filter(x=>x.bookId===b.id&&x.status==="issued").length;return(<tr key={b.id} style={{background:i%2===0?"white":"#fafafa"}}><td style={{...td,color:"#94a3b8"}}>{i+1}</td><td style={{...td,fontWeight:"bold"}}>{b.title}</td><td style={td}>{b.author||"—"}</td><td style={td}>{b.category}</td><td style={td}>{b.shelf||"—"}</td><td style={{...td,fontWeight:"bold"}}>{b.copies}</td><td style={{...td,color:b.available>0?"#15803d":"#b91c1c",fontWeight:"bold"}}>{b.available}</td><td style={td}>{issued}</td><td style={td}><span style={{fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:"bold",background:b.available===b.copies-issued?"#f0fdf4":"#fef3c7",color:b.available===b.copies-issued?"#15803d":"#b45309"}}>{b.available===b.copies-issued?"✅ OK":"⚠️ Check"}</span></td></tr>);}):<tr><td colSpan={9} style={{padding:30,textAlign:"center",color:"#94a3b8"}}>No books in inventory.</td></tr>}</tbody></table></div></Card></>}
+      {tab==="reports"&&<><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,marginBottom:16}}><Stat icon="📚" label="Total Books" value={books.reduce((s,b)=>s+b.copies,0)} color="#7c3aed"/><Stat icon="📤" label="Total Issued" value={borrows.filter(b=>b.status==="issued").length} color="#b45309"/><Stat icon="✅" label="Total Returned" value={borrows.filter(b=>b.status==="returned").length} color="#15803d"/><Stat icon="⚠️" label="Overdue Now" value={overdueList.length} color="#b91c1c"/><Stat icon="💰" label="Fines Collected" value={`KES ${totalFines.toLocaleString()}`} color="#b45309"/><Stat icon="🛒" label="Acquisitions" value={acquisitions.length} color="#7c3aed"/></div><Card><div style={{fontWeight:"bold",color:"#3b0764",marginBottom:12}}>📊 Books by Category</div>{["Textbook","Reference","Novel","Science","History","Religious","Arts","Biography","Other"].map(cat=>{const count=books.filter(b=>b.category===cat).length;return count>0?(<div key={cat} style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}><div style={{width:90,fontSize:11,color:"#374151"}}>{cat}</div><div style={{flex:1,height:12,background:"#f1f5f9",borderRadius:6}}><div style={{width:`${Math.min(100,(count/books.length)*100)}%`,height:"100%",background:"#7c3aed",borderRadius:6}}/></div><div style={{width:30,fontSize:11,fontWeight:"bold",color:"#7c3aed",textAlign:"right"}}>{count}</div></div>):null;})}</Card></>}
     </div>
   );
 }
