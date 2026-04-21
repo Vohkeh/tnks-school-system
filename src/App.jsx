@@ -548,7 +548,7 @@ function Logo({size=60,src}) {
 // ══════════════════════════════════════════════════════════
 // SIDEBAR
 // ══════════════════════════════════════════════════════════
-function Sidebar({view,setView,user,onLogout,logo}) {
+function Sidebar({view,setView,user,onLogout,logo,collapsed=false,onToggleCollapse}) {
   // Track which groups are open — default open the group containing the active view
   const ADMIN_GROUPS = [
     {
@@ -734,10 +734,58 @@ function Sidebar({view,setView,user,onLogout,logo}) {
   const isActive = (v) => view===v;
   const groupHasActive = (g) => g.single ? isActive(g.view||g.id) : (g.items||[]).some(i=>isActive(i.id));
 
+  const W = collapsed ? 56 : 230;
+
+  // ── COLLAPSED (icon-rail) mode ──────────────────────────
+  if(collapsed){
+    // Flatten all items for icon rail
+    const allItems = groups.flatMap(g =>
+      g.single ? [{id:g.view||g.id, label:g.label, icon:g.icon}] : (g.items||[])
+    );
+    return (
+      <div style={{width:W,background:"#3b0764",color:"white",display:"flex",flexDirection:"column",flexShrink:0,overflowY:"auto",height:"100vh",minHeight:0,transition:"width .22s ease",alignItems:"center"}}>
+        {/* Expand toggle */}
+        <button onClick={onToggleCollapse} title="Expand sidebar"
+          style={{width:"100%",background:"transparent",border:"none",color:"rgba(255,255,255,.7)",cursor:"pointer",padding:"14px 0 10px",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,borderBottom:"1px solid rgba(255,255,255,.1)"}}>
+          ›
+        </button>
+        {/* Logo */}
+        <div style={{padding:"10px 0 6px",flexShrink:0}}>
+          <Logo size={34} src={logo}/>
+        </div>
+        {/* Icon rail */}
+        <nav style={{flex:1,width:"100%",paddingBottom:8,overflowY:"auto"}}>
+          {allItems.map(item=>{
+            const active = isActive(item.id);
+            return (
+              <button key={item.id} onClick={()=>setView(item.id)} title={item.label}
+                style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",padding:"9px 0",border:"none",cursor:"pointer",fontFamily:F,fontSize:19,background:active?"rgba(255,255,255,0.18)":"transparent",borderLeft:active?"3px solid #a78bfa":"3px solid transparent",transition:"all .12s"}}>
+                {item.icon}
+              </button>
+            );
+          })}
+        </nav>
+        {/* Footer logout */}
+        <div style={{padding:"10px 0 12px",borderTop:"1px solid rgba(255,255,255,.1)",width:"100%",display:"flex",justifyContent:"center",flexShrink:0}}>
+          <button onClick={onLogout} title="Logout"
+            style={{background:"transparent",border:"none",cursor:"pointer",fontSize:18,padding:"6px"}}>
+            🔓
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── EXPANDED mode ───────────────────────────────────────
   return (
-    <div style={{width:230,background:"#3b0764",color:"white",display:"flex",flexDirection:"column",flexShrink:0,overflowY:"auto",position:"relative",height:"100vh",minHeight:0}}>
+    <div style={{width:W,background:"#3b0764",color:"white",display:"flex",flexDirection:"column",flexShrink:0,overflowY:"auto",position:"relative",height:"100vh",minHeight:0,transition:"width .22s ease"}}>
       {/* Header */}
-      <div style={{padding:"16px 14px 12px",borderBottom:"1px solid rgba(255,255,255,0.12)",textAlign:"center",flexShrink:0}}>
+      <div style={{padding:"16px 14px 12px",borderBottom:"1px solid rgba(255,255,255,0.12)",textAlign:"center",flexShrink:0,position:"relative"}}>
+        {/* Collapse toggle — top-right */}
+        <button onClick={onToggleCollapse} title="Collapse sidebar"
+          style={{position:"absolute",top:10,right:8,background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.18)",borderRadius:6,color:"rgba(255,255,255,.7)",cursor:"pointer",width:24,height:24,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontFamily:F,lineHeight:1}}>
+          ‹
+        </button>
         <Logo size={50} src={logo}/>
         <div style={{fontSize:10.5,fontWeight:"bold",lineHeight:1.3,marginTop:8,opacity:.95}}>{SCHOOL.name}</div>
         <div style={{fontSize:9,color:"rgba(255,255,255,0.45)",marginTop:3,letterSpacing:1.2,textTransform:"uppercase"}}>
@@ -755,7 +803,6 @@ function Sidebar({view,setView,user,onLogout,logo}) {
           const hasActive = groupHasActive(g);
 
           if(g.single){
-            // Single-item group — just a nav button, no accordion
             const active = isActive(g.view||g.id);
             return (
               <button key={g.id} onClick={()=>setView(g.view||g.id)}
@@ -766,10 +813,8 @@ function Sidebar({view,setView,user,onLogout,logo}) {
             );
           }
 
-          // Accordion group
           return (
             <div key={g.id}>
-              {/* Group header */}
               <button onClick={()=>toggleGroup(g.id)}
                 style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px 10px 16px",border:"none",cursor:"pointer",fontFamily:F,fontSize:12.5,fontWeight:hasActive||isOpen?"bold":"normal",background:hasActive?"rgba(255,255,255,0.1)":isOpen?"rgba(255,255,255,0.06)":"transparent",color:hasActive||isOpen?"white":"rgba(255,255,255,0.78)",borderLeft:hasActive?"3px solid #a78bfa":"3px solid transparent",transition:"all .15s",textAlign:"left"}}>
                 <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -778,7 +823,6 @@ function Sidebar({view,setView,user,onLogout,logo}) {
                 </div>
                 <span style={{fontSize:10,opacity:.6,transition:"transform .2s",display:"inline-block",transform:isOpen?"rotate(180deg)":"rotate(0deg)"}}>▾</span>
               </button>
-              {/* Sub-items */}
               {isOpen&&(
                 <div style={{background:"rgba(0,0,0,0.15)"}}>
                   {(g.items||[]).map(item=>{
@@ -10851,12 +10895,21 @@ function SystemAuditPage({ user }) {
 }
 export default function App(){
   const [ready,setReady]=useState(false);
-  const [sidebarOpen,setSidebarOpen]=useState(false);
   const [isMobile,setIsMobile]=useState(()=>window.innerWidth<768);
+  const [sidebarCollapsed,setSidebarCollapsed]=useState(()=>window.innerHeight>window.innerWidth);
   useEffect(()=>{
-    const onResize=()=>setIsMobile(window.innerWidth<768);
+    // resize: only update isMobile — preserves manual collapse preference
+    function onResize(){ setIsMobile(window.innerWidth<768); }
+    // orientationchange: auto-collapse on portrait, expand on landscape
+    function onOrient(){
+      const mobile=window.innerWidth<768;
+      const portrait=window.innerHeight>window.innerWidth;
+      setIsMobile(mobile);
+      setSidebarCollapsed(portrait);
+    }
     window.addEventListener("resize",onResize);
-    return()=>window.removeEventListener("resize",onResize);
+    window.addEventListener("orientationchange",onOrient);
+    return()=>{window.removeEventListener("resize",onResize);window.removeEventListener("orientationchange",onOrient);};
   },[]);
   // Apply saved font + theme on mount
   useEffect(()=>{
@@ -11064,17 +11117,15 @@ export default function App(){
 
   const _themeP=localStorage.getItem("tnks_theme")||"light";
   const _fontP=localStorage.getItem("tnks_font")||"Georgia,serif";
+  const _sbW=sidebarCollapsed?56:230;
+  const _mobileOverlay=isMobile&&!sidebarCollapsed;
   if(user.role==="parent")return(
     <div style={{display:"flex",height:"100vh",fontFamily:_fontP,background:_themeP==="dark"?"#0f172a":"#f1f5f9",position:"relative"}}>
-      {/* Mobile overlay */}
-      {isMobile&&sidebarOpen&&<div onClick={()=>setSidebarOpen(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:40}}/>}
-      {/* Sidebar */}
-      <div style={{position:isMobile?"fixed":"relative",left:isMobile?(sidebarOpen?"0":"-230px"):"0",top:0,bottom:0,zIndex:50,height:"100vh",transition:"left .25s ease",flexShrink:0}}>
-        <Sidebar view={view} setView={v=>{setView(v);setSidebarOpen(false);}} user={user} onLogout={()=>{setUser(null);setView("dashboard");setSidebarOpen(false);}} logo={logo}/>
+      {_mobileOverlay&&<div onClick={()=>setSidebarCollapsed(true)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:40}}/>}
+      <div style={{position:_mobileOverlay?"fixed":"relative",left:0,top:0,bottom:0,zIndex:50,height:"100vh",flexShrink:0,width:_mobileOverlay?230:_sbW,transition:"width .22s ease"}}>
+        <Sidebar view={view} setView={v=>{setView(v);if(isMobile)setSidebarCollapsed(true);}} user={user} onLogout={()=>{setUser(null);setView("dashboard");setSidebarCollapsed(true);}} logo={logo} collapsed={sidebarCollapsed} onToggleCollapse={()=>setSidebarCollapsed(c=>!c)}/>
       </div>
-      {/* Hamburger button — mobile only */}
-      {isMobile&&<button onClick={()=>setSidebarOpen(o=>!o)} style={{position:"fixed",top:12,left:12,zIndex:60,background:"#3b0764",color:"white",border:"none",borderRadius:8,width:38,height:38,cursor:"pointer",fontSize:20,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 2px 8px rgba(0,0,0,.3)"}}>☰</button>}
-      <main style={{flex:1,overflowY:"auto",overflowX:"auto",minWidth:0,paddingTop:isMobile?50:0}}>
+      <main style={{flex:1,overflowY:"auto",overflowX:"auto",minWidth:0}}>
         {view==="schoolinfo"&&<SchoolInfoPage logo={logo}/>}
         {view==="noticeboard"&&<NoticeBoard {...ctx}/>}
         {(view==="dashboard"||view==="parent_report"||view==="parent_fees")&&<ParentView {...ctx} events={events} feeStructure={feeStructure} users={users}/>}
@@ -11087,15 +11138,11 @@ export default function App(){
   const _bg2=_theme2==="dark"?"#0f172a":"#f1f5f9";
   return(
     <div style={{display:"flex",height:"100vh",fontFamily:_appFont2,background:_bg2,position:"relative"}}>
-      {/* Mobile overlay */}
-      {isMobile&&sidebarOpen&&<div onClick={()=>setSidebarOpen(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:40}}/>}
-      {/* Sidebar */}
-      <div style={{position:isMobile?"fixed":"relative",left:isMobile?(sidebarOpen?"0":"-230px"):"0",top:0,bottom:0,zIndex:50,height:"100vh",transition:"left .25s ease",flexShrink:0}}>
-        <Sidebar view={view} setView={v=>{setView(v);setSidebarOpen(false);}} user={user} onLogout={()=>{setUser(null);setView("dashboard");setSidebarOpen(false);}} logo={logo}/>
+      {_mobileOverlay&&<div onClick={()=>setSidebarCollapsed(true)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:40}}/>}
+      <div style={{position:_mobileOverlay?"fixed":"relative",left:0,top:0,bottom:0,zIndex:50,height:"100vh",flexShrink:0,width:_mobileOverlay?230:_sbW,transition:"width .22s ease"}}>
+        <Sidebar view={view} setView={v=>{setView(v);if(isMobile)setSidebarCollapsed(true);}} user={user} onLogout={()=>{setUser(null);setView("dashboard");setSidebarCollapsed(true);}} logo={logo} collapsed={sidebarCollapsed} onToggleCollapse={()=>setSidebarCollapsed(c=>!c)}/>
       </div>
-      {/* Hamburger button — mobile only */}
-      {isMobile&&<button onClick={()=>setSidebarOpen(o=>!o)} style={{position:"fixed",top:12,left:12,zIndex:60,background:"#3b0764",color:"white",border:"none",borderRadius:8,width:38,height:38,cursor:"pointer",fontSize:20,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 2px 8px rgba(0,0,0,.3)"}}>☰</button>}
-      <main style={{flex:1,overflowY:"auto",overflowX:"auto",minWidth:0,paddingTop:isMobile?50:0}}>
+      <main style={{flex:1,overflowY:"auto",overflowX:"auto",minWidth:0}}>
         {view==="dashboard"&&<Dashboard {...ctx}/>}
         {view==="students"&&<StudentsPage students={students} setStudents={setStudents} results={results} setResults={setResults} comments={comments} setComments={setComments} fees={fees} setFees={setFees} monitoring={monitoring} setMonitoring={setMonitoring}/>}
         {view==="admissions"&&<AdmissionsPage students={students} setStudents={setStudents}/>}
