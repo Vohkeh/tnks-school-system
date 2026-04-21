@@ -10256,7 +10256,7 @@ function StudentRoutesPage({ students, setStudents, user }) {
                   <div style={{fontWeight:"bold",fontSize:13,color:"#3b0764"}}>{s.name}</div>
                   <div style={{fontSize:11,color:"#64748b"}}>{s.class}</div>
                 </div>
-                <div style={{display:"flex",gap:4"}}>
+                <div style={{display:"flex",gap:4}}>
                   {ROUTES.map(r=><button key={r} onClick={()=>assignStudent(s.id,r)} style={{padding:"4px 10px",border:"none",borderRadius:6,cursor:"pointer",fontFamily:F,fontSize:11,fontWeight:"bold",background:r===selRoute?"#3b0764":"#f1f5f9",color:r===selRoute?"white":"#374151"}}>{r}</button>)}
                 </div>
               </div>
