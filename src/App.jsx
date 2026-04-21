@@ -568,26 +568,39 @@ function Sidebar({view,setView,user,onLogout,logo}) {
     {
       id:"staff_grp", label:"Staff Manager", icon:"👤",
       items:[
-        {id:"staff",      label:"Staff List",       icon:"👨‍🏫"},
-        {id:"timeinout",  label:"Attendance Sheet", icon:"🕐"},
-        {id:"duty",       label:"Duty Roster",      icon:"🛡️"},
+        {id:"staff",            label:"Staff List",          icon:"👨‍🏫"},
+        {id:"timeinout",        label:"Attendance Sheet",    icon:"🕐"},
+        {id:"staff_att_report", label:"Attendance Report",   icon:"📊"},
+        {id:"duty",             label:"Duty Roster",         icon:"🛡️"},
       ]
     },
     {
       id:"academic_grp", label:"Academic Manager", icon:"📖",
       items:[
-        {id:"exams",       label:"Exam Management",  icon:"✍️"},
-        {id:"results",     label:"Record Marks",     icon:"📝"},
-        {id:"analytics",   label:"Exam Analysis",    icon:"📈"},
-        {id:"reports",     label:"Report Forms",     icon:"🖨️"},
-        {id:"ai_comments", label:"AI Comments",      icon:"🤖"},
-        {id:"bulk",        label:"Bulk Operations",  icon:"📦"},
+        {id:"dean_settings",      label:"Dean Settings",      icon:"🎓"},
+        {id:"exam_settings",      label:"Exam Settings",      icon:"⚙️"},
+        {id:"exams",              label:"Exam Management",    icon:"📅"},
+        {id:"subject_allocation", label:"Subject Allocation", icon:"📚"},
+        {id:"results",            label:"Record Marks",       icon:"📝"},
+        {id:"edit_marks",         label:"Edit Marks",         icon:"✏️"},
+        {id:"marks_status",       label:"Marks Status",       icon:"📊"},
+        {id:"analytics",          label:"Exam Analysis",      icon:"📈"},
+        {id:"reports",            label:"Report Forms",       icon:"🖨️"},
+        {id:"ai_comments",        label:"AI Comments",        icon:"🤖"},
+        {id:"bulk",               label:"Bulk Operations",    icon:"📦"},
       ]
     },
     {
       id:"timetable_grp", label:"Timetable", icon:"▦",
       items:[
         {id:"timetable", label:"Setup & Generate",  icon:"⚙️"},
+      ]
+    },
+    {
+      id:"online_grp", label:"Online Classes", icon:"💻",
+      items:[
+        {id:"videoclasses", label:"Video Classes",  icon:"🎥"},
+        {id:"homework",     label:"Homework",       icon:"📝"},
       ]
     },
     {
@@ -8922,6 +8935,1920 @@ STEP 5: Add route handlers in the main <main> block:
 // Also update icon for feestructure: {id:"feestructure",icon:"📑",label:"Fee Structure"},
 
 // ── 3. COMPLETE App() FUNCTION — replace yours with this ────────
+
+// ══════════════════════════════════════════════════════════
+// STAFF ATTENDANCE REPORT
+// ══════════════════════════════════════════════════════════
+function StaffAttendanceReport({ staff, user }) {
+  const F = getAppFont();
+  const [records, setRecords] = useState([]);
+  const [filterStaff, setFilterStaff] = useState("All");
+  const [month, setMonth] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; });
+  const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const [tab, setTab] = useState("sheet");
+
+  useEffect(() => { load("tnks_staff_att_records").then(d => { if(d) setRecords(d); }); }, []);
+  useEffect(() => { save("tnks_staff_att_records", records); }, [records]);
+
+  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [att, setAtt] = useState({});
+  const [saved, setSaved] = useState(false);
+  const STATUSES = ["Present","Absent","Late","Leave","Half Day"];
+  const SC = { Present:"#15803d", Absent:"#b91c1c", Late:"#b45309", Leave:"#7c3aed", "Half Day":"#0e7490" };
+
+  const activeStaff = (staff||[]).filter(s => s.status !== "former");
+  const markAll = (st) => { const n={...att}; activeStaff.forEach(s => { n[`${date}-${s.id}`]=st; }); setAtt(n); };
+  const present = activeStaff.filter(s => !att[`${date}-${s.id}`] || att[`${date}-${s.id}`]==="Present").length;
+  const absent = activeStaff.filter(s => att[`${date}-${s.id}`]==="Absent").length;
+  const onLeave = activeStaff.filter(s => att[`${date}-${s.id}`]==="Leave").length;
+
+  function saveAttendance() {
+    const entries = activeStaff.map(s => ({ date, staffId: s.id, staffName: s.name, status: att[`${date}-${s.id}`]||"Present" }));
+    setRecords(prev => { const filtered = prev.filter(r => r.date !== date); return [...filtered, ...entries]; });
+    setSaved(true); setTimeout(() => setSaved(false), 2500);
+  }
+
+  // Report: per staff per month
+  const [rptYear, rptMonth] = month.split("-");
+  const mLabel = MONTHS[parseInt(rptMonth)-1];
+  const filteredRecs = records.filter(r => r.date && r.date.startsWith(month));
+  const staffSummary = activeStaff.filter(s => filterStaff==="All" || s.id===filterStaff).map(s => {
+    const sRecs = filteredRecs.filter(r => r.staffId===s.id);
+    return {
+      ...s,
+      present: sRecs.filter(r => r.status==="Present").length,
+      absent: sRecs.filter(r => r.status==="Absent").length,
+      late: sRecs.filter(r => r.status==="Late").length,
+      leave: sRecs.filter(r => r.status==="Leave").length,
+      total: sRecs.length,
+    };
+  });
+
+  const th = { textAlign:"left", padding:"9px 12px", fontWeight:"bold", fontSize:11, color:"#7c3aed", background:"#f5f3ff" };
+  const td = { padding:"9px 12px", fontSize:12, borderTop:"1px solid #f1f5f9" };
+
+  return (
+    <div style={{padding:24}}>
+      <PageH title="Staff Attendance" sub="Daily staff attendance & monthly reports">
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          {[["sheet","📋 Daily Sheet"],["report","📊 Monthly Report"]].map(([t,l]) =>
+            <Btn key={t} onClick={() => setTab(t)} v={tab===t?"primary":"ghost"} style={{fontSize:12}}>{l}</Btn>
+          )}
+        </div>
+      </PageH>
+
+      {tab==="sheet" && <>
+        <Card style={{marginBottom:16}}>
+          <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"flex-end"}}>
+            <div><label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:3}}>DATE</label>
+              <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={{border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px",fontSize:13,fontFamily:F}}/></div>
+            <div style={{display:"flex",gap:6}}>
+              <Btn onClick={()=>markAll("Present")} v="green" style={{fontSize:11}}>✅ All Present</Btn>
+              <Btn onClick={()=>markAll("Absent")} v="red" style={{fontSize:11}}>❌ All Absent</Btn>
+            </div>
+          </div>
+        </Card>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginBottom:16}}>
+          <Stat icon="✅" label="Present" value={present} color="#15803d"/>
+          <Stat icon="❌" label="Absent" value={absent} color="#b91c1c"/>
+          <Stat icon="🏖️" label="On Leave" value={onLeave} color="#7c3aed"/>
+          <Stat icon="👥" label="Total Staff" value={activeStaff.length} color="#3b0764"/>
+        </div>
+        {activeStaff.length > 0 ? <Card style={{padding:0}}>
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}>
+              <thead><tr>{["","#","Name","Staff ID","Type","Status"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
+              <tbody>{activeStaff.map((s,i) => {
+                const st = att[`${date}-${s.id}`] || "Present";
+                return <tr key={s.id} style={{background:i%2===0?"white":"#fafafa"}}>
+                  <td style={{...td,width:44}}><Avatar name={s.name} photo={s.photo} size={30}/></td>
+                  <td style={{...td,color:"#94a3b8"}}>{i+1}</td>
+                  <td style={{...td,fontWeight:"bold"}}>{s.name}</td>
+                  <td style={{...td,fontFamily:"monospace",fontSize:11}}>{s.staffId}</td>
+                  <td style={td}><span style={{fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:"bold",background:s.staffType==="teaching"?"#f5f3ff":"#f0fdf4",color:s.staffType==="teaching"?"#7c3aed":"#15803d"}}>{s.staffType}</span></td>
+                  <td style={td}><div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                    {STATUSES.map(x => <button key={x} onClick={() => setAtt(a=>({...a,[`${date}-${s.id}`]:x}))}
+                      style={{padding:"3px 9px",border:"none",borderRadius:20,fontSize:11,cursor:"pointer",fontFamily:F,fontWeight:"bold",background:st===x?SC[x]:"#f1f5f9",color:st===x?"white":"#374151"}}>{x}</button>)}
+                  </div></td>
+                </tr>;
+              })}</tbody>
+            </table>
+          </div>
+          <div style={{padding:"12px 16px",borderTop:"1px solid #f1f5f9",display:"flex",gap:10}}>
+            <Btn onClick={saveAttendance} v="green">💾 Save Records</Btn>
+            {saved && <span style={{color:"#15803d",fontWeight:"bold",fontSize:13,alignSelf:"center"}}>✅ Saved!</span>}
+          </div>
+        </Card> : <Empty icon="👥" text="No active staff to record."/>}
+      </>}
+
+      {tab==="report" && <>
+        <Card style={{marginBottom:16}}>
+          <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
+            <div><label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:3}}>MONTH</label>
+              <input type="month" value={month} onChange={e=>setMonth(e.target.value)} style={{border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px",fontSize:13,fontFamily:F}}/></div>
+            <Sel label="STAFF MEMBER" value={filterStaff} onChange={setFilterStaff}
+              options={["All",...activeStaff.map(s=>s.id)]} labels={["All",...activeStaff.map(s=>s.name)]}/>
+          </div>
+        </Card>
+        <Card style={{padding:0}}>
+          <div style={{padding:"12px 16px",background:"#f5f3ff",fontWeight:"bold",color:"#3b0764",fontSize:13,borderBottom:"1px solid #ede9fe"}}>
+            Attendance Report — {mLabel} {rptYear}
+          </div>
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}>
+              <thead><tr>{["#","Name","Dept","Days Recorded","Present","Absent","Late","Leave","Attendance %"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
+              <tbody>{staffSummary.length ? staffSummary.map((s,i) => {
+                const pct = s.total > 0 ? Math.round((s.present/s.total)*100) : 0;
+                return <tr key={s.id} style={{background:i%2===0?"white":"#fafafa"}}>
+                  <td style={{...td,color:"#94a3b8"}}>{i+1}</td>
+                  <td style={{...td,fontWeight:"bold"}}>{s.name}</td>
+                  <td style={{...td,fontSize:11,color:"#64748b"}}>{s.subject||"—"}</td>
+                  <td style={td}>{s.total}</td>
+                  <td style={{...td,color:"#15803d",fontWeight:"bold"}}>{s.present}</td>
+                  <td style={{...td,color:"#b91c1c"}}>{s.absent}</td>
+                  <td style={{...td,color:"#b45309"}}>{s.late}</td>
+                  <td style={{...td,color:"#7c3aed"}}>{s.leave}</td>
+                  <td style={td}><span style={{fontSize:11,fontWeight:"bold",padding:"2px 10px",borderRadius:20,background:pct>=90?"#dcfce7":pct>=75?"#fef9c3":"#fee2e2",color:pct>=90?"#15803d":pct>=75?"#b45309":"#b91c1c"}}>{pct}%</span></td>
+                </tr>;
+              }) : <tr><td colSpan={9} style={{padding:30,textAlign:"center",color:"#94a3b8"}}>No attendance records for this month.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      </>}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// DEAN SETTINGS
+// ══════════════════════════════════════════════════════════
+function DeanSettingsPage({ staff, user, students }) {
+  const F = getAppFont();
+  const [settings, setSettings] = useState({ deanName:"", deanPhone:"", deanEmail:"", deanSignature:"", principalName:"", principalPhone:"", reportFooter:"", passMark:50, gradeConfig:JSON.stringify([{grade:"EE",min:80,color:"#15803d"},{grade:"ME",min:60,color:"#7c3aed"},{grade:"AE",min:40,color:"#b45309"},{grade:"BE",min:0,color:"#b91c1c"}]) });
+  const [msg, setMsg] = useState({ t:"", ok:true });
+  const flash = (t, ok=true) => { setMsg({t,ok}); setTimeout(() => setMsg({t:"",ok:true}), 2500); };
+
+  useEffect(() => { load("tnks_dean_settings").then(d => { if(d) setSettings(prev => ({...prev,...d})); }); }, []);
+
+  function doSave() {
+    save("tnks_dean_settings", settings);
+    flash("✅ Dean Settings saved!");
+  }
+
+  const upd = (k, v) => setSettings(p => ({...p, [k]: v}));
+
+  return (
+    <div style={{padding:24}}>
+      <PageH title="🎓 Dean Settings" sub="Configure academic leadership and grading settings"/>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+        <Card>
+          <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>👨‍💼 Dean / Academic Head</div>
+          <div style={{display:"grid",gap:12}}>
+            <Inp label="DEAN'S FULL NAME" value={settings.deanName} onChange={v=>upd("deanName",v)} placeholder="e.g. Mrs. Jane Mwangi"/>
+            <Inp label="PHONE" value={settings.deanPhone} onChange={v=>upd("deanPhone",v)} placeholder="+254 7..."/>
+            <Inp label="EMAIL" value={settings.deanEmail} onChange={v=>upd("deanEmail",v)} placeholder="dean@tnks.sc.ke" type="email"/>
+            <Inp label="SIGNATURE NAME (for reports)" value={settings.deanSignature} onChange={v=>upd("deanSignature",v)} placeholder="As it appears on report forms"/>
+          </div>
+        </Card>
+        <Card>
+          <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>🏫 Principal / Head Teacher</div>
+          <div style={{display:"grid",gap:12}}>
+            <Inp label="PRINCIPAL'S FULL NAME" value={settings.principalName} onChange={v=>upd("principalName",v)} placeholder="e.g. Mr. Samuel Kimani"/>
+            <Inp label="PHONE" value={settings.principalPhone} onChange={v=>upd("principalPhone",v)} placeholder="+254 7..."/>
+            <Inp label="PASS MARK (%)" value={settings.passMark} onChange={v=>upd("passMark",v)} placeholder="50" type="number"/>
+          </div>
+        </Card>
+        <Card style={{gridColumn:"span 2"}}>
+          <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>📄 Report Form Footer Text</div>
+          <Textarea label="FOOTER NOTE (printed on all report forms)" value={settings.reportFooter} onChange={v=>upd("reportFooter",v)} placeholder="e.g. This report is confidential and intended for parent/guardian use only." rows={3}/>
+        </Card>
+      </div>
+      {msg.t && <div style={{marginTop:12,fontSize:13,fontWeight:"bold",color:msg.ok?"#15803d":"#b91c1c",background:msg.ok?"#f0fdf4":"#fef2f2",padding:"10px 16px",borderRadius:8}}>{msg.t}</div>}
+      <div style={{marginTop:16}}><Btn onClick={doSave} v="primary">💾 Save Dean Settings</Btn></div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// EXAM SETTINGS
+// ══════════════════════════════════════════════════════════
+function ExamSettingsPage({ user }) {
+  const F = getAppFont();
+  const [settings, setSettings] = useState({ currentTerm:"Term 1", currentYear:String(new Date().getFullYear()), currentExam:"End Term Exam", examDurationMins:90, reportingDate:"", closingDate:"", openingDate:"", maxMark:100, gradeScale:"CBC" });
+  const [msg, setMsg] = useState({ t:"", ok:true });
+  useEffect(() => { load("tnks_exam_settings").then(d => { if(d) setSettings(p=>({...p,...d})); }); }, []);
+  const flash = (t,ok=true) => { setMsg({t,ok}); setTimeout(() => setMsg({t:"",ok:true}), 2500); };
+  function doSave() { save("tnks_exam_settings", settings); flash("✅ Exam settings saved!"); }
+  const upd = (k,v) => setSettings(p=>({...p,[k]:v}));
+  return (
+    <div style={{padding:24}}>
+      <PageH title="✍️ Exam Settings" sub="Configure current term, exam and grading defaults"/>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+        <Card>
+          <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>📅 Current Academic Period</div>
+          <div style={{display:"grid",gap:12}}>
+            <Sel label="CURRENT TERM" value={settings.currentTerm} onChange={v=>upd("currentTerm",v)} options={TERMS}/>
+            <Inp label="ACADEMIC YEAR" value={settings.currentYear} onChange={v=>upd("currentYear",v)} placeholder="2025"/>
+            <Sel label="CURRENT EXAM TYPE" value={settings.currentExam} onChange={v=>upd("currentExam",v)} options={EXAM_TYPES}/>
+            <Inp label="EXAM DURATION (minutes)" value={settings.examDurationMins} onChange={v=>upd("examDurationMins",v)} placeholder="90" type="number"/>
+          </div>
+        </Card>
+        <Card>
+          <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>🗓️ Term Dates</div>
+          <div style={{display:"grid",gap:12}}>
+            <Inp label="TERM OPENING DATE" value={settings.openingDate} onChange={v=>upd("openingDate",v)} type="date"/>
+            <Inp label="TERM CLOSING DATE" value={settings.closingDate} onChange={v=>upd("closingDate",v)} type="date"/>
+            <Inp label="NEXT TERM REPORTING DATE" value={settings.reportingDate} onChange={v=>upd("reportingDate",v)} type="date"/>
+            <Inp label="MAXIMUM MARKS (per subject)" value={settings.maxMark} onChange={v=>upd("maxMark",v)} placeholder="100" type="number"/>
+          </div>
+        </Card>
+      </div>
+      {msg.t && <div style={{marginTop:12,fontSize:13,fontWeight:"bold",color:msg.ok?"#15803d":"#b91c1c",background:msg.ok?"#f0fdf4":"#fef2f2",padding:"10px 16px",borderRadius:8}}>{msg.t}</div>}
+      <div style={{marginTop:16}}><Btn onClick={doSave} v="primary">💾 Save Exam Settings</Btn></div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// SUBJECT ALLOCATION
+// ══════════════════════════════════════════════════════════
+function SubjectAllocationPage({ staff, user, students }) {
+  const F = getAppFont();
+  const [allocations, setAllocations] = useState([]);
+  const [form, setForm] = useState({ teacherId:"", cls:"Grade 7", subject:"" });
+  const [msg, setMsg] = useState({ t:"", ok:true });
+  const flash = (t,ok=true) => { setMsg({t,ok}); setTimeout(()=>setMsg({t:"",ok:true}),2500); };
+  useEffect(() => { load("tnks_subject_allocations").then(d => { if(d) setAllocations(d); }); }, []);
+  useEffect(() => { save("tnks_subject_allocations", allocations); }, [allocations]);
+
+  const teachers = (staff||[]).filter(s => s.staffType==="teaching" && s.status!=="former");
+  const getSubsForClass = (cls) => {
+    if(cls==="PP1"||cls==="PP2") return SUBJECTS_MAP.PP;
+    if(cls==="Grade 1"||cls==="Grade 2"||cls==="Grade 3") return SUBJECTS_MAP.Lower;
+    if(cls==="Grade 4"||cls==="Grade 5"||cls==="Grade 6") return SUBJECTS_MAP.Upper;
+    return SUBJECTS_MAP.JSS;
+  };
+
+  function doAdd() {
+    if(!form.teacherId||!form.cls||!form.subject) return flash("All fields required.",false);
+    const dup = allocations.find(a => a.cls===form.cls && a.subject===form.subject);
+    if(dup) return flash("This subject/class already allocated. Remove existing first.",false);
+    const t = teachers.find(x=>x.id===form.teacherId);
+    setAllocations(p => [...p, {...form, id:Date.now().toString(), teacherName:t?.name||"—"}]);
+    flash("✅ Allocation saved!");
+    setForm(p=>({...p, teacherId:"", subject:""}));
+  }
+
+  const th = { textAlign:"left", padding:"9px 12px", fontWeight:"bold", fontSize:11, color:"#7c3aed", background:"#f5f3ff" };
+  const td = { padding:"9px 12px", fontSize:12, borderTop:"1px solid #f1f5f9" };
+
+  return (
+    <div style={{padding:24}}>
+      <PageH title="📚 Subject Allocation" sub="Assign teachers to subjects per class"/>
+      <Card style={{marginBottom:16}}>
+        <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>Assign Teacher to Subject</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:12}}>
+          <Sel label="CLASS" value={form.cls} onChange={v=>setForm(p=>({...p,cls:v,subject:""}))} options={ALL_CLASSES}/>
+          <Sel label="SUBJECT" value={form.subject} onChange={v=>setForm(p=>({...p,subject:v}))}
+            options={["",  ...getSubsForClass(form.cls)]} labels={["-- Select subject --", ...getSubsForClass(form.cls)]}/>
+          <div><label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:3}}>TEACHER *</label>
+            <select value={form.teacherId} onChange={e=>setForm(p=>({...p,teacherId:e.target.value}))}
+              style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px",fontSize:13,fontFamily:F}}>
+              <option value="">-- Select teacher --</option>
+              {teachers.map(t => <option key={t.id} value={t.id}>{t.name} ({t.subject||"General"})</option>)}
+            </select>
+          </div>
+        </div>
+        {msg.t && <div style={{marginTop:10,fontSize:13,fontWeight:"bold",color:msg.ok?"#15803d":"#b91c1c"}}>{msg.t}</div>}
+        <div style={{marginTop:14}}><Btn onClick={doAdd} v="primary">➕ Assign</Btn></div>
+      </Card>
+      <Card style={{padding:0}}>
+        <div style={{padding:"12px 16px",background:"#f5f3ff",fontWeight:"bold",color:"#3b0764",fontSize:13,borderBottom:"1px solid #ede9fe"}}>
+          Current Allocations ({allocations.length})
+        </div>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",minWidth:500}}>
+            <thead><tr>{["#","Class","Subject","Teacher","Action"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
+            <tbody>{allocations.length ? allocations.map((a,i) => <tr key={a.id} style={{background:i%2===0?"white":"#fafafa"}}>
+              <td style={{...td,color:"#94a3b8"}}>{i+1}</td>
+              <td style={td}><span style={{fontSize:11,background:"#f5f3ff",color:"#7c3aed",padding:"2px 8px",borderRadius:20,fontWeight:"bold"}}>{a.cls}</span></td>
+              <td style={{...td,fontWeight:"bold"}}>{a.subject}</td>
+              <td style={td}>{a.teacherName}</td>
+              <td style={td}><button onClick={() => setAllocations(p=>p.filter(x=>x.id!==a.id))} style={{color:"#b91c1c",background:"none",border:"none",cursor:"pointer",fontSize:12}}>Remove</button></td>
+            </tr>) : <tr><td colSpan={5} style={{padding:30,textAlign:"center",color:"#94a3b8"}}>No allocations yet.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// EDIT MARKS
+// ══════════════════════════════════════════════════════════
+function EditMarksPage({ students, results, setResults, term, year, examType }) {
+  const F = getAppFont();
+  const [cls, setCls] = useState("Grade 7");
+  const [selStudent, setSelStudent] = useState("");
+  const [editResults, setEditResults] = useState([]);
+  const [msg, setMsg] = useState({ t:"", ok:true });
+  const flash = (t,ok=true) => { setMsg({t,ok}); setTimeout(()=>setMsg({t:"",ok:true}),2500); };
+
+  const clsStudents = students.filter(s => s.class===cls);
+  const student = students.find(s => s.id===selStudent);
+
+  function getSubjects(cls) {
+    if(cls==="PP1"||cls==="PP2") return SUBJECTS_MAP.PP;
+    if(cls==="Grade 1"||cls==="Grade 2"||cls==="Grade 3") return SUBJECTS_MAP.Lower;
+    if(cls==="Grade 4"||cls==="Grade 5"||cls==="Grade 6") return SUBJECTS_MAP.Upper;
+    return SUBJECTS_MAP.JSS;
+  }
+
+  useEffect(() => {
+    if(!selStudent) { setEditResults([]); return; }
+    const subs = getSubjects(cls);
+    const existing = subs.map(sub => {
+      const r = results.find(x => x.studentId===selStudent && x.subject===sub && x.term===term && x.year===year && x.examType===examType);
+      return { subject:sub, marks: r ? String(r.marks) : "", id: r ? r.id : null };
+    });
+    setEditResults(existing);
+  }, [selStudent, cls, term, year, examType]);
+
+  function doSave() {
+    if(!selStudent) return flash("Select a student first.",false);
+    let newResults = [...results.filter(r => !(r.studentId===selStudent && r.term===term && r.year===year && r.examType===examType))];
+    editResults.forEach(er => {
+      if(er.marks !== "" && !isNaN(parseFloat(er.marks))) {
+        newResults.push({ id: er.id||`${selStudent}-${er.subject}-${term}-${year}-${examType}`, studentId:selStudent, subject:er.subject, marks:parseFloat(er.marks), term, year, examType, class:cls, editedAt:new Date().toLocaleDateString("en-KE") });
+      }
+    });
+    setResults(newResults);
+    flash("✅ Marks updated successfully!");
+  }
+
+  return (
+    <div style={{padding:24}}>
+      <PageH title="✏️ Edit Marks" sub="Modify recorded marks for a student"/>
+      <Card style={{marginBottom:16}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:12}}>
+          <Sel label="CLASS" value={cls} onChange={v=>{setCls(v);setSelStudent("");}} options={ALL_CLASSES}/>
+          <div><label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:3}}>STUDENT</label>
+            <select value={selStudent} onChange={e=>setSelStudent(e.target.value)} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px",fontSize:13,fontFamily:F}}>
+              <option value="">-- Select student --</option>
+              {clsStudents.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+        </div>
+      </Card>
+      {selStudent && editResults.length > 0 && <Card>
+        <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>
+          Edit marks for {student?.name} — {term} {year} ({examType})
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:10,marginBottom:16}}>
+          {editResults.map((er,i) => (
+            <div key={er.subject} style={{background:"#f8fafc",borderRadius:10,padding:"10px 14px"}}>
+              <div style={{fontSize:11,fontWeight:"bold",color:"#64748b",marginBottom:6}}>{er.subject}</div>
+              <input value={er.marks} onChange={e=>{const c=[...editResults];c[i]={...c[i],marks:e.target.value};setEditResults(c);}}
+                placeholder="—" type="number" min="0" max="100"
+                style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px",fontSize:14,fontFamily:F,fontWeight:"bold",color:"#3b0764",boxSizing:"border-box"}}/>
+            </div>
+          ))}
+        </div>
+        {msg.t && <div style={{marginBottom:10,fontSize:13,fontWeight:"bold",color:msg.ok?"#15803d":"#b91c1c",background:msg.ok?"#f0fdf4":"#fef2f2",padding:"10px 16px",borderRadius:8}}>{msg.t}</div>}
+        <Btn onClick={doSave} v="primary">💾 Save Edited Marks</Btn>
+      </Card>}
+      {!selStudent && <Empty icon="✏️" text="Select a class and student to edit their marks."/>}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// MARKS STATUS
+// ══════════════════════════════════════════════════════════
+function MarksStatusPage({ students, results, term, year, examType }) {
+  const F = getAppFont();
+  return (
+    <div style={{padding:24}}>
+      <PageH title="📊 Marks Status" sub={`Shows which classes have submitted marks — ${term} ${year} (${examType})`}/>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:14}}>
+        {ALL_CLASSES.map(cls => {
+          const clsStudents = students.filter(s=>s.class===cls);
+          const subs = (() => {
+            if(cls==="PP1"||cls==="PP2") return SUBJECTS_MAP.PP;
+            if(cls==="Grade 1"||cls==="Grade 2"||cls==="Grade 3") return SUBJECTS_MAP.Lower;
+            if(cls==="Grade 4"||cls==="Grade 5"||cls==="Grade 6") return SUBJECTS_MAP.Upper;
+            return SUBJECTS_MAP.JSS;
+          })();
+          const clsResults = results.filter(r=>r.term===term&&r.year===year&&r.examType===examType&&clsStudents.some(s=>s.id===r.studentId));
+          const totalExpected = clsStudents.length * subs.length;
+          const entered = clsResults.length;
+          const pct = totalExpected > 0 ? Math.round((entered/totalExpected)*100) : 0;
+          const status = pct===100?"Complete":pct>0?"In Progress":"Not Started";
+          const col = pct===100?"#15803d":pct>0?"#b45309":"#b91c1c";
+          const bg = pct===100?"#dcfce7":pct>0?"#fef3c7":"#fee2e2";
+          return (
+            <Card key={cls} style={{borderLeft:`4px solid ${col}`}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                <div style={{fontWeight:"bold",color:"#3b0764",fontSize:14}}>{cls}</div>
+                <span style={{fontSize:11,fontWeight:"bold",padding:"3px 10px",borderRadius:20,background:bg,color:col}}>{status}</span>
+              </div>
+              <div style={{fontSize:12,color:"#64748b",marginBottom:8}}>{clsStudents.length} students · {subs.length} subjects</div>
+              <div style={{background:"#f1f5f9",borderRadius:99,height:8,overflow:"hidden",marginBottom:6}}>
+                <div style={{width:`${pct}%`,height:"100%",background:pct===100?"#15803d":pct>50?"#b45309":"#b91c1c",borderRadius:99,transition:"width .3s"}}/>
+              </div>
+              <div style={{fontSize:12,fontWeight:"bold",color:col}}>{entered}/{totalExpected} marks entered ({pct}%)</div>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// HOMEWORK (Online Classes)
+// ══════════════════════════════════════════════════════════
+function HomeworkPage({ students, staff, user }) {
+  const F = getAppFont();
+  const blank = { title:"", cls:"Grade 7", subject:"", dueDate:"", instructions:"", attachmentUrl:"", teacherName:user.name };
+  const [assignments, setAssignments] = useState([]);
+  const [submissions, setSubmissions] = useState([]);
+  const [form, setForm] = useState(blank);
+  const [tab, setTab] = useState("list");
+  const [msg, setMsg] = useState({ t:"", ok:true });
+  const [selAssign, setSelAssign] = useState(null);
+
+  useEffect(() => {
+    load("tnks_homework").then(d=>{ if(d) setAssignments(d); });
+    load("tnks_homework_submissions").then(d=>{ if(d) setSubmissions(d); });
+  }, []);
+  useEffect(() => { save("tnks_homework", assignments); }, [assignments]);
+  useEffect(() => { save("tnks_homework_submissions", submissions); }, [submissions]);
+
+  const flash = (t,ok=true) => { setMsg({t,ok}); setTimeout(()=>setMsg({t:"",ok:true}),2500); };
+
+  function doAdd() {
+    if(!form.title||!form.subject||!form.dueDate) return flash("Title, subject and due date required.",false);
+    setAssignments(p => [...p, {...form, id:Date.now().toString(), createdAt:new Date().toLocaleDateString("en-KE")}]);
+    flash("✅ Homework assigned!"); setForm(blank); setTab("list");
+  }
+
+  function addSubmission(assignId, studentId, studentName, note) {
+    setSubmissions(p => [...p.filter(x=>!(x.assignId===assignId&&x.studentId===studentId)), { id:Date.now().toString(), assignId, studentId, studentName, note, submittedAt:new Date().toLocaleString("en-KE"), status:"Submitted" }]);
+  }
+
+  const th = { textAlign:"left", padding:"9px 12px", fontWeight:"bold", fontSize:11, color:"#7c3aed", background:"#f5f3ff" };
+  const td = { padding:"9px 12px", fontSize:12, borderTop:"1px solid #f1f5f9" };
+
+  return (
+    <div style={{padding:24}}>
+      <PageH title="📝 Homework" sub="Assign and track student homework">
+        <div style={{display:"flex",gap:6}}>
+          {[["list","📋 Assignments"],["add","➕ Assign"],["submissions","📤 Submissions"]].map(([t,l])=>
+            <Btn key={t} onClick={()=>{setTab(t);if(t==="add")setForm(blank);}} v={tab===t?"primary":"ghost"} style={{fontSize:12}}>{l}</Btn>
+          )}
+        </div>
+      </PageH>
+
+      {tab==="add" && <Card style={{marginBottom:16}}>
+        <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>New Homework Assignment</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:12}}>
+          <Inp label="TITLE *" value={form.title} onChange={v=>setForm(p=>({...p,title:v}))} placeholder="e.g. Algebraic Equations Practice"/>
+          <Sel label="CLASS *" value={form.cls} onChange={v=>setForm(p=>({...p,cls:v}))} options={ALL_CLASSES}/>
+          <Inp label="SUBJECT *" value={form.subject} onChange={v=>setForm(p=>({...p,subject:v}))} placeholder="e.g. Mathematics"/>
+          <Inp label="DUE DATE *" value={form.dueDate} onChange={v=>setForm(p=>({...p,dueDate:v}))} type="date"/>
+          <Inp label="ASSIGNED BY" value={form.teacherName} onChange={v=>setForm(p=>({...p,teacherName:v}))} placeholder="Teacher name"/>
+        </div>
+        <div style={{marginTop:12}}>
+          <Textarea label="INSTRUCTIONS" value={form.instructions} onChange={v=>setForm(p=>({...p,instructions:v}))} placeholder="Describe the assignment in detail..." rows={4}/>
+        </div>
+        <div style={{marginTop:12}}>
+          <Inp label="RESOURCE LINK (optional)" value={form.attachmentUrl} onChange={v=>setForm(p=>({...p,attachmentUrl:v}))} placeholder="https://..."/>
+        </div>
+        {msg.t && <div style={{marginTop:10,fontSize:13,fontWeight:"bold",color:msg.ok?"#15803d":"#b91c1c"}}>{msg.t}</div>}
+        <div style={{marginTop:14}}><Btn onClick={doAdd} v="primary">📤 Post Assignment</Btn></div>
+      </Card>}
+
+      {tab==="list" && <>
+        {assignments.length === 0 ? <Empty icon="📝" text="No homework assignments posted yet."/> :
+        <div style={{display:"grid",gap:12}}>
+          {[...assignments].reverse().map(a => {
+            const subs = submissions.filter(s=>s.assignId===a.id);
+            const clsCount = students.filter(s=>s.class===a.cls).length;
+            const overdue = new Date(a.dueDate) < new Date();
+            return <Card key={a.id} style={{borderLeft:`4px solid ${overdue?"#b91c1c":"#7c3aed"}`}}>
+              <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+                <div>
+                  <div style={{fontWeight:"bold",color:"#3b0764",fontSize:14}}>{a.title}</div>
+                  <div style={{fontSize:12,color:"#64748b",marginTop:2}}>{a.cls} · {a.subject} · Due: <b style={{color:overdue?"#b91c1c":"#374151"}}>{a.dueDate}</b> · By: {a.teacherName}</div>
+                  {a.instructions && <div style={{fontSize:12,color:"#374151",marginTop:6,fontStyle:"italic"}}>{a.instructions.slice(0,120)}{a.instructions.length>120?"...":""}</div>}
+                  {a.attachmentUrl && <a href={a.attachmentUrl} target="_blank" rel="noreferrer" style={{fontSize:12,color:"#7c3aed",display:"block",marginTop:4}}>🔗 View Resource</a>}
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:20,fontWeight:"bold",color:"#3b0764"}}>{subs.length}<span style={{fontSize:12,fontWeight:"normal",color:"#94a3b8"}}>/{clsCount}</span></div>
+                  <div style={{fontSize:10,color:"#94a3b8"}}>submitted</div>
+                  <div style={{display:"flex",gap:6,marginTop:8}}>
+                    <Btn onClick={()=>setSelAssign(selAssign===a.id?null:a.id)} v="ghost" style={{fontSize:11}}>📋 Submissions</Btn>
+                    <button onClick={()=>setAssignments(p=>p.filter(x=>x.id!==a.id))} style={{color:"#b91c1c",background:"none",border:"none",cursor:"pointer",fontSize:12}}>🗑️</button>
+                  </div>
+                </div>
+              </div>
+              {selAssign===a.id && <div style={{marginTop:12,borderTop:"1px solid #f1f5f9",paddingTop:12}}>
+                <div style={{fontSize:12,fontWeight:"bold",color:"#3b0764",marginBottom:8}}>Submissions for {a.title}</div>
+                {subs.length === 0 ? <div style={{fontSize:12,color:"#94a3b8"}}>No submissions yet.</div> :
+                <table style={{width:"100%",borderCollapse:"collapse"}}>
+                  <thead><tr>{["Student","Note","Time","Status"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
+                  <tbody>{subs.map((s,i)=><tr key={s.id} style={{background:i%2===0?"white":"#fafafa"}}>
+                    <td style={{...td,fontWeight:"bold"}}>{s.studentName}</td>
+                    <td style={{...td,fontSize:11}}>{s.note||"—"}</td>
+                    <td style={{...td,fontSize:11,fontFamily:"monospace"}}>{s.submittedAt}</td>
+                    <td style={td}><span style={{fontSize:10,background:"#dcfce7",color:"#15803d",padding:"2px 8px",borderRadius:20,fontWeight:"bold"}}>✅ {s.status}</span></td>
+                  </tr>)}</tbody>
+                </table>}
+              </div>}
+            </Card>;
+          })}
+        </div>}
+      </>}
+
+      {tab==="submissions" && <>
+        <div style={{display:"grid",gap:12}}>
+          {assignments.length===0?<Empty icon="📝" text="No assignments yet."/>:
+          assignments.map(a => {
+            const subs = submissions.filter(s=>s.assignId===a.id);
+            const clsStudents = students.filter(s=>s.class===a.cls);
+            const notSubmitted = clsStudents.filter(s=>!subs.some(sub=>sub.studentId===s.id));
+            return <Card key={a.id}>
+              <div style={{fontWeight:"bold",color:"#3b0764",fontSize:13,marginBottom:8}}>{a.title} — {a.cls} · {a.subject}</div>
+              <div style={{fontSize:11,color:"#64748b",marginBottom:10}}>Due: {a.dueDate} · {subs.length}/{clsStudents.length} submitted</div>
+              {notSubmitted.length > 0 && <div style={{fontSize:11,color:"#b45309",marginBottom:8}}>
+                ⚠️ Pending: {notSubmitted.map(s=>s.name).join(", ")}
+              </div>}
+              {user.role==="admin" && notSubmitted.length > 0 && <div style={{fontSize:12,marginTop:6}}>
+                <b>Mark as submitted (admin):</b>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:6}}>
+                  {notSubmitted.map(s=><button key={s.id} onClick={()=>addSubmission(a.id,s.id,s.name,"Admin-recorded")} style={{background:"#f0fdf4",color:"#15803d",border:"1px solid #bbf7d0",borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:11,fontFamily:F}}>✅ {s.name}</button>)}
+                </div>
+              </div>}
+            </Card>;
+          })}
+        </div>
+      </>}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// FINANCE SETTINGS
+// ══════════════════════════════════════════════════════════
+function FinanceSettingsPage({ user }) {
+  const F = getAppFont();
+  const [settings, setSettings] = useState({ schoolName:SCHOOL.name, bankName:"", bankBranch:"", accountNo:"", mpesaTill:"", mpesaPaybill:"", invoicePrefix:"INV", financeContact:"", vatRate:"0", currency:"KES", fiscalYear:"January-December" });
+  const [msg, setMsg] = useState({t:"",ok:true});
+  useEffect(()=>{ load("tnks_finance_settings").then(d=>{if(d)setSettings(p=>({...p,...d}));}); },[]);
+  const flash=(t,ok=true)=>{setMsg({t,ok});setTimeout(()=>setMsg({t:"",ok:true}),2500);};
+  function doSave(){save("tnks_finance_settings",settings);flash("✅ Finance settings saved!");}
+  const upd=(k,v)=>setSettings(p=>({...p,[k]:v}));
+  return (
+    <div style={{padding:24}}>
+      <PageH title="💳 Finance Settings" sub="Bank details, M-Pesa, and invoice configuration"/>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+        <Card>
+          <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>🏦 Bank Details</div>
+          <div style={{display:"grid",gap:12}}>
+            <Inp label="BANK NAME" value={settings.bankName} onChange={v=>upd("bankName",v)} placeholder="e.g. Equity Bank"/>
+            <Inp label="BRANCH" value={settings.bankBranch} onChange={v=>upd("bankBranch",v)} placeholder="e.g. Meru Branch"/>
+            <Inp label="ACCOUNT NUMBER" value={settings.accountNo} onChange={v=>upd("accountNo",v)} placeholder="e.g. 0123456789"/>
+          </div>
+        </Card>
+        <Card>
+          <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>📱 M-Pesa Settings</div>
+          <div style={{display:"grid",gap:12}}>
+            <Inp label="PAYBILL NUMBER" value={settings.mpesaPaybill} onChange={v=>upd("mpesaPaybill",v)} placeholder="e.g. 522533"/>
+            <Inp label="TILL NUMBER (Lipa Na M-Pesa)" value={settings.mpesaTill} onChange={v=>upd("mpesaTill",v)} placeholder="e.g. 9876543"/>
+            <Inp label="FINANCE CONTACT PERSON" value={settings.financeContact} onChange={v=>upd("financeContact",v)} placeholder="Name & phone"/>
+          </div>
+        </Card>
+        <Card>
+          <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>🧾 Invoice Settings</div>
+          <div style={{display:"grid",gap:12}}>
+            <Inp label="INVOICE PREFIX" value={settings.invoicePrefix} onChange={v=>upd("invoicePrefix",v)} placeholder="e.g. TNKS-INV"/>
+            <Sel label="CURRENCY" value={settings.currency} onChange={v=>upd("currency",v)} options={["KES","USD","GBP"]}/>
+            <Sel label="FISCAL YEAR" value={settings.fiscalYear} onChange={v=>upd("fiscalYear",v)} options={["January-December","July-June"]}/>
+          </div>
+        </Card>
+      </div>
+      {msg.t && <div style={{marginTop:12,fontSize:13,fontWeight:"bold",color:msg.ok?"#15803d":"#b91c1c",background:msg.ok?"#f0fdf4":"#fef2f2",padding:"10px 16px",borderRadius:8}}>{msg.t}</div>}
+      <div style={{marginTop:16}}><Btn onClick={doSave} v="primary">💾 Save Finance Settings</Btn></div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// PROMISSORY NOTES
+// ══════════════════════════════════════════════════════════
+function PromissoryNotesPage({ students, user }) {
+  const F = getAppFont();
+  const blank = { studentId:"", amount:"", dueDate:"", reason:"", guarantor:"", guarantorPhone:"", status:"Active" };
+  const [notes, setNotes] = useState([]);
+  const [form, setForm] = useState(blank);
+  const [tab, setTab] = useState("list");
+  const [msg, setMsg] = useState({t:"",ok:true});
+  useEffect(()=>{ load("tnks_promissory").then(d=>{if(d)setNotes(d);}); },[]);
+  useEffect(()=>{ save("tnks_promissory",notes); },[notes]);
+  const flash=(t,ok=true)=>{setMsg({t,ok});setTimeout(()=>setMsg({t:"",ok:true}),2500);};
+  function doAdd(){
+    if(!form.studentId||!form.amount||!form.dueDate) return flash("Student, amount, and due date required.",false);
+    const s=students.find(x=>x.id===form.studentId);
+    setNotes(p=>[...p,{...form,id:Date.now().toString(),studentName:s?.name||"—",studentClass:s?.class||"—",amount:parseFloat(form.amount),createdAt:new Date().toLocaleDateString("en-KE"),createdBy:user.name}]);
+    flash("✅ Promissory note recorded!"); setForm(blank); setTab("list");
+  }
+  const th={textAlign:"left",padding:"9px 12px",fontWeight:"bold",fontSize:11,color:"#7c3aed",background:"#f5f3ff"};
+  const td={padding:"9px 12px",fontSize:12,borderTop:"1px solid #f1f5f9"};
+  const overdue=notes.filter(n=>n.status==="Active"&&new Date(n.dueDate)<new Date());
+  return (
+    <div style={{padding:24}}>
+      <PageH title="📜 Promissory Notes" sub="Track fee payment promises and follow-ups">
+        <div style={{display:"flex",gap:6}}>
+          {[["list","📋 Notes"],["add","➕ Add Note"]].map(([t,l])=>
+            <Btn key={t} onClick={()=>{setTab(t);if(t==="add")setForm(blank);}} v={tab===t?"primary":"ghost"} style={{fontSize:12}}>{l}</Btn>
+          )}
+        </div>
+      </PageH>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12,marginBottom:16}}>
+        <Stat icon="📜" label="Total Notes" value={notes.length} color="#7c3aed"/>
+        <Stat icon="✅" label="Active" value={notes.filter(n=>n.status==="Active").length} color="#15803d"/>
+        <Stat icon="⚠️" label="Overdue" value={overdue.length} color="#b91c1c"/>
+        <Stat icon="💰" label="Total Promised" value={`KES ${notes.reduce((a,n)=>a+(n.amount||0),0).toLocaleString()}`} color="#3b0764"/>
+      </div>
+      {tab==="add" && <Card style={{marginBottom:16}}>
+        <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>New Promissory Note</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:12}}>
+          <div><label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:3}}>STUDENT *</label>
+            <select value={form.studentId} onChange={e=>setForm(p=>({...p,studentId:e.target.value}))} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px",fontSize:13,fontFamily:F}}>
+              <option value="">-- Select --</option>
+              {students.sort((a,b)=>a.name.localeCompare(b.name)).map(s=><option key={s.id} value={s.id}>{s.name} ({s.class})</option>)}
+            </select></div>
+          <Inp label="AMOUNT PROMISED (KES) *" value={form.amount} onChange={v=>setForm(p=>({...p,amount:v}))} type="number" placeholder="0"/>
+          <Inp label="PAYMENT DUE DATE *" value={form.dueDate} onChange={v=>setForm(p=>({...p,dueDate:v}))} type="date"/>
+          <Inp label="REASON / BALANCE FOR" value={form.reason} onChange={v=>setForm(p=>({...p,reason:v}))} placeholder="e.g. Term 1 school fees"/>
+          <Inp label="GUARANTOR NAME" value={form.guarantor} onChange={v=>setForm(p=>({...p,guarantor:v}))} placeholder="Parent/Guardian name"/>
+          <Inp label="GUARANTOR PHONE" value={form.guarantorPhone} onChange={v=>setForm(p=>({...p,guarantorPhone:v}))} placeholder="+254 7..."/>
+        </div>
+        {msg.t && <div style={{marginTop:10,fontSize:13,fontWeight:"bold",color:msg.ok?"#15803d":"#b91c1c"}}>{msg.t}</div>}
+        <div style={{marginTop:14}}><Btn onClick={doAdd} v="primary">📜 Record Note</Btn></div>
+      </Card>}
+      <Card style={{padding:0}}>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",minWidth:700}}>
+            <thead><tr>{["#","Student","Class","Amount","Due Date","Reason","Guarantor","Status","Action"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
+            <tbody>{notes.length?[...notes].reverse().map((n,i)=>{
+              const isOverdue=n.status==="Active"&&new Date(n.dueDate)<new Date();
+              return <tr key={n.id} style={{background:isOverdue?"#fef9f9":i%2===0?"white":"#fafafa"}}>
+                <td style={{...td,color:"#94a3b8"}}>{i+1}</td>
+                <td style={{...td,fontWeight:"bold"}}>{n.studentName}</td>
+                <td style={td}>{n.studentClass}</td>
+                <td style={{...td,fontWeight:"bold",color:"#3b0764"}}>KES {(n.amount||0).toLocaleString()}</td>
+                <td style={{...td,color:isOverdue?"#b91c1c":"#374151",fontWeight:isOverdue?"bold":"normal"}}>{n.dueDate}{isOverdue&&" ⚠️"}</td>
+                <td style={{...td,fontSize:11}}>{n.reason||"—"}</td>
+                <td style={{...td,fontSize:11}}>{n.guarantor||"—"}</td>
+                <td style={td}><span style={{fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:"bold",background:n.status==="Fulfilled"?"#dcfce7":isOverdue?"#fee2e2":"#fef3c7",color:n.status==="Fulfilled"?"#15803d":isOverdue?"#b91c1c":"#b45309"}}>{n.status}</span></td>
+                <td style={td}><div style={{display:"flex",gap:4}}>
+                  <button onClick={()=>setNotes(p=>p.map(x=>x.id===n.id?{...x,status:"Fulfilled"}:x))} style={{color:"#15803d",background:"none",border:"none",cursor:"pointer",fontSize:11}}>✅ Mark Paid</button>
+                  <button onClick={()=>setNotes(p=>p.filter(x=>x.id!==n.id))} style={{color:"#b91c1c",background:"none",border:"none",cursor:"pointer",fontSize:11}}>Del</button>
+                </div></td>
+              </tr>;
+            }):<tr><td colSpan={9} style={{padding:30,textAlign:"center",color:"#94a3b8"}}>No promissory notes yet.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// COLLECT INCOME (Non-fee income)
+// ══════════════════════════════════════════════════════════
+function CollectIncomePage({ user }) {
+  const F = getAppFont();
+  const blank = { type:"Donation", amount:"", payer:"", purpose:"", reference:"", date:new Date().toISOString().split("T")[0], notes:"" };
+  const [income, setIncome] = useState([]);
+  const [form, setForm] = useState(blank);
+  const [tab, setTab] = useState("list");
+  const [msg, setMsg] = useState({t:"",ok:true});
+  const TYPES = ["Donation","Facility Hire","Government Grant","Alumni Contribution","Event Income","Other"];
+  useEffect(()=>{ load("tnks_income").then(d=>{if(d)setIncome(d);}); },[]);
+  useEffect(()=>{ save("tnks_income",income); },[income]);
+  const flash=(t,ok=true)=>{setMsg({t,ok});setTimeout(()=>setMsg({t:"",ok:true}),2500);};
+  function doAdd(){
+    if(!form.amount||!form.payer) return flash("Amount and payer name required.",false);
+    setIncome(p=>[...p,{...form,id:Date.now().toString(),amount:parseFloat(form.amount),recordedBy:user.name,recordedAt:new Date().toLocaleString("en-KE")}]);
+    flash("✅ Income recorded!"); setForm(blank); setTab("list");
+  }
+  const th={textAlign:"left",padding:"9px 12px",fontWeight:"bold",fontSize:11,color:"#7c3aed",background:"#f5f3ff"};
+  const td={padding:"9px 12px",fontSize:12,borderTop:"1px solid #f1f5f9"};
+  const totalIncome=income.reduce((a,x)=>a+(x.amount||0),0);
+  return (
+    <div style={{padding:24}}>
+      <PageH title="💰 Collect Income" sub="Record non-fee income: donations, facility hire, grants">
+        <div style={{display:"flex",gap:6}}>
+          {[["list","📋 Records"],["add","➕ Record Income"]].map(([t,l])=>
+            <Btn key={t} onClick={()=>{setTab(t);if(t==="add")setForm(blank);}} v={tab===t?"primary":"ghost"} style={{fontSize:12}}>{l}</Btn>
+          )}
+        </div>
+      </PageH>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12,marginBottom:16}}>
+        <Stat icon="💰" label="Total Income" value={`KES ${totalIncome.toLocaleString()}`} color="#15803d"/>
+        <Stat icon="🎁" label="Donations" value={income.filter(x=>x.type==="Donation").length} color="#7c3aed"/>
+        <Stat icon="🏢" label="Facility Hire" value={`KES ${income.filter(x=>x.type==="Facility Hire").reduce((a,x)=>a+(x.amount||0),0).toLocaleString()}`} color="#0e7490"/>
+        <Stat icon="🏛️" label="Gov. Grants" value={`KES ${income.filter(x=>x.type==="Government Grant").reduce((a,x)=>a+(x.amount||0),0).toLocaleString()}`} color="#b45309"/>
+      </div>
+      {tab==="add" && <Card style={{marginBottom:16}}>
+        <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>Record New Income</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:12}}>
+          <Sel label="INCOME TYPE *" value={form.type} onChange={v=>setForm(p=>({...p,type:v}))} options={TYPES}/>
+          <Inp label="AMOUNT (KES) *" value={form.amount} onChange={v=>setForm(p=>({...p,amount:v}))} type="number" placeholder="0"/>
+          <Inp label="PAYER / SOURCE *" value={form.payer} onChange={v=>setForm(p=>({...p,payer:v}))} placeholder="Name of donor/payer"/>
+          <Inp label="PURPOSE" value={form.purpose} onChange={v=>setForm(p=>({...p,purpose:v}))} placeholder="e.g. Library equipment"/>
+          <Inp label="REFERENCE NO." value={form.reference} onChange={v=>setForm(p=>({...p,reference:v}))} placeholder="e.g. M-Pesa Ref"/>
+          <Inp label="DATE" value={form.date} onChange={v=>setForm(p=>({...p,date:v}))} type="date"/>
+        </div>
+        <div style={{marginTop:12}}>
+          <Textarea label="NOTES" value={form.notes} onChange={v=>setForm(p=>({...p,notes:v}))} placeholder="Additional details..." rows={2}/>
+        </div>
+        {msg.t && <div style={{marginTop:10,fontSize:13,fontWeight:"bold",color:msg.ok?"#15803d":"#b91c1c"}}>{msg.t}</div>}
+        <div style={{marginTop:14}}><Btn onClick={doAdd} v="primary">💾 Record Income</Btn></div>
+      </Card>}
+      <Card style={{padding:0}}>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",minWidth:700}}>
+            <thead><tr>{["#","Date","Type","Amount","Payer","Purpose","Reference","Recorded By","Del"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
+            <tbody>{income.length?[...income].reverse().map((x,i)=><tr key={x.id} style={{background:i%2===0?"white":"#fafafa"}}>
+              <td style={{...td,color:"#94a3b8"}}>{i+1}</td>
+              <td style={{...td,fontFamily:"monospace",fontSize:11}}>{x.date}</td>
+              <td style={td}><span style={{fontSize:10,background:"#f5f3ff",color:"#7c3aed",padding:"2px 8px",borderRadius:20,fontWeight:"bold"}}>{x.type}</span></td>
+              <td style={{...td,fontWeight:"bold",color:"#15803d"}}>KES {(x.amount||0).toLocaleString()}</td>
+              <td style={{...td,fontWeight:"bold"}}>{x.payer}</td>
+              <td style={{...td,fontSize:11}}>{x.purpose||"—"}</td>
+              <td style={{...td,fontFamily:"monospace",fontSize:11}}>{x.reference||"—"}</td>
+              <td style={{...td,fontSize:11}}>{x.recordedBy}</td>
+              <td style={td}><button onClick={()=>setIncome(p=>p.filter(y=>y.id!==x.id))} style={{color:"#b91c1c",background:"none",border:"none",cursor:"pointer",fontSize:12}}>🗑️</button></td>
+            </tr>):<tr><td colSpan={9} style={{padding:30,textAlign:"center",color:"#94a3b8"}}>No income records yet.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// PAY SUPPLIERS
+// ══════════════════════════════════════════════════════════
+function PaySuppliersPage({ user }) {
+  const F = getAppFont();
+  const blank = { supplier:"", category:"Stationery", amount:"", invoiceNo:"", paymentMethod:"M-Pesa", description:"", paymentDate:new Date().toISOString().split("T")[0], status:"Paid" };
+  const [payments, setPayments] = useState([]);
+  const [form, setForm] = useState(blank);
+  const [tab, setTab] = useState("list");
+  const [msg, setMsg] = useState({t:"",ok:true});
+  const CATEGORIES=["Stationery","Utilities","Maintenance","Food & Supplies","Transport","Salaries","Professional Services","Other"];
+  useEffect(()=>{ load("tnks_supplier_payments").then(d=>{if(d)setPayments(d);}); },[]);
+  useEffect(()=>{ save("tnks_supplier_payments",payments); },[payments]);
+  const flash=(t,ok=true)=>{setMsg({t,ok});setTimeout(()=>setMsg({t:"",ok:true}),2500);};
+  function doAdd(){
+    if(!form.supplier||!form.amount) return flash("Supplier and amount required.",false);
+    setPayments(p=>[...p,{...form,id:Date.now().toString(),amount:parseFloat(form.amount),recordedBy:user.name}]);
+    flash("✅ Payment recorded!"); setForm(blank); setTab("list");
+  }
+  const th={textAlign:"left",padding:"9px 12px",fontWeight:"bold",fontSize:11,color:"#7c3aed",background:"#f5f3ff"};
+  const td={padding:"9px 12px",fontSize:12,borderTop:"1px solid #f1f5f9"};
+  const totalPaid=payments.filter(p=>p.status==="Paid").reduce((a,x)=>a+(x.amount||0),0);
+  const totalPending=payments.filter(p=>p.status==="Pending").reduce((a,x)=>a+(x.amount||0),0);
+  return (
+    <div style={{padding:24}}>
+      <PageH title="🏪 Pay Suppliers" sub="Record payments to suppliers and vendors">
+        <div style={{display:"flex",gap:6}}>
+          {[["list","📋 Payments"],["add","➕ Record Payment"]].map(([t,l])=>
+            <Btn key={t} onClick={()=>{setTab(t);if(t==="add")setForm(blank);}} v={tab===t?"primary":"ghost"} style={{fontSize:12}}>{l}</Btn>
+          )}
+        </div>
+      </PageH>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12,marginBottom:16}}>
+        <Stat icon="✅" label="Total Paid" value={`KES ${totalPaid.toLocaleString()}`} color="#15803d"/>
+        <Stat icon="⏳" label="Pending" value={`KES ${totalPending.toLocaleString()}`} color="#b45309"/>
+        <Stat icon="🏪" label="Total Transactions" value={payments.length} color="#7c3aed"/>
+      </div>
+      {tab==="add" && <Card style={{marginBottom:16}}>
+        <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>Record Supplier Payment</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:12}}>
+          <Inp label="SUPPLIER / VENDOR *" value={form.supplier} onChange={v=>setForm(p=>({...p,supplier:v}))} placeholder="e.g. ABC Stationery Ltd"/>
+          <Sel label="CATEGORY" value={form.category} onChange={v=>setForm(p=>({...p,category:v}))} options={CATEGORIES}/>
+          <Inp label="AMOUNT (KES) *" value={form.amount} onChange={v=>setForm(p=>({...p,amount:v}))} type="number" placeholder="0"/>
+          <Inp label="INVOICE / REF NO." value={form.invoiceNo} onChange={v=>setForm(p=>({...p,invoiceNo:v}))} placeholder="e.g. INV-2025-001"/>
+          <Sel label="PAYMENT METHOD" value={form.paymentMethod} onChange={v=>setForm(p=>({...p,paymentMethod:v}))} options={["M-Pesa","Bank Transfer","Cash","Cheque"]}/>
+          <Inp label="PAYMENT DATE" value={form.paymentDate} onChange={v=>setForm(p=>({...p,paymentDate:v}))} type="date"/>
+          <Sel label="STATUS" value={form.status} onChange={v=>setForm(p=>({...p,status:v}))} options={["Paid","Pending","Partial"]}/>
+          <Inp label="DESCRIPTION" value={form.description} onChange={v=>setForm(p=>({...p,description:v}))} placeholder="What was purchased"/>
+        </div>
+        {msg.t && <div style={{marginTop:10,fontSize:13,fontWeight:"bold",color:msg.ok?"#15803d":"#b91c1c"}}>{msg.t}</div>}
+        <div style={{marginTop:14}}><Btn onClick={doAdd} v="primary">💾 Record Payment</Btn></div>
+      </Card>}
+      <Card style={{padding:0}}>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",minWidth:700}}>
+            <thead><tr>{["#","Date","Supplier","Category","Amount","Invoice","Method","Status","By","Del"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
+            <tbody>{payments.length?[...payments].reverse().map((x,i)=><tr key={x.id} style={{background:i%2===0?"white":"#fafafa"}}>
+              <td style={{...td,color:"#94a3b8"}}>{i+1}</td>
+              <td style={{...td,fontFamily:"monospace",fontSize:11}}>{x.paymentDate}</td>
+              <td style={{...td,fontWeight:"bold"}}>{x.supplier}</td>
+              <td style={td}><span style={{fontSize:10,background:"#f5f3ff",color:"#7c3aed",padding:"2px 8px",borderRadius:20,fontWeight:"bold"}}>{x.category}</span></td>
+              <td style={{...td,fontWeight:"bold",color:"#3b0764"}}>KES {(x.amount||0).toLocaleString()}</td>
+              <td style={{...td,fontFamily:"monospace",fontSize:11}}>{x.invoiceNo||"—"}</td>
+              <td style={{...td,fontSize:11}}>{x.paymentMethod}</td>
+              <td style={td}><span style={{fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:"bold",background:x.status==="Paid"?"#dcfce7":x.status==="Pending"?"#fef3c7":"#fff7ed",color:x.status==="Paid"?"#15803d":x.status==="Pending"?"#b45309":"#7c3aed"}}>{x.status}</span></td>
+              <td style={{...td,fontSize:11}}>{x.recordedBy}</td>
+              <td style={td}><button onClick={()=>setPayments(p=>p.filter(y=>y.id!==x.id))} style={{color:"#b91c1c",background:"none",border:"none",cursor:"pointer",fontSize:12}}>🗑️</button></td>
+            </tr>):<tr><td colSpan={10} style={{padding:30,textAlign:"center",color:"#94a3b8"}}>No supplier payments yet.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// PAYMENT REPORTS (Finance)
+// ══════════════════════════════════════════════════════════
+function PaymentReportsPage({ fees, students, user }) {
+  const F = getAppFont();
+  const [filterCls, setFilterCls] = useState("All");
+  const [filterTerm, setFilterTerm] = useState("All");
+  const [filterYear, setFilterYear] = useState(String(new Date().getFullYear()));
+  const YEARS = getYears().slice(-5);
+
+  const filtered = fees.filter(f => {
+    const s = students.find(x=>x.id===f.studentId);
+    return (filterCls==="All"||s?.class===filterCls) &&
+           (filterTerm==="All"||f.term===filterTerm) &&
+           (!filterYear||f.year===filterYear);
+  });
+
+  const totalBilled = filtered.reduce((a,f)=>a+(f.amount||0),0);
+  const totalPaid = filtered.reduce((a,f)=>a+(f.paid||0),0);
+  const totalBalance = totalBilled - totalPaid;
+  const collectionRate = totalBilled>0?Math.round((totalPaid/totalBilled)*100):0;
+
+  const classBreakdown = ALL_CLASSES.map(cls => {
+    const clsFees = fees.filter(f=>students.find(s=>s.id===f.studentId&&s.class===cls));
+    const billed = clsFees.reduce((a,f)=>a+(f.amount||0),0);
+    const paid = clsFees.reduce((a,f)=>a+(f.paid||0),0);
+    return { cls, billed, paid, balance:billed-paid, rate:billed>0?Math.round((paid/billed)*100):0 };
+  }).filter(x=>x.billed>0);
+
+  const th={textAlign:"left",padding:"9px 12px",fontWeight:"bold",fontSize:11,color:"#7c3aed",background:"#f5f3ff"};
+  const td={padding:"9px 12px",fontSize:12,borderTop:"1px solid #f1f5f9"};
+
+  return (
+    <div style={{padding:24}}>
+      <PageH title="📊 Payment Reports" sub="Fee collection analysis and financial summaries"/>
+      <Card style={{marginBottom:16}}>
+        <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
+          <Sel label="CLASS" value={filterCls} onChange={setFilterCls} options={["All",...ALL_CLASSES]}/>
+          <Sel label="TERM" value={filterTerm} onChange={setFilterTerm} options={["All",...TERMS]}/>
+          <Sel label="YEAR" value={filterYear} onChange={setFilterYear} options={["All",...YEARS]} labels={["All",...YEARS]}/>
+        </div>
+      </Card>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12,marginBottom:16}}>
+        <Stat icon="💳" label="Total Billed" value={`KES ${totalBilled.toLocaleString()}`} color="#3b0764"/>
+        <Stat icon="✅" label="Total Paid" value={`KES ${totalPaid.toLocaleString()}`} color="#15803d"/>
+        <Stat icon="⚠️" label="Outstanding" value={`KES ${totalBalance.toLocaleString()}`} color="#b91c1c"/>
+        <Stat icon="📈" label="Collection Rate" value={`${collectionRate}%`} color={collectionRate>=80?"#15803d":collectionRate>=50?"#b45309":"#b91c1c"}/>
+      </div>
+      <Card>
+        <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>📚 Collection by Class</div>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse"}}>
+            <thead><tr>{["Class","Billed","Paid","Balance","Rate"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
+            <tbody>{classBreakdown.map((c,i)=><tr key={c.cls} style={{background:i%2===0?"white":"#fafafa"}}>
+              <td style={{...td,fontWeight:"bold"}}>{c.cls}</td>
+              <td style={td}>KES {c.billed.toLocaleString()}</td>
+              <td style={{...td,color:"#15803d",fontWeight:"bold"}}>KES {c.paid.toLocaleString()}</td>
+              <td style={{...td,color:c.balance>0?"#b91c1c":"#15803d"}}>KES {c.balance.toLocaleString()}</td>
+              <td style={td}><div style={{display:"flex",alignItems:"center",gap:8}}>
+                <div style={{flex:1,background:"#f1f5f9",borderRadius:99,height:6,overflow:"hidden",minWidth:60}}>
+                  <div style={{width:`${c.rate}%`,height:"100%",background:c.rate>=80?"#15803d":c.rate>=50?"#b45309":"#b91c1c",borderRadius:99}}/>
+                </div>
+                <span style={{fontSize:11,fontWeight:"bold",color:c.rate>=80?"#15803d":c.rate>=50?"#b45309":"#b91c1c",minWidth:35}}>{c.rate}%</span>
+              </div></td>
+            </tr>)}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// ACCOUNTING REPORTS
+// ══════════════════════════════════════════════════════════
+function AccountingReportsPage({ fees, students, user }) {
+  const F = getAppFont();
+  const [year, setYear] = useState(String(new Date().getFullYear()));
+  const YEARS = getYears().slice(-5);
+  const [income, setIncome] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [supplierPayments, setSupplierPayments] = useState([]);
+
+  useEffect(()=>{
+    load("tnks_income").then(d=>{if(d)setIncome(d);});
+    load("tnks_expenses").then(d=>{if(d)setExpenses(d);});
+    load("tnks_supplier_payments").then(d=>{if(d)setSupplierPayments(d);});
+  },[]);
+
+  const feeIncome = fees.reduce((a,f)=>a+(f.paid||0),0);
+  const otherIncome = income.filter(x=>(!year||x.date?.startsWith(year))).reduce((a,x)=>a+(x.amount||0),0);
+  const totalExpenses = expenses.filter(x=>(!year||x.date?.startsWith(year))).reduce((a,x)=>a+(x.amount||0),0);
+  const totalSupplier = supplierPayments.filter(x=>x.status==="Paid"&&(!year||x.paymentDate?.startsWith(year))).reduce((a,x)=>a+(x.amount||0),0);
+  const totalIncome = feeIncome + otherIncome;
+  const totalOutgoings = totalExpenses + totalSupplier;
+  const netPosition = totalIncome - totalOutgoings;
+
+  return (
+    <div style={{padding:24}}>
+      <PageH title="📒 Accounting Reports" sub="Overview of income, expenses and financial position"/>
+      <Card style={{marginBottom:16}}>
+        <Sel label="FINANCIAL YEAR" value={year} onChange={setYear} options={YEARS}/>
+      </Card>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,marginBottom:16}}>
+        <Stat icon="📈" label="Total Income" value={`KES ${totalIncome.toLocaleString()}`} color="#15803d"/>
+        <Stat icon="📉" label="Total Outgoings" value={`KES ${totalOutgoings.toLocaleString()}`} color="#b91c1c"/>
+        <Stat icon="🏦" label="Net Position" value={`KES ${netPosition.toLocaleString()}`} color={netPosition>=0?"#15803d":"#b91c1c"}/>
+        <Stat icon="💳" label="Fee Collection" value={`KES ${feeIncome.toLocaleString()}`} color="#7c3aed"/>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+        <Card>
+          <div style={{fontWeight:"bold",color:"#15803d",marginBottom:14,fontSize:14}}>📈 Income Breakdown</div>
+          <div style={{display:"grid",gap:10}}>
+            {[["💳 School Fees Collected",feeIncome,"#15803d"],["💰 Other Income",otherIncome,"#7c3aed"],["📊 Total Income",totalIncome,"#3b0764"]].map(([l,v,c])=>
+              <div key={l} style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#f8fafc",borderRadius:8,padding:"10px 14px"}}>
+                <span style={{fontSize:13,color:"#374151"}}>{l}</span>
+                <span style={{fontWeight:"bold",color:c,fontSize:13}}>KES {(v||0).toLocaleString()}</span>
+              </div>
+            )}
+          </div>
+        </Card>
+        <Card>
+          <div style={{fontWeight:"bold",color:"#b91c1c",marginBottom:14,fontSize:14}}>📉 Expenditure Breakdown</div>
+          <div style={{display:"grid",gap:10}}>
+            {[["🏪 Supplier Payments",totalSupplier,"#b91c1c"],["📦 General Expenses",totalExpenses,"#b45309"],["📊 Total Outgoings",totalOutgoings,"#3b0764"]].map(([l,v,c])=>
+              <div key={l} style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#f8fafc",borderRadius:8,padding:"10px 14px"}}>
+                <span style={{fontSize:13,color:"#374151"}}>{l}</span>
+                <span style={{fontWeight:"bold",color:c,fontSize:13}}>KES {(v||0).toLocaleString()}</span>
+              </div>
+            )}
+          </div>
+        </Card>
+      </div>
+      <Card style={{marginTop:16,background:netPosition>=0?"linear-gradient(135deg,#f0fdf4,#dcfce7)":"linear-gradient(135deg,#fef2f2,#fee2e2)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div>
+            <div style={{fontSize:13,color:"#64748b"}}>NET FINANCIAL POSITION — {year}</div>
+            <div style={{fontSize:24,fontWeight:"bold",color:netPosition>=0?"#15803d":"#b91c1c",marginTop:4}}>
+              {netPosition>=0?"Surplus":"Deficit"}: KES {Math.abs(netPosition).toLocaleString()}
+            </div>
+          </div>
+          <div style={{fontSize:48}}>{netPosition>=0?"📈":"📉"}</div>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// PAYROLL DASHBOARD
+// ══════════════════════════════════════════════════════════
+function PayrollDashboard({ staff, user, setView }) {
+  const F = getAppFont();
+  const [records, setRecords] = useState([]);
+  useEffect(()=>{ load("tnks_payroll").then(d=>{if(d)setRecords(d);}); },[]);
+  const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const currentMonth=MONTHS[new Date().getMonth()];
+  const currentYear=String(new Date().getFullYear());
+  const thisMonth=records.filter(r=>r.month===currentMonth&&r.year===currentYear);
+  const totalGross=thisMonth.reduce((a,r)=>a+(parseFloat(r.grossSalary)||0),0);
+  const totalNet=thisMonth.reduce((a,r)=>a+(parseFloat(r.netPay)||0),0);
+  const totalDeductions=thisMonth.reduce((a,r)=>a+(parseFloat(r.totalDeductions)||0),0);
+  const activeStaff=(staff||[]).filter(s=>s.status!=="former").length;
+  const processed=thisMonth.length;
+  const pending=activeStaff-processed;
+  return (
+    <div style={{padding:24}}>
+      <PageH title="💼 Payroll Dashboard" sub={`Current payroll overview — ${currentMonth} ${currentYear}`}/>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,marginBottom:20}}>
+        <Stat icon="👥" label="Active Staff" value={activeStaff} color="#3b0764"/>
+        <Stat icon="✅" label="Processed" value={processed} color="#15803d"/>
+        <Stat icon="⏳" label="Pending" value={pending} color={pending>0?"#b45309":"#15803d"}/>
+        <Stat icon="💰" label="Total Gross" value={`KES ${totalGross.toLocaleString()}`} color="#7c3aed"/>
+        <Stat icon="📉" label="Total Deductions" value={`KES ${totalDeductions.toLocaleString()}`} color="#b91c1c"/>
+        <Stat icon="✅" label="Total Net Pay" value={`KES ${totalNet.toLocaleString()}`} color="#15803d"/>
+      </div>
+      {pending>0&&<div style={{background:"#fef3c7",border:"1px solid #fde68a",borderRadius:10,padding:"12px 16px",marginBottom:16,fontSize:13,color:"#b45309",fontWeight:"bold"}}>
+        ⚠️ {pending} staff member(s) have not been processed for {currentMonth} {currentYear}. Go to Generate Payslips to process.
+      </div>}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+        <Card>
+          <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>📊 {currentMonth} Payroll Summary</div>
+          {thisMonth.length?<div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {thisMonth.map(r=>(
+              <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#f8fafc",borderRadius:8,padding:"10px 14px"}}>
+                <div>
+                  <div style={{fontWeight:"bold",fontSize:13,color:"#3b0764"}}>{r.staffName}</div>
+                  <div style={{fontSize:11,color:"#64748b"}}>Gross: KES {Number(r.grossSalary).toLocaleString()}</div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontWeight:"bold",color:"#15803d",fontSize:13}}>KES {Number(r.netPay).toLocaleString()}</div>
+                  <div style={{fontSize:10,color:"#94a3b8"}}>Net Pay</div>
+                </div>
+              </div>
+            ))}
+          </div>:<div style={{textAlign:"center",padding:"30px 0",color:"#94a3b8",fontSize:13}}>
+            <div style={{fontSize:32,marginBottom:8}}>💼</div>
+            No payroll processed for {currentMonth} {currentYear} yet.
+          </div>}
+        </Card>
+        <Card>
+          <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>⚡ Quick Actions</div>
+          <div style={{display:"grid",gap:10}}>
+            {[["generate","💾 Generate Payslips","Process staff payroll for this month","#3b0764"],["payslips","📋 View Payslips","View and print processed payslips","#7c3aed"],["payroll_allowances","💰 Allowances","Manage allowance presets","#15803d"],["payroll_deductions","📉 Deductions","SACCO and other deductions","#b91c1c"],["payroll_reports","📊 Reports","Monthly payroll reports","#0e7490"],["payroll_settings","⚙️ Settings","Payroll period settings","#b45309"]].map(([v,l,d,c])=>(
+              <button key={v} onClick={()=>setView(v)} style={{background:"#f8fafc",border:`1px solid ${c}22`,borderRadius:10,padding:"10px 14px",cursor:"pointer",fontFamily:F,textAlign:"left",display:"flex",alignItems:"center",gap:10}}>
+                <div>
+                  <div style={{fontWeight:"bold",color:c,fontSize:13}}>{l}</div>
+                  <div style={{fontSize:11,color:"#64748b"}}>{d}</div>
+                </div>
+                <span style={{marginLeft:"auto",color:c}}>→</span>
+              </button>
+            ))}
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// PAYROLL ALLOWANCES
+// ══════════════════════════════════════════════════════════
+function PayrollAllowancesPage({ user }) {
+  const F = getAppFont();
+  const blank = { name:"", type:"Fixed", amount:"", taxable:false, notes:"" };
+  const [allowances, setAllowances] = useState([{ id:"1", name:"House Allowance", type:"Fixed", amount:5000, taxable:false, notes:"Standard house allowance" },{ id:"2", name:"Transport Allowance", type:"Fixed", amount:3000, taxable:false, notes:"Monthly transport" },{ id:"3", name:"Medical Allowance", type:"Fixed", amount:2000, taxable:false, notes:"Medical allowance" }]);
+  const [form, setForm] = useState(blank);
+  const [msg, setMsg] = useState({t:"",ok:true});
+  useEffect(()=>{ load("tnks_allowances").then(d=>{if(d&&d.length>0)setAllowances(d);}); },[]);
+  useEffect(()=>{ save("tnks_allowances",allowances); },[allowances]);
+  const flash=(t,ok=true)=>{setMsg({t,ok});setTimeout(()=>setMsg({t:"",ok:true}),2500);};
+  function doAdd(){
+    if(!form.name||!form.amount) return flash("Name and amount required.",false);
+    setAllowances(p=>[...p,{...form,id:Date.now().toString(),amount:parseFloat(form.amount)}]);
+    flash("✅ Allowance added!"); setForm(blank);
+  }
+  const th={textAlign:"left",padding:"9px 12px",fontWeight:"bold",fontSize:11,color:"#7c3aed",background:"#f5f3ff"};
+  const td={padding:"9px 12px",fontSize:12,borderTop:"1px solid #f1f5f9"};
+  return (
+    <div style={{padding:24}}>
+      <PageH title="💰 Allowances" sub="Preset allowance types for payroll processing"/>
+      <Card style={{marginBottom:16}}>
+        <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>Add Allowance Type</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}>
+          <Inp label="ALLOWANCE NAME *" value={form.name} onChange={v=>setForm(p=>({...p,name:v}))} placeholder="e.g. Teaching Allowance"/>
+          <Sel label="TYPE" value={form.type} onChange={v=>setForm(p=>({...p,type:v}))} options={["Fixed","Percentage of Basic"]}/>
+          <Inp label="AMOUNT / RATE *" value={form.amount} onChange={v=>setForm(p=>({...p,amount:v}))} type="number" placeholder="e.g. 5000"/>
+          <div style={{display:"flex",alignItems:"center",gap:8,paddingTop:22}}>
+            <input type="checkbox" id="taxable" checked={form.taxable} onChange={e=>setForm(p=>({...p,taxable:e.target.checked}))} style={{width:16,height:16}}/>
+            <label htmlFor="taxable" style={{fontSize:12,color:"#374151"}}>Taxable</label>
+          </div>
+        </div>
+        {msg.t&&<div style={{marginTop:10,fontSize:13,fontWeight:"bold",color:msg.ok?"#15803d":"#b91c1c"}}>{msg.t}</div>}
+        <div style={{marginTop:14}}><Btn onClick={doAdd} v="primary">➕ Add Allowance</Btn></div>
+      </Card>
+      <Card style={{padding:0}}>
+        <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <thead><tr>{["#","Name","Type","Amount/Rate","Taxable","Action"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
+          <tbody>{allowances.map((a,i)=><tr key={a.id} style={{background:i%2===0?"white":"#fafafa"}}>
+            <td style={{...td,color:"#94a3b8"}}>{i+1}</td>
+            <td style={{...td,fontWeight:"bold"}}>{a.name}</td>
+            <td style={td}>{a.type}</td>
+            <td style={{...td,color:"#15803d",fontWeight:"bold"}}>{a.type==="Fixed"?`KES ${Number(a.amount).toLocaleString()}`:`${a.amount}%`}</td>
+            <td style={td}>{a.taxable?"✅ Yes":"—"}</td>
+            <td style={td}><button onClick={()=>setAllowances(p=>p.filter(x=>x.id!==a.id))} style={{color:"#b91c1c",background:"none",border:"none",cursor:"pointer",fontSize:12}}>Remove</button></td>
+          </tr>)}
+          </tbody>
+        </table>
+      </Card>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// PAYROLL DEDUCTIONS
+// ══════════════════════════════════════════════════════════
+function PayrollDeductionsPage({ user }) {
+  const F = getAppFont();
+  const blank = { name:"", type:"Fixed", amount:"", mandatory:false, notes:"" };
+  const [deductions, setDeductions] = useState([{ id:"1", name:"SACCO Loan", type:"Fixed", amount:2000, mandatory:false, notes:"Monthly SACCO deduction" },{ id:"2", name:"Welfare Contribution", type:"Fixed", amount:500, mandatory:true, notes:"Staff welfare" }]);
+  const [form, setForm] = useState(blank);
+  const [msg, setMsg] = useState({t:"",ok:true});
+  useEffect(()=>{ load("tnks_payroll_deductions").then(d=>{if(d&&d.length>0)setDeductions(d);}); },[]);
+  useEffect(()=>{ save("tnks_payroll_deductions",deductions); },[deductions]);
+  const flash=(t,ok=true)=>{setMsg({t,ok});setTimeout(()=>setMsg({t:"",ok:true}),2500);};
+  function doAdd(){
+    if(!form.name||!form.amount) return flash("Name and amount required.",false);
+    setDeductions(p=>[...p,{...form,id:Date.now().toString(),amount:parseFloat(form.amount)}]);
+    flash("✅ Deduction type added!"); setForm(blank);
+  }
+  const th={textAlign:"left",padding:"9px 12px",fontWeight:"bold",fontSize:11,color:"#7c3aed",background:"#f5f3ff"};
+  const td={padding:"9px 12px",fontSize:12,borderTop:"1px solid #f1f5f9"};
+  return (
+    <div style={{padding:24}}>
+      <PageH title="📉 Deductions" sub="Preset deduction types: SACCO, welfare, etc."/>
+      <Card style={{marginBottom:16}}>
+        <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>Add Deduction Type</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}>
+          <Inp label="DEDUCTION NAME *" value={form.name} onChange={v=>setForm(p=>({...p,name:v}))} placeholder="e.g. SACCO Loan"/>
+          <Sel label="TYPE" value={form.type} onChange={v=>setForm(p=>({...p,type:v}))} options={["Fixed","Percentage of Basic"]}/>
+          <Inp label="AMOUNT / RATE *" value={form.amount} onChange={v=>setForm(p=>({...p,amount:v}))} type="number" placeholder="e.g. 2000"/>
+          <div style={{display:"flex",alignItems:"center",gap:8,paddingTop:22}}>
+            <input type="checkbox" id="mandatory" checked={form.mandatory} onChange={e=>setForm(p=>({...p,mandatory:e.target.checked}))} style={{width:16,height:16}}/>
+            <label htmlFor="mandatory" style={{fontSize:12,color:"#374151"}}>Mandatory for all staff</label>
+          </div>
+        </div>
+        {msg.t&&<div style={{marginTop:10,fontSize:13,fontWeight:"bold",color:msg.ok?"#15803d":"#b91c1c"}}>{msg.t}</div>}
+        <div style={{marginTop:14}}><Btn onClick={doAdd} v="primary">➕ Add Deduction</Btn></div>
+      </Card>
+      <Card style={{padding:0}}>
+        <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <thead><tr>{["#","Name","Type","Amount/Rate","Mandatory","Action"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
+          <tbody>{deductions.map((d,i)=><tr key={d.id} style={{background:i%2===0?"white":"#fafafa"}}>
+            <td style={{...td,color:"#94a3b8"}}>{i+1}</td>
+            <td style={{...td,fontWeight:"bold"}}>{d.name}</td>
+            <td style={td}>{d.type}</td>
+            <td style={{...td,color:"#b91c1c",fontWeight:"bold"}}>{d.type==="Fixed"?`KES ${Number(d.amount).toLocaleString()}`:`${d.amount}%`}</td>
+            <td style={td}>{d.mandatory?"⚠️ Yes":"—"}</td>
+            <td style={td}><button onClick={()=>setDeductions(p=>p.filter(x=>x.id!==d.id))} style={{color:"#b91c1c",background:"none",border:"none",cursor:"pointer",fontSize:12}}>Remove</button></td>
+          </tr>)}
+          </tbody>
+        </table>
+      </Card>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// PAYROLL RELIEFS
+// ══════════════════════════════════════════════════════════
+function PayrollReliefsPage({ user }) {
+  const F = getAppFont();
+  const [reliefs] = useState([
+    {name:"Personal Relief",amount:2400,notes:"KRA standard monthly personal relief — automatically applied"},
+    {name:"Insurance Relief",amount:0,type:"15% of premiums (max KES 5,000/month)",notes:"Enter actual insurance premium for each staff member when processing payslips"},
+    {name:"Disability Exemption",amount:150000,notes:"Annual exemption for persons with disability — KRA requirement"},
+  ]);
+  return (
+    <div style={{padding:24}}>
+      <PageH title="🪙 Tax Reliefs" sub="Personal relief, insurance relief and exemptions applied in payroll"/>
+      <div style={{display:"grid",gap:14}}>
+        {reliefs.map((r,i)=>(
+          <Card key={i} style={{borderLeft:"4px solid #15803d"}}>
+            <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+              <div>
+                <div style={{fontWeight:"bold",color:"#3b0764",fontSize:14}}>{r.name}</div>
+                <div style={{fontSize:12,color:"#64748b",marginTop:4}}>{r.notes}</div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontWeight:"bold",color:"#15803d",fontSize:14}}>{r.amount?`KES ${r.amount.toLocaleString()}/month`:r.type}</div>
+                <div style={{fontSize:10,color:"#94a3b8",marginTop:2}}>Applied automatically</div>
+              </div>
+            </div>
+          </Card>
+        ))}
+        <Card style={{background:"#fffbeb",border:"1px solid #fde68a"}}>
+          <div style={{fontSize:12,color:"#b45309",fontWeight:"bold"}}>📌 Note on Reliefs</div>
+          <div style={{fontSize:12,color:"#374151",marginTop:6,lineHeight:1.6}}>
+            Personal relief of KES 2,400/month is automatically deducted from PAYE in all payslip calculations. Insurance relief requires the actual premium amount per staff member. Contact KRA or a certified accountant for jurisdiction-specific advice.
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// PAYROLL SETTINGS
+// ══════════════════════════════════════════════════════════
+function PayrollSettingsPage({ user }) {
+  const F = getAppFont();
+  const [settings, setSettings] = useState({ payPeriod:"Monthly", payDay:"25", processingDay:"20", currency:"KES", taxYear:"January-December", kraPin:"", nssfNo:"", shifNo:"" });
+  const [msg, setMsg] = useState({t:"",ok:true});
+  useEffect(()=>{ load("tnks_payroll_settings").then(d=>{if(d)setSettings(p=>({...p,...d}));}); },[]);
+  const flash=(t,ok=true)=>{setMsg({t,ok});setTimeout(()=>setMsg({t:"",ok:true}),2500);};
+  function doSave(){ save("tnks_payroll_settings",settings); flash("✅ Payroll settings saved!"); }
+  const upd=(k,v)=>setSettings(p=>({...p,[k]:v}));
+  return (
+    <div style={{padding:24}}>
+      <PageH title="⚙️ Payroll Settings" sub="Configure payroll period, compliance numbers and defaults"/>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+        <Card>
+          <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>📅 Pay Period Settings</div>
+          <div style={{display:"grid",gap:12}}>
+            <Sel label="PAY PERIOD" value={settings.payPeriod} onChange={v=>upd("payPeriod",v)} options={["Monthly","Bi-Weekly","Weekly"]}/>
+            <Inp label="PAY DAY (day of month)" value={settings.payDay} onChange={v=>upd("payDay",v)} placeholder="e.g. 25"/>
+            <Inp label="PROCESSING DEADLINE (day)" value={settings.processingDay} onChange={v=>upd("processingDay",v)} placeholder="e.g. 20"/>
+            <Sel label="TAX YEAR" value={settings.taxYear} onChange={v=>upd("taxYear",v)} options={["January-December","July-June"]}/>
+          </div>
+        </Card>
+        <Card>
+          <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>🏛️ Compliance Numbers</div>
+          <div style={{display:"grid",gap:12}}>
+            <Inp label="KRA PIN (School)" value={settings.kraPin} onChange={v=>upd("kraPin",v)} placeholder="e.g. P051234567X"/>
+            <Inp label="NSSF EMPLOYER NO." value={settings.nssfNo} onChange={v=>upd("nssfNo",v)} placeholder="Employer NSSF number"/>
+            <Inp label="SHIF EMPLOYER NO." value={settings.shifNo} onChange={v=>upd("shifNo",v)} placeholder="Employer SHIF number"/>
+          </div>
+        </Card>
+      </div>
+      {msg.t&&<div style={{marginTop:12,fontSize:13,fontWeight:"bold",color:msg.ok?"#15803d":"#b91c1c",background:msg.ok?"#f0fdf4":"#fef2f2",padding:"10px 16px",borderRadius:8}}>{msg.t}</div>}
+      <div style={{marginTop:16}}><Btn onClick={doSave} v="primary">💾 Save Settings</Btn></div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// STUDENT ROUTES (Transport)
+// ══════════════════════════════════════════════════════════
+function StudentRoutesPage({ students, setStudents, user }) {
+  const F = getAppFont();
+  const ROUTES = ["Route A","Route B","Route C"];
+  const [selRoute, setSelRoute] = useState("Route A");
+  const [search, setSearch] = useState("");
+  const [filterCls, setFilterCls] = useState("All");
+
+  const routeStudents = students.filter(s => s.busRoute===selRoute);
+  const unassigned = students.filter(s => !s.busRoute && s.status!=="transferred");
+
+  function assignStudent(studentId, route) {
+    setStudents(p => p.map(s => s.id===studentId ? {...s, busRoute:route} : s));
+  }
+  function removeFromRoute(studentId) {
+    setStudents(p => p.map(s => s.id===studentId ? {...s, busRoute:undefined} : s));
+  }
+
+  const filtered = unassigned.filter(s =>
+    (filterCls==="All"||s.class===filterCls) &&
+    (!search||s.name.toLowerCase().includes(search.toLowerCase()))
+  );
+
+  const th={textAlign:"left",padding:"9px 12px",fontWeight:"bold",fontSize:11,color:"#7c3aed",background:"#f5f3ff"};
+  const td={padding:"9px 12px",fontSize:12,borderTop:"1px solid #f1f5f9"};
+
+  return (
+    <div style={{padding:24}}>
+      <PageH title="🚌 Student Routes" sub="Assign individual students to specific bus routes"/>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12,marginBottom:16}}>
+        {ROUTES.map(r => {
+          const count = students.filter(s=>s.busRoute===r).length;
+          return <Stat key={r} icon="🚌" label={r} value={`${count} students`} color="#7c3aed"/>;
+        })}
+        <Stat icon="❓" label="Unassigned" value={unassigned.length} color="#b45309"/>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,alignItems:"start"}}>
+        {/* Route roster */}
+        <Card>
+          <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:12,fontSize:14}}>📋 Students on Route</div>
+          <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
+            {ROUTES.map(r=><button key={r} onClick={()=>setSelRoute(r)} style={{padding:"5px 14px",border:"none",borderRadius:20,cursor:"pointer",fontFamily:F,fontSize:12,fontWeight:"bold",background:selRoute===r?"#3b0764":"#f1f5f9",color:selRoute===r?"white":"#374151"}}>{r} ({students.filter(s=>s.busRoute===r).length})</button>)}
+          </div>
+          {routeStudents.length ? <table style={{width:"100%",borderCollapse:"collapse"}}>
+            <thead><tr>{["#","Name","Class","Action"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
+            <tbody>{routeStudents.sort((a,b)=>a.name.localeCompare(b.name)).map((s,i)=><tr key={s.id} style={{background:i%2===0?"white":"#fafafa"}}>
+              <td style={{...td,color:"#94a3b8"}}>{i+1}</td>
+              <td style={{...td,fontWeight:"bold"}}>{s.name}</td>
+              <td style={td}>{s.class}</td>
+              <td style={td}>{user.role==="admin"&&<button onClick={()=>removeFromRoute(s.id)} style={{color:"#b91c1c",background:"none",border:"none",cursor:"pointer",fontSize:12}}>Remove</button>}</td>
+            </tr>)}</tbody>
+          </table> : <Empty icon="🚌" text={`No students on ${selRoute} yet.`}/>}
+        </Card>
+        {/* Assign */}
+        {user.role==="admin" && <Card>
+          <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:12,fontSize:14}}>➕ Assign to {selRoute}</div>
+          <div style={{display:"flex",gap:10,marginBottom:12,flexWrap:"wrap"}}>
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search students..." style={{flex:1,minWidth:150,border:"1.5px solid #e2e8f0",borderRadius:8,padding:"7px 10px",fontSize:12,fontFamily:F,outline:"none"}}/>
+            <Sel value={filterCls} onChange={setFilterCls} options={["All",...ALL_CLASSES]}/>
+          </div>
+          {filtered.length ? <div style={{maxHeight:380,overflowY:"auto",display:"flex",flexDirection:"column",gap:6}}>
+            {filtered.map(s=>(
+              <div key={s.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#f8fafc",borderRadius:8,padding:"8px 12px"}}>
+                <div>
+                  <div style={{fontWeight:"bold",fontSize:13,color:"#3b0764"}}>{s.name}</div>
+                  <div style={{fontSize:11,color:"#64748b"}}>{s.class}</div>
+                </div>
+                <div style={{display:"flex",gap:4"}}>
+                  {ROUTES.map(r=><button key={r} onClick={()=>assignStudent(s.id,r)} style={{padding:"4px 10px",border:"none",borderRadius:6,cursor:"pointer",fontFamily:F,fontSize:11,fontWeight:"bold",background:r===selRoute?"#3b0764":"#f1f5f9",color:r===selRoute?"white":"#374151"}}>{r}</button>)}
+                </div>
+              </div>
+            ))}
+          </div> : <Empty icon="👥" text="No unassigned students match the filter."/>}
+        </Card>}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// VEHICLES (Transport)
+// ══════════════════════════════════════════════════════════
+function VehiclesPage({ user }) {
+  const F = getAppFont();
+  const blank = { regNo:"", make:"", model:"", capacity:"", driver:"", driverPhone:"", status:"Active", lastService:"", nextService:"", notes:"" };
+  const [vehicles, setVehicles] = useState([]);
+  const [form, setForm] = useState(blank);
+  const [editId, setEditId] = useState(null);
+  const [tab, setTab] = useState("list");
+  const [msg, setMsg] = useState({t:"",ok:true});
+  useEffect(()=>{ load("tnks_vehicles").then(d=>{if(d)setVehicles(d);}); },[]);
+  useEffect(()=>{ save("tnks_vehicles",vehicles); },[vehicles]);
+  const flash=(t,ok=true)=>{setMsg({t,ok});setTimeout(()=>setMsg({t:"",ok:true}),2500);};
+  function doSave(){
+    if(!form.regNo||!form.make) return flash("Reg. no. and make required.",false);
+    const entry={...form,id:editId||Date.now().toString(),capacity:parseInt(form.capacity)||0};
+    if(editId){setVehicles(p=>p.map(x=>x.id===editId?entry:x));}else{setVehicles(p=>[...p,entry]);}
+    flash(editId?"✅ Vehicle updated!":"✅ Vehicle added!"); setForm(blank); setEditId(null); setTab("list");
+  }
+  const th={textAlign:"left",padding:"9px 12px",fontWeight:"bold",fontSize:11,color:"#7c3aed",background:"#f5f3ff"};
+  const td={padding:"9px 12px",fontSize:12,borderTop:"1px solid #f1f5f9"};
+  return (
+    <div style={{padding:24}}>
+      <PageH title="🚐 Vehicles" sub="Vehicle registry with registration, capacity and driver details">
+        <div style={{display:"flex",gap:6}}>
+          {[["list","📋 Vehicles"],["add","➕ Add Vehicle"]].map(([t,l])=>
+            <Btn key={t} onClick={()=>{setTab(t);if(t==="add"&&!editId)setForm(blank);}} v={tab===t?"primary":"ghost"} style={{fontSize:12}}>{l}</Btn>
+          )}
+        </div>
+      </PageH>
+      {tab==="add"&&<Card style={{marginBottom:16}}>
+        <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>{editId?"Edit Vehicle":"Add New Vehicle"}</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}>
+          <Inp label="REG. NO. *" value={form.regNo} onChange={v=>setForm(p=>({...p,regNo:v}))} placeholder="e.g. KCZ 123A"/>
+          <Inp label="MAKE *" value={form.make} onChange={v=>setForm(p=>({...p,make:v}))} placeholder="e.g. Mitsubishi"/>
+          <Inp label="MODEL" value={form.model} onChange={v=>setForm(p=>({...p,model:v}))} placeholder="e.g. Rosa"/>
+          <Inp label="CAPACITY (seats)" value={form.capacity} onChange={v=>setForm(p=>({...p,capacity:v}))} type="number" placeholder="40"/>
+          <Inp label="DRIVER NAME" value={form.driver} onChange={v=>setForm(p=>({...p,driver:v}))} placeholder="Driver's name"/>
+          <Inp label="DRIVER PHONE" value={form.driverPhone} onChange={v=>setForm(p=>({...p,driverPhone:v}))} placeholder="+254 7..."/>
+          <Sel label="STATUS" value={form.status} onChange={v=>setForm(p=>({...p,status:v}))} options={["Active","In Service","Decommissioned"]}/>
+          <Inp label="LAST SERVICE DATE" value={form.lastService} onChange={v=>setForm(p=>({...p,lastService:v}))} type="date"/>
+          <Inp label="NEXT SERVICE DATE" value={form.nextService} onChange={v=>setForm(p=>({...p,nextService:v}))} type="date"/>
+        </div>
+        {msg.t&&<div style={{marginTop:10,fontSize:13,fontWeight:"bold",color:msg.ok?"#15803d":"#b91c1c"}}>{msg.t}</div>}
+        <div style={{marginTop:14,display:"flex",gap:8}}>
+          <Btn onClick={doSave} v="primary">{editId?"Update Vehicle":"Add Vehicle"}</Btn>
+          {editId&&<Btn onClick={()=>{setEditId(null);setForm(blank);setTab("list");}} v="ghost">Cancel</Btn>}
+        </div>
+      </Card>}
+      {tab==="list"&&<Card style={{padding:0}}>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",minWidth:700}}>
+            <thead><tr>{["#","Reg. No.","Make/Model","Capacity","Driver","Phone","Status","Next Service","Action"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
+            <tbody>{vehicles.length?vehicles.map((v,i)=><tr key={v.id} style={{background:i%2===0?"white":"#fafafa"}}>
+              <td style={{...td,color:"#94a3b8"}}>{i+1}</td>
+              <td style={{...td,fontFamily:"monospace",fontWeight:"bold",fontSize:13}}>{v.regNo}</td>
+              <td style={td}>{v.make} {v.model}</td>
+              <td style={{...td,fontWeight:"bold"}}>{v.capacity} seats</td>
+              <td style={{...td,fontWeight:"bold"}}>{v.driver||"—"}</td>
+              <td style={td}>{v.driverPhone||"—"}</td>
+              <td style={td}><span style={{fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:"bold",background:v.status==="Active"?"#dcfce7":v.status==="In Service"?"#fef3c7":"#f1f5f9",color:v.status==="Active"?"#15803d":v.status==="In Service"?"#b45309":"#64748b"}}>{v.status}</span></td>
+              <td style={{...td,fontSize:11,color:v.nextService&&new Date(v.nextService)<new Date()?"#b91c1c":"#374151"}}>{v.nextService||"—"}</td>
+              <td style={td}><button onClick={()=>{setEditId(v.id);setForm({regNo:v.regNo,make:v.make,model:v.model||"",capacity:v.capacity,driver:v.driver||"",driverPhone:v.driverPhone||"",status:v.status,lastService:v.lastService||"",nextService:v.nextService||"",notes:v.notes||""});setTab("add");}} style={{color:"#7c3aed",background:"none",border:"none",cursor:"pointer",fontSize:12,marginRight:6}}>Edit</button><button onClick={()=>setVehicles(p=>p.filter(x=>x.id!==v.id))} style={{color:"#b91c1c",background:"none",border:"none",cursor:"pointer",fontSize:12}}>Del</button></td>
+            </tr>):<tr><td colSpan={9} style={{padding:30,textAlign:"center",color:"#94a3b8"}}>No vehicles registered yet.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </Card>}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// TRANSPORT REPORTS
+// ══════════════════════════════════════════════════════════
+function TransportReportsPage({ students, user }) {
+  const F = getAppFont();
+  const [busLogs, setBusLogs] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
+  useEffect(()=>{ load("tnks_bus_monitoring").then(d=>{if(d)setBusLogs(d);}); load("tnks_vehicles").then(d=>{if(d)setVehicles(d);}); },[]);
+  const ROUTES=["Route A","Route B","Route C"];
+  const routeBreakdown=ROUTES.map(r=>({route:r,students:students.filter(s=>s.busRoute===r).length}));
+  const totalTransport=students.filter(s=>s.busRoute).length;
+  return (
+    <div style={{padding:24}}>
+      <PageH title="📊 Transport Reports" sub="Student distribution, route capacity and movement logs"/>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12,marginBottom:16}}>
+        <Stat icon="🚌" label="Students on Transport" value={totalTransport} color="#7c3aed"/>
+        <Stat icon="🚐" label="Vehicles Registered" value={vehicles.length} color="#3b0764"/>
+        <Stat icon="📋" label="Movement Logs" value={busLogs.length} color="#15803d"/>
+        <Stat icon="❓" label="Unassigned Students" value={students.filter(s=>!s.busRoute&&s.status!=="transferred").length} color="#b45309"/>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+        <Card>
+          <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>🚌 Route Breakdown</div>
+          <div style={{display:"grid",gap:10}}>
+            {routeBreakdown.map(r=>(
+              <div key={r.route} style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#f8fafc",borderRadius:8,padding:"10px 14px"}}>
+                <div style={{fontWeight:"bold",color:"#3b0764"}}>{r.route}</div>
+                <div style={{fontWeight:"bold",color:"#7c3aed",fontSize:18}}>{r.students} <span style={{fontSize:12,fontWeight:"normal",color:"#94a3b8"}}>students</span></div>
+              </div>
+            ))}
+          </div>
+        </Card>
+        <Card>
+          <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>🚐 Vehicle Summary</div>
+          {vehicles.length?<div style={{display:"grid",gap:8}}>
+            {vehicles.map(v=><div key={v.id} style={{background:"#f8fafc",borderRadius:8,padding:"10px 14px"}}>
+              <div style={{fontWeight:"bold",color:"#3b0764"}}>{v.regNo} — {v.make} {v.model}</div>
+              <div style={{fontSize:11,color:"#64748b",marginTop:2}}>Driver: {v.driver||"—"} · Capacity: {v.capacity} · Status: {v.status}</div>
+            </div>)}
+          </div>:<Empty icon="🚐" text="No vehicles registered yet."/>}
+        </Card>
+      </div>
+      {busLogs.length>0&&<Card style={{marginTop:16}}>
+        <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>📋 Recent Bus Movements</div>
+        <div style={{display:"grid",gap:8}}>
+          {[...busLogs].reverse().slice(0,10).map(l=>(
+            <div key={l.id} style={{display:"flex",justifyContent:"space-between",background:"#f8fafc",borderRadius:8,padding:"10px 14px",flexWrap:"wrap",gap:6}}>
+              <div>
+                <div style={{fontWeight:"bold",fontSize:13,color:"#3b0764"}}>{l.route} → {l.destination}</div>
+                <div style={{fontSize:11,color:"#64748b"}}>{l.date} · {l.timeDeparted||"—"} → {l.timeArrived||"—"} · {l.reason||"—"}</div>
+              </div>
+              <div style={{fontSize:11,color:"#94a3b8"}}>{l.recordedBy}</div>
+            </div>
+          ))}
+        </div>
+      </Card>}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// SMS SETTINGS
+// ══════════════════════════════════════════════════════════
+function SMSSettingsPage({ user }) {
+  const F = getAppFont();
+  const [settings, setSettings] = useState({ provider:"Africa's Talking", apiKey:"", username:"", senderId:"TNKS", testPhone:"", enabled:false });
+  const [msg, setMsg] = useState({t:"",ok:true});
+  useEffect(()=>{ load("tnks_sms_settings").then(d=>{if(d)setSettings(p=>({...p,...d}));}); },[]);
+  const flash=(t,ok=true)=>{setMsg({t,ok});setTimeout(()=>setMsg({t:"",ok:true}),2500);};
+  function doSave(){ save("tnks_sms_settings",settings); flash("✅ SMS settings saved!"); }
+  const upd=(k,v)=>setSettings(p=>({...p,[k]:v}));
+  return (
+    <div style={{padding:24}}>
+      <PageH title="📱 SMS Settings" sub="Configure your SMS gateway provider and API keys"/>
+      <Card style={{marginBottom:16,background:"#fffbeb",border:"1px solid #fde68a"}}>
+        <div style={{fontSize:12,color:"#b45309",fontWeight:"bold"}}>⚠️ Security Note</div>
+        <div style={{fontSize:12,color:"#374151",marginTop:4}}>API keys are stored locally on your device. Never share them publicly. For production use, integrate with your backend server instead of storing keys in the browser.</div>
+      </Card>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+        <Card>
+          <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>⚙️ API Configuration</div>
+          <div style={{display:"grid",gap:12}}>
+            <Sel label="SMS PROVIDER" value={settings.provider} onChange={v=>upd("provider",v)} options={["Africa's Talking","Twilio","Vonage","Infobip","Custom"]}/>
+            <Inp label="API KEY" value={settings.apiKey} onChange={v=>upd("apiKey",v)} placeholder="Your API key" type="password"/>
+            <Inp label="USERNAME / ACCOUNT SID" value={settings.username} onChange={v=>upd("username",v)} placeholder="Provider username"/>
+            <Inp label="SENDER ID (max 11 chars)" value={settings.senderId} onChange={v=>upd("senderId",v.slice(0,11))} placeholder="e.g. TNKS"/>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <input type="checkbox" id="smsEnabled" checked={settings.enabled} onChange={e=>upd("enabled",e.target.checked)} style={{width:16,height:16}}/>
+              <label htmlFor="smsEnabled" style={{fontSize:13,fontWeight:"bold",color:"#374151"}}>Enable live SMS sending</label>
+            </div>
+          </div>
+        </Card>
+        <Card>
+          <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>🧪 Test Configuration</div>
+          <div style={{display:"grid",gap:12}}>
+            <Inp label="TEST PHONE NUMBER" value={settings.testPhone} onChange={v=>upd("testPhone",v)} placeholder="+254 7..."/>
+            <div style={{background:"#f5f3ff",border:"1px solid #ddd6fe",borderRadius:8,padding:"12px 14px",fontSize:12,color:"#7c3aed"}}>
+              <b>Currently:</b> {settings.enabled?"🟢 Live sending enabled":"🔴 Simulation mode (no actual SMS sent)"}
+            </div>
+            <div style={{fontSize:11,color:"#64748b"}}>Supported providers: Africa's Talking (recommended for Kenya), Twilio (international), and more.</div>
+          </div>
+        </Card>
+      </div>
+      {msg.t&&<div style={{marginTop:12,fontSize:13,fontWeight:"bold",color:msg.ok?"#15803d":"#b91c1c",background:msg.ok?"#f0fdf4":"#fef2f2",padding:"10px 16px",borderRadius:8}}>{msg.t}</div>}
+      <div style={{marginTop:16}}><Btn onClick={doSave} v="primary">💾 Save SMS Settings</Btn></div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// SEND SMS
+// ══════════════════════════════════════════════════════════
+function SendSMSPage({ students, user }) {
+  const F = getAppFont();
+  const [to, setTo] = useState("all");
+  const [filterCls, setFilterCls] = useState("All");
+  const [message, setMessage] = useState("");
+  const [log, setLog] = useState([]);
+  const [msg, setMsg] = useState({t:"",ok:true});
+  const [smsSettings, setSmsSettings] = useState(null);
+  useEffect(()=>{ load("tnks_sms_settings").then(d=>{if(d)setSmsSettings(d);}); load("tnks_sms_log").then(d=>{if(d)setLog(d);}); },[]);
+  useEffect(()=>{ save("tnks_sms_log",log); },[log]);
+  const flash=(t,ok=true)=>{setMsg({t,ok});setTimeout(()=>setMsg({t:"",ok:true}),2500);};
+  const recipients = students.filter(s=>(to==="all"||(to==="class"&&(filterCls==="All"||s.class===filterCls)))&&(s.parentPhone||s.email)&&s.status!=="transferred");
+  function doSend(){
+    if(!message.trim()) return flash("Message is required.",false);
+    const entry={id:Date.now().toString(),to,filterCls,message,recipients:recipients.length,sentBy:user.name,sentAt:new Date().toLocaleString("en-KE"),status:smsSettings?.enabled?"Sent":"Simulated"};
+    setLog(p=>[entry,...p]);
+    flash(`✅ ${smsSettings?.enabled?"SMS sent":"Simulated"} to ${recipients.length} recipients!`);
+    setMessage("");
+  }
+  const th={textAlign:"left",padding:"9px 12px",fontWeight:"bold",fontSize:11,color:"#7c3aed",background:"#f5f3ff"};
+  const td={padding:"9px 12px",fontSize:12,borderTop:"1px solid #f1f5f9"};
+  return (
+    <div style={{padding:24}}>
+      <PageH title="📱 Send SMS" sub="Send text messages directly to parents and staff"/>
+      {!smsSettings?.enabled&&<div style={{background:"#fef3c7",border:"1px solid #fde68a",borderRadius:10,padding:"12px 16px",marginBottom:16,fontSize:12,color:"#b45309",fontWeight:"bold"}}>
+        ⚠️ SMS is in simulation mode. Go to <b>Communication → SMS Settings</b> to configure your provider.
+      </div>}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,alignItems:"start"}}>
+        <Card>
+          <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>📋 Compose SMS</div>
+          <div style={{display:"grid",gap:12}}>
+            <Sel label="SEND TO" value={to} onChange={setTo} options={["all","class"]} labels={["All Parents","Specific Class"]}/>
+            {(to==="all"||to==="class")&&<Sel label="FILTER BY CLASS" value={filterCls} onChange={setFilterCls} options={["All",...ALL_CLASSES]}/>}
+            <div style={{background:"#f0fdf4",borderRadius:8,padding:"10px 14px",fontSize:12,color:"#15803d",fontWeight:"bold"}}>{recipients.length} recipients selected</div>
+            <Textarea label="MESSAGE" value={message} onChange={setMessage} placeholder="Type your SMS message here... (160 chars per SMS)" rows={5}/>
+            <div style={{fontSize:11,color:message.length>160?"#b91c1c":"#64748b",fontWeight:"bold"}}>
+              {message.length} characters {message.length>160?`(${Math.ceil(message.length/160)} SMS parts)`:""}
+            </div>
+          </div>
+          {msg.t&&<div style={{marginTop:10,fontSize:13,fontWeight:"bold",color:msg.ok?"#15803d":"#b91c1c"}}>{msg.t}</div>}
+          <div style={{marginTop:14}}><Btn onClick={doSend} v="primary">📱 Send SMS ({recipients.length})</Btn></div>
+        </Card>
+        <Card>
+          <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:12,fontSize:14}}>📋 SMS Log ({log.length})</div>
+          {log.length?<div style={{maxHeight:380,overflowY:"auto"}}>
+            {log.map(l=><div key={l.id} style={{background:"#f8fafc",borderRadius:8,padding:"10px 12px",marginBottom:8}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                <span style={{fontWeight:"bold",color:"#3b0764",fontSize:12}}>To: {l.to==="all"?"All":l.filterCls} ({l.recipients})</span>
+                <span style={{fontSize:10,padding:"2px 8px",borderRadius:20,background:l.status==="Sent"?"#dcfce7":"#fef3c7",color:l.status==="Sent"?"#15803d":"#b45309",fontWeight:"bold"}}>{l.status}</span>
+              </div>
+              <div style={{fontSize:12,color:"#374151",marginBottom:4}}>{l.message.slice(0,80)}{l.message.length>80?"...":""}</div>
+              <div style={{fontSize:10,color:"#94a3b8"}}>{l.sentAt} · {l.sentBy}</div>
+            </div>)}
+          </div>:<Empty icon="📱" text="No SMS sent yet."/>}
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// SMS HISTORY
+// ══════════════════════════════════════════════════════════
+function SMSHistoryPage({ user }) {
+  const F = getAppFont();
+  const [log, setLog] = useState([]);
+  const [search, setSearch] = useState("");
+  useEffect(()=>{ load("tnks_sms_log").then(d=>{if(d)setLog(d);}); },[]);
+  const filtered=log.filter(l=>!search||l.message.toLowerCase().includes(search.toLowerCase())||l.to?.toLowerCase().includes(search.toLowerCase()));
+  const th={textAlign:"left",padding:"9px 12px",fontWeight:"bold",fontSize:11,color:"#7c3aed",background:"#f5f3ff"};
+  const td={padding:"9px 12px",fontSize:12,borderTop:"1px solid #f1f5f9"};
+  return (
+    <div style={{padding:24}}>
+      <PageH title="📋 SMS History" sub="View all sent SMS messages and their status"/>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12,marginBottom:16}}>
+        <Stat icon="📱" label="Total Sent" value={log.length} color="#7c3aed"/>
+        <Stat icon="✅" label="Live Sent" value={log.filter(l=>l.status==="Sent").length} color="#15803d"/>
+        <Stat icon="🔄" label="Simulated" value={log.filter(l=>l.status==="Simulated").length} color="#b45309"/>
+      </div>
+      <div style={{marginBottom:14}}>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search messages..." style={{width:"100%",maxWidth:400,border:"1.5px solid #e2e8f0",borderRadius:9,padding:"8px 12px",fontSize:13,fontFamily:F,outline:"none",boxSizing:"border-box"}}/>
+      </div>
+      <Card style={{padding:0}}>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}>
+            <thead><tr>{["Time","Recipients","Message Preview","Sent By","Status","Action"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
+            <tbody>{filtered.length?filtered.map((l,i)=><tr key={l.id} style={{background:i%2===0?"white":"#fafafa"}}>
+              <td style={{...td,fontFamily:"monospace",fontSize:11}}>{l.sentAt}</td>
+              <td style={{...td,fontWeight:"bold"}}>{l.recipients}</td>
+              <td style={td}>{l.message.slice(0,60)}{l.message.length>60?"...":""}</td>
+              <td style={{...td,fontSize:11}}>{l.sentBy}</td>
+              <td style={td}><span style={{fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:"bold",background:l.status==="Sent"?"#dcfce7":"#fef3c7",color:l.status==="Sent"?"#15803d":"#b45309"}}>{l.status}</span></td>
+              <td style={td}><button onClick={()=>setLog(p=>p.filter(x=>x.id!==l.id))} style={{color:"#b91c1c",background:"none",border:"none",cursor:"pointer",fontSize:12}}>🗑️</button></td>
+            </tr>):<tr><td colSpan={6} style={{padding:30,textAlign:"center",color:"#94a3b8"}}>No SMS history yet.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// SEND EMAIL
+// ══════════════════════════════════════════════════════════
+function SendEmailPage({ students, user }) {
+  const F = getAppFont();
+  const [to, setTo] = useState("all");
+  const [filterCls, setFilterCls] = useState("All");
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+  const [log, setLog] = useState([]);
+  const [msg, setMsg] = useState({t:"",ok:true});
+  useEffect(()=>{ load("tnks_email_log").then(d=>{if(d)setLog(d);}); },[]);
+  useEffect(()=>{ save("tnks_email_log",log); },[log]);
+  const flash=(t,ok=true)=>{setMsg({t,ok});setTimeout(()=>setMsg({t:"",ok:true}),2500);};
+  const recipients=students.filter(s=>(to==="all"||(to==="class"&&(filterCls==="All"||s.class===filterCls)))&&s.email&&s.status!=="transferred");
+  function doSend(){
+    if(!subject.trim()||!body.trim()) return flash("Subject and body required.",false);
+    const entry={id:Date.now().toString(),to,filterCls,subject,body,recipients:recipients.length,sentBy:user.name,sentAt:new Date().toLocaleString("en-KE"),status:"Simulated"};
+    setLog(p=>[entry,...p]);
+    flash(`✅ Email logged for ${recipients.length} recipients. (Simulation — connect to SendGrid/Mailchimp to send live.)`);
+    setSubject(""); setBody("");
+  }
+  return (
+    <div style={{padding:24}}>
+      <PageH title="📧 Send Email" sub="Compose and send emails to parents"/>
+      <div style={{background:"#fef3c7",border:"1px solid #fde68a",borderRadius:10,padding:"12px 16px",marginBottom:16,fontSize:12,color:"#b45309",fontWeight:"bold"}}>
+        ⚠️ Email sending is in simulation mode. Connect to SendGrid, Mailchimp, or another email provider to send live.
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,alignItems:"start"}}>
+        <Card>
+          <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>📧 Compose Email</div>
+          <div style={{display:"grid",gap:12}}>
+            <Sel label="SEND TO" value={to} onChange={setTo} options={["all","class"]} labels={["All Parents","Specific Class"]}/>
+            {(to==="all"||to==="class")&&<Sel label="FILTER BY CLASS" value={filterCls} onChange={setFilterCls} options={["All",...ALL_CLASSES]}/>}
+            <div style={{background:"#f0fdf4",borderRadius:8,padding:"10px 14px",fontSize:12,color:"#15803d",fontWeight:"bold"}}>{recipients.length} recipients with email addresses</div>
+            <Inp label="SUBJECT *" value={subject} onChange={setSubject} placeholder="Email subject line..."/>
+            <Textarea label="MESSAGE *" value={body} onChange={setBody} placeholder="Type your email message here..." rows={8}/>
+          </div>
+          {msg.t&&<div style={{marginTop:10,fontSize:13,fontWeight:"bold",color:msg.ok?"#15803d":"#b91c1c"}}>{msg.t}</div>}
+          <div style={{marginTop:14}}><Btn onClick={doSend} v="primary">📧 Send Email ({recipients.length})</Btn></div>
+        </Card>
+        <Card>
+          <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:12,fontSize:14}}>📋 Email Log ({log.length})</div>
+          {log.length?<div style={{maxHeight:380,overflowY:"auto"}}>
+            {log.map(l=><div key={l.id} style={{background:"#f8fafc",borderRadius:8,padding:"10px 12px",marginBottom:8}}>
+              <div style={{fontWeight:"bold",color:"#3b0764",fontSize:12,marginBottom:2}}>{l.subject}</div>
+              <div style={{fontSize:11,color:"#64748b",marginBottom:4}}>To: {l.to==="all"?"All":l.filterCls} ({l.recipients}) · {l.sentAt}</div>
+              <div style={{fontSize:10,padding:"2px 8px",borderRadius:20,background:"#fef3c7",color:"#b45309",fontWeight:"bold",display:"inline-block"}}>{l.status}</div>
+            </div>)}
+          </div>:<Empty icon="📧" text="No emails sent yet."/>}
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// EMAIL HISTORY
+// ══════════════════════════════════════════════════════════
+function EmailHistoryPage({ user }) {
+  const F = getAppFont();
+  const [log, setLog] = useState([]);
+  useEffect(()=>{ load("tnks_email_log").then(d=>{if(d)setLog(d);}); },[]);
+  const th={textAlign:"left",padding:"9px 12px",fontWeight:"bold",fontSize:11,color:"#7c3aed",background:"#f5f3ff"};
+  const td={padding:"9px 12px",fontSize:12,borderTop:"1px solid #f1f5f9"};
+  return (
+    <div style={{padding:24}}>
+      <PageH title="📧 Email History" sub="All sent email records"/>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12,marginBottom:16}}>
+        <Stat icon="📧" label="Total Emails" value={log.length} color="#7c3aed"/>
+        <Stat icon="👨‍👩‍👧" label="Total Recipients" value={log.reduce((a,l)=>a+(l.recipients||0),0)} color="#15803d"/>
+      </div>
+      <Card style={{padding:0}}>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}>
+            <thead><tr>{["Time","Subject","Recipients","Sent By","Status","Del"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
+            <tbody>{log.length?log.map((l,i)=><tr key={l.id} style={{background:i%2===0?"white":"#fafafa"}}>
+              <td style={{...td,fontFamily:"monospace",fontSize:11}}>{l.sentAt}</td>
+              <td style={{...td,fontWeight:"bold"}}>{l.subject}</td>
+              <td style={td}>{l.recipients}</td>
+              <td style={{...td,fontSize:11}}>{l.sentBy}</td>
+              <td style={td}><span style={{fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:"bold",background:"#fef3c7",color:"#b45309"}}>{l.status}</span></td>
+              <td style={td}><button onClick={()=>setLog(p=>p.filter(x=>x.id!==l.id))} style={{color:"#b91c1c",background:"none",border:"none",cursor:"pointer",fontSize:12}}>🗑️</button></td>
+            </tr>):<tr><td colSpan={6} style={{padding:30,textAlign:"center",color:"#94a3b8"}}>No email history yet.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// ROLES & PERMISSIONS
+// ══════════════════════════════════════════════════════════
+function RolesPermissionsPage({ users, setUsers, user }) {
+  const F = getAppFont();
+  const PERMS = ["View Dashboard","View Students","Edit Students","View Staff","Edit Staff","Record Marks","Edit Marks","View Reports","Print Reports","Manage Fees","View Finance","Process Payroll","Manage Library","Manage Timetable","Manage Transport","Send Notifications","System Settings","User Management"];
+  const DEFAULT_PERMS = {
+    admin: PERMS,
+    teacher: ["View Dashboard","View Students","Record Marks","View Reports","Print Reports","Manage Library","Manage Timetable"],
+  };
+  const [rolePerms, setRolePerms] = useState(() => ({
+    admin: [...PERMS],
+    teacher: ["View Dashboard","View Students","Record Marks","View Reports","Print Reports","Manage Library","Manage Timetable"],
+  }));
+  useEffect(()=>{ load("tnks_role_perms").then(d=>{if(d)setRolePerms(d);}); },[]);
+  const [msg, setMsg] = useState({t:"",ok:true});
+  const flash=(t,ok=true)=>{setMsg({t,ok});setTimeout(()=>setMsg({t:"",ok:true}),2500);};
+
+  function togglePerm(role, perm) {
+    if(role==="admin") return; // admin always has all
+    setRolePerms(p=>({
+      ...p,
+      [role]: p[role]?.includes(perm) ? p[role].filter(x=>x!==perm) : [...(p[role]||[]), perm]
+    }));
+  }
+  function doSave(){ save("tnks_role_perms",rolePerms); flash("✅ Role permissions saved!"); }
+
+  return (
+    <div style={{padding:24}}>
+      <PageH title="🔐 Roles & Permissions" sub="Control what each role can access and do"/>
+      <Card style={{background:"#fef3c7",border:"1px solid #fde68a",marginBottom:16}}>
+        <div style={{fontSize:12,color:"#b45309"}}>ℹ️ Admin always has full access. Teacher permissions can be customized below.</div>
+      </Card>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+        {["admin","teacher"].map(role=>(
+          <Card key={role}>
+            <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span>{role==="admin"?"👑 Admin":"👨‍🏫 Teacher"}</span>
+              {role==="admin"&&<span style={{fontSize:11,color:"#15803d",background:"#dcfce7",padding:"2px 10px",borderRadius:20}}>Full Access</span>}
+            </div>
+            <div style={{display:"grid",gap:6}}>
+              {PERMS.map(p=>{
+                const has = role==="admin" ? true : (rolePerms[role]||[]).includes(p);
+                return <div key={p} style={{display:"flex",alignItems:"center",gap:10,padding:"6px 10px",borderRadius:8,background:has?"#f0fdf4":"#f8fafc"}}>
+                  <input type="checkbox" checked={has} onChange={()=>togglePerm(role,p)} disabled={role==="admin"} style={{width:15,height:15}}/>
+                  <span style={{fontSize:12,color:"#374151",flex:1}}>{p}</span>
+                  <span style={{fontSize:16}}>{has?"✅":"—"}</span>
+                </div>;
+              })}
+            </div>
+          </Card>
+        ))}
+      </div>
+      {msg.t&&<div style={{marginTop:12,fontSize:13,fontWeight:"bold",color:msg.ok?"#15803d":"#b91c1c",background:msg.ok?"#f0fdf4":"#fef2f2",padding:"10px 16px",borderRadius:8}}>{msg.t}</div>}
+      <div style={{marginTop:16}}><Btn onClick={doSave} v="primary">💾 Save Permissions</Btn></div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// DATABASE BACKUP
+// ══════════════════════════════════════════════════════════
+function DatabaseBackupPage({ students, staff, results, fees, user }) {
+  const F = getAppFont();
+  const [backups, setBackups] = useState([]);
+  const [msg, setMsg] = useState({t:"",ok:true});
+  useEffect(()=>{ load("tnks_backup_log").then(d=>{if(d)setBackups(d);}); },[]);
+  const flash=(t,ok=true)=>{setMsg({t,ok});setTimeout(()=>setMsg({t:"",ok:true}),2500);};
+
+  async function doBackup() {
+    const allKeys=["tnks_users","tnks_students","tnks_results","tnks_comments","tnks_announcements","tnks_fees","tnks_staff","tnks_monitoring","tnks_timetable","tnks_books","tnks_borrows","tnks_events","tnks_council","tnks_duties","tnks_exam_schedules","tnks_clubs","tnks_parent_comms","tnks_inventory","tnks_transport_routes","tnks_bus_monitoring","tnks_payroll","tnks_pocket_money","tnks_fee_structure","tnks_income","tnks_supplier_payments","tnks_expenses","tnks_vehicles","tnks_homework","tnks_promissory"];
+    const backupData={};
+    for(const key of allKeys){
+      try{ const d=await load(key); if(d) backupData[key]=d; }catch{}
+    }
+    backupData._meta={ exportedAt:new Date().toISOString(), exportedBy:user.name, version:"TNKS v2.0", studentCount:students.length, staffCount:staff.length };
+    const blob=new Blob([JSON.stringify(backupData,null,2)],{type:"application/json"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url; a.download=`TNKS_Backup_${new Date().toISOString().split("T")[0]}.json`;
+    a.click(); URL.revokeObjectURL(url);
+    const entry={id:Date.now().toString(),exportedAt:new Date().toLocaleString("en-KE"),exportedBy:user.name,size:`~${Math.round(JSON.stringify(backupData).length/1024)}KB`,records:Object.keys(backupData).length-1};
+    const updated=[entry,...backups].slice(0,20);
+    setBackups(updated); save("tnks_backup_log",updated);
+    flash("✅ Backup downloaded successfully!");
+  }
+
+  function doRestore(e) {
+    const file=e.target.files?.[0]; if(!file) return;
+    const reader=new FileReader();
+    reader.onload=async(ev)=>{
+      try{
+        const data=JSON.parse(ev.target.result);
+        if(!data._meta) return flash("Invalid backup file.",false);
+        if(!confirm(`Restore backup from ${data._meta.exportedAt}? This will overwrite current data.`)) return;
+        for(const [key,val] of Object.entries(data)){
+          if(key!=="meta") await save(key,val);
+        }
+        flash("✅ Backup restored! Please refresh the page.");
+        setTimeout(()=>window.location.reload(),2000);
+      }catch{ flash("Failed to parse backup file.",false); }
+    };
+    reader.readAsText(file);
+  }
+
+  const th={textAlign:"left",padding:"9px 12px",fontWeight:"bold",fontSize:11,color:"#7c3aed",background:"#f5f3ff"};
+  const td={padding:"9px 12px",fontSize:12,borderTop:"1px solid #f1f5f9"};
+
+  return (
+    <div style={{padding:24}}>
+      <PageH title="💾 Database Backup" sub="Export all school data to JSON for safekeeping and restoration"/>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
+        <Card>
+          <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:12,fontSize:14}}>📤 Export Backup</div>
+          <div style={{fontSize:12,color:"#64748b",marginBottom:14,lineHeight:1.6}}>Downloads all school data as a single JSON file. Includes students, staff, marks, fees, payroll, library, timetable, and all other records.</div>
+          <div style={{display:"grid",gap:8,marginBottom:14}}>
+            <div style={{background:"#f0fdf4",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#15803d"}}>✅ {students.length} students · {staff.length} staff</div>
+            <div style={{background:"#f0fdf4",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#15803d"}}>✅ {results.length} result records · {fees.length} fee records</div>
+          </div>
+          {msg.t&&<div style={{marginBottom:10,fontSize:13,fontWeight:"bold",color:msg.ok?"#15803d":"#b91c1c"}}>{msg.t}</div>}
+          <Btn onClick={doBackup} v="primary">💾 Download Backup (JSON)</Btn>
+        </Card>
+        <Card>
+          <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:12,fontSize:14}}>📥 Restore from Backup</div>
+          <div style={{fontSize:12,color:"#b91c1c",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:8,padding:"10px 14px",marginBottom:14}}>⚠️ <b>Warning:</b> Restoring will overwrite ALL current data with the backup file's contents. This cannot be undone.</div>
+          <div style={{marginBottom:14}}>
+            <label style={{display:"block",border:"2px dashed #e2e8f0",borderRadius:10,padding:"20px",textAlign:"center",cursor:"pointer",fontSize:13,color:"#64748b",fontFamily:F}}>
+              📁 Click to select backup JSON file
+              <input type="file" accept=".json" onChange={doRestore} style={{display:"none"}}/>
+            </label>
+          </div>
+        </Card>
+      </div>
+      {backups.length>0&&<Card style={{padding:0}}>
+        <div style={{padding:"12px 16px",background:"#f5f3ff",fontWeight:"bold",color:"#3b0764",fontSize:13,borderBottom:"1px solid #ede9fe"}}>Backup History (last 20)</div>
+        <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <thead><tr>{["Time","Exported By","Size","Action"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
+          <tbody>{backups.map((b,i)=><tr key={b.id} style={{background:i%2===0?"white":"#fafafa"}}>
+            <td style={{...td,fontFamily:"monospace",fontSize:11}}>{b.exportedAt}</td>
+            <td style={{...td,fontWeight:"bold"}}>{b.exportedBy}</td>
+            <td style={td}>{b.size}</td>
+            <td style={td}><span style={{fontSize:11,color:"#15803d"}}>✅ Downloaded</span></td>
+          </tr>)}
+          </tbody>
+        </table>
+      </Card>}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// SYSTEM AUDIT LOG
+// ══════════════════════════════════════════════════════════
+function SystemAuditPage({ user }) {
+  const F = getAppFont();
+  const [logs, setLogs] = useState([]);
+  const [filterUser, setFilterUser] = useState("All");
+  const [filterAction, setFilterAction] = useState("All");
+  useEffect(()=>{ load("tnks_audit_log").then(d=>{if(d)setLogs(d);}); },[]);
+  const ACTIONS=["All","Login","Logout","Created","Updated","Deleted","Exported","Imported","Settings Changed"];
+  const users=["All",...new Set(logs.map(l=>l.user))];
+  const filtered=logs.filter(l=>(filterUser==="All"||l.user===filterUser)&&(filterAction==="All"||l.action===filterAction));
+  const th={textAlign:"left",padding:"9px 12px",fontWeight:"bold",fontSize:11,color:"#7c3aed",background:"#f5f3ff"};
+  const td={padding:"9px 12px",fontSize:12,borderTop:"1px solid #f1f5f9"};
+  const ACTION_COLORS={Login:"#15803d",Logout:"#64748b",Created:"#7c3aed",Updated:"#b45309",Deleted:"#b91c1c",Exported:"#0e7490",Imported:"#15803d","Settings Changed":"#7c3aed"};
+  return (
+    <div style={{padding:24}}>
+      <PageH title="🔍 System Audit" sub="Complete log of all actions taken in the system"/>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12,marginBottom:16}}>
+        <Stat icon="📋" label="Total Logs" value={logs.length} color="#7c3aed"/>
+        <Stat icon="👤" label="Users Tracked" value={new Set(logs.map(l=>l.user)).size} color="#3b0764"/>
+        <Stat icon="🗑️" label="Deletions" value={logs.filter(l=>l.action==="Deleted").length} color="#b91c1c"/>
+        <Stat icon="⚙️" label="Settings Changes" value={logs.filter(l=>l.action==="Settings Changed").length} color="#b45309"/>
+      </div>
+      <Card style={{marginBottom:16}}>
+        <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
+          <Sel label="FILTER BY USER" value={filterUser} onChange={setFilterUser} options={users}/>
+          <Sel label="FILTER BY ACTION" value={filterAction} onChange={setFilterAction} options={ACTIONS}/>
+        </div>
+      </Card>
+      {logs.length===0?<Card style={{textAlign:"center",padding:40}}>
+        <div style={{fontSize:48,marginBottom:12}}>🔍</div>
+        <div style={{fontSize:14,fontWeight:"bold",color:"#3b0764"}}>Audit log is empty</div>
+        <div style={{fontSize:12,color:"#64748b",marginTop:6}}>System actions are automatically recorded as users interact with the system. Check back after some activity.</div>
+      </Card>:<Card style={{padding:0}}>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}>
+            <thead><tr>{["Time","User","Action","Details","IP / Session"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
+            <tbody>{filtered.length?[...filtered].reverse().map((l,i)=><tr key={l.id} style={{background:i%2===0?"white":"#fafafa"}}>
+              <td style={{...td,fontFamily:"monospace",fontSize:11}}>{l.timestamp}</td>
+              <td style={{...td,fontWeight:"bold"}}>{l.user}</td>
+              <td style={td}><span style={{fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:"bold",background:(ACTION_COLORS[l.action]||"#7c3aed")+"15",color:ACTION_COLORS[l.action]||"#7c3aed"}}>{l.action}</span></td>
+              <td style={{...td,fontSize:11}}>{l.details||"—"}</td>
+              <td style={{...td,fontSize:11,color:"#94a3b8"}}>{l.session||"Browser session"}</td>
+            </tr>):<tr><td colSpan={5} style={{padding:30,textAlign:"center",color:"#94a3b8"}}>No logs match the filter.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </Card>}
+    </div>
+  );
+}
 export default function App(){
   const [ready,setReady]=useState(false);
   const [sidebarOpen,setSidebarOpen]=useState(false);
@@ -9205,6 +11132,49 @@ export default function App(){
         {view==="settings"&&user.role==="admin"&&<SettingsPage users={users} setUsers={setUsers} logo={logo} setLogo={setLogo}/>}
         {view==="settings"&&user.role!=="admin"&&<div style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Admin access required.</div>}
         {view==="schoolinfo"&&<SchoolInfoPage logo={logo}/>}
+        {/* ── New components ── */}
+        {view==="staff_att_report"&&<StaffAttendanceReport staff={staff} user={user}/>}
+        {view==="dean_settings"&&user.role==="admin"&&<DeanSettingsPage staff={staff} user={user} students={students}/>}
+        {view==="dean_settings"&&user.role!=="admin"&&<div style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Admin access required.</div>}
+        {view==="exam_settings"&&user.role==="admin"&&<ExamSettingsPage user={user}/>}
+        {view==="exam_settings"&&user.role!=="admin"&&<div style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Admin access required.</div>}
+        {view==="subject_allocation"&&<SubjectAllocationPage staff={staff} user={user} students={students}/>}
+        {view==="edit_marks"&&<EditMarksPage students={students} results={results} setResults={setResults} term={term} year={year} examType={examType}/>}
+        {view==="marks_status"&&<MarksStatusPage students={students} results={results} term={term} year={year} examType={examType}/>}
+        {view==="homework"&&<HomeworkPage students={students} staff={staff} user={user}/>}
+        {view==="videoclasses"&&<div style={{padding:40,textAlign:"center",color:"#94a3b8",fontSize:18}}>🎥 Video Classes — Coming Soon</div>}
+        {view==="finance_settings"&&user.role==="admin"&&<FinanceSettingsPage user={user}/>}
+        {view==="finance_settings"&&user.role!=="admin"&&<div style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Admin access required.</div>}
+        {view==="promissory_notes"&&<PromissoryNotesPage students={students} user={user}/>}
+        {view==="collect_income"&&<CollectIncomePage user={user}/>}
+        {view==="pay_suppliers"&&<PaySuppliersPage user={user}/>}
+        {view==="payment_reports"&&<PaymentReportsPage fees={fees} students={students} user={user}/>}
+        {view==="accounting_reports"&&<AccountingReportsPage fees={fees} students={students} user={user}/>}
+        {view==="payroll_dashboard"&&user.role==="admin"&&<PayrollDashboard staff={staff} user={user} setView={setView}/>}
+        {view==="payroll_dashboard"&&user.role!=="admin"&&<div style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Admin access required.</div>}
+        {view==="payroll_allowances"&&user.role==="admin"&&<PayrollAllowancesPage user={user}/>}
+        {view==="payroll_allowances"&&user.role!=="admin"&&<div style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Admin access required.</div>}
+        {view==="payroll_deductions"&&user.role==="admin"&&<PayrollDeductionsPage user={user}/>}
+        {view==="payroll_deductions"&&user.role!=="admin"&&<div style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Admin access required.</div>}
+        {view==="payroll_reliefs"&&user.role==="admin"&&<PayrollReliefsPage user={user}/>}
+        {view==="payroll_reliefs"&&user.role!=="admin"&&<div style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Admin access required.</div>}
+        {view==="payroll_settings"&&user.role==="admin"&&<PayrollSettingsPage user={user}/>}
+        {view==="payroll_settings"&&user.role!=="admin"&&<div style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Admin access required.</div>}
+        {view==="student_routes"&&<StudentRoutesPage students={students} setStudents={setStudents} user={user}/>}
+        {view==="vehicles"&&<VehiclesPage user={user}/>}
+        {view==="transport_reports"&&<TransportReportsPage students={students} user={user}/>}
+        {view==="sms_settings"&&user.role==="admin"&&<SMSSettingsPage user={user}/>}
+        {view==="sms_settings"&&user.role!=="admin"&&<div style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Admin access required.</div>}
+        {view==="send_sms"&&<SendSMSPage students={students} user={user}/>}
+        {view==="sms_history"&&<SMSHistoryPage user={user}/>}
+        {view==="send_email"&&<SendEmailPage students={students} user={user}/>}
+        {view==="email_history"&&<EmailHistoryPage user={user}/>}
+        {view==="roles_permissions"&&user.role==="admin"&&<RolesPermissionsPage users={users} setUsers={setUsers} user={user}/>}
+        {view==="roles_permissions"&&user.role!=="admin"&&<div style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Admin access required.</div>}
+        {view==="database_backup"&&user.role==="admin"&&<DatabaseBackupPage students={students} staff={staff} results={results} fees={fees} user={user}/>}
+        {view==="database_backup"&&user.role!=="admin"&&<div style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Admin access required.</div>}
+        {view==="system_audit"&&user.role==="admin"&&<SystemAuditPage user={user}/>}
+        {view==="system_audit"&&user.role!=="admin"&&<div style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Admin access required.</div>}
       </main>
     </div>
   );
