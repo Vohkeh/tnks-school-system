@@ -321,6 +321,7 @@ const DEFAULT_USERS = [
   {id:"u2",name:"Director",username:"director",password:"Director@TNKS2",role:"admin",email:"director@nyagakindikischools.sc.ke",staffType:"non-teaching",subject:"Director",phone:"+254 722 679747",contactRole:"director"},
   {id:"u3",name:"Manager",username:"manager",password:"Manager@TNKS3",role:"admin",email:"manager@tnks.sc.ke",staffType:"non-teaching",subject:"Manager",phone:"+254 720 537265",contactRole:"manager"},
   {id:"u4",name:"Secretary",username:"secretary",password:"Secretary@TNKS4",role:"teacher",email:"secretary@tnks.sc.ke",staffType:"non-teaching",subject:"Secretary",phone:"+254 722 679747",contactRole:"secretary"},
+  {id:"u18",name:"Dean of Studies",username:"dean",password:"Dean@TNKS18",role:"teacher",email:"dean@tnks.sc.ke",staffType:"teaching",subject:"Academics",phone:"",contactRole:"dean"},
   {id:"u5",name:"Ms. Purity",username:"purity",password:"Purity@TNKS5",role:"teacher",email:"purity@tnks.sc.ke",staffType:"teaching",subject:"",phone:"",contactRole:"teacher"},
   {id:"u6",name:"Mr. Gitonga",username:"gitonga",password:"Gitonga@TNKS6",role:"teacher",email:"gitonga@tnks.sc.ke",staffType:"teaching",subject:"",phone:"",contactRole:"teacher"},
   {id:"u7",name:"Mr. Mwangangi",username:"mwangangi",password:"Mwangangi@TNKS7",role:"teacher",email:"mwangangi@tnks.sc.ke",staffType:"teaching",subject:"",phone:"",contactRole:"teacher"},
@@ -548,7 +549,7 @@ function Logo({size=60,src}) {
 // ══════════════════════════════════════════════════════════
 // SIDEBAR
 // ══════════════════════════════════════════════════════════
-function Sidebar({view,setView,user,onLogout,logo,collapsed=false,onToggleCollapse}) {
+function Sidebar({view,setView,user,onLogout,logo,collapsed=false,onToggleCollapse,myClass}) {
   // Track which groups are open — default open the group containing the active view
   const ADMIN_GROUPS = [
     {
@@ -669,6 +670,7 @@ function Sidebar({view,setView,user,onLogout,logo,collapsed=false,onToggleCollap
 
   const TEACHER_GROUPS = [
     {id:"dashboard",  label:"Dashboard",        icon:"▣",  single:true, view:"dashboard"},
+    ...(myClass ? [{id:"my_class", label:`My Class — ${myClass}`, icon:"🏫", single:true, view:"my_class"}] : []),
     {
       id:"students_grp", label:"Students Manager", icon:"🎓",
       items:[
@@ -708,7 +710,130 @@ function Sidebar({view,setView,user,onLogout,logo,collapsed=false,onToggleCollap
     {id:"noticeboard",   label:"Notice Board",      icon:"📌", single:true, view:"noticeboard"},
   ];
 
-  const groups = user.role==="admin"?ADMIN_GROUPS : user.role==="parent"?PARENT_GROUPS : TEACHER_GROUPS;
+  // ── SECRETARY: admin-adjacent, handles admin tasks but no payroll/system settings ──
+  const SECRETARY_GROUPS = [
+    {id:"dashboard", label:"Dashboard", icon:"▣", single:true, view:"dashboard"},
+    {id:"students_grp", label:"Students Manager", icon:"🎓",
+      items:[
+        {id:"students",   label:"Students List",   icon:"👥"},
+        {id:"admissions", label:"Admissions",      icon:"📋"},
+        {id:"alumni",     label:"Former Students", icon:"🎓"},
+        {id:"monitoring", label:"Health Monitoring",icon:"🏥"},
+        {id:"attendance", label:"Attendance",      icon:"✅"},
+        {id:"timeinout",  label:"Time In/Out",     icon:"🕐"},
+      ]
+    },
+    {id:"academic_grp", label:"Academics", icon:"📖",
+      items:[
+        {id:"exams",        label:"Exam Management", icon:"📅"},
+        {id:"reports",      label:"Report Forms",    icon:"🖨️"},
+        {id:"analytics",    label:"Exam Analysis",   icon:"📈"},
+      ]
+    },
+    {id:"finance_grp", label:"Finance", icon:"💳",
+      items:[
+        {id:"feestructure",    label:"Fee Structure",    icon:"📑"},
+        {id:"fees",            label:"Fees / Invoicing",  icon:"💰"},
+        {id:"promissory_notes",label:"Promissory Notes",  icon:"📄"},
+        {id:"payment_reports", label:"Payment Reports",   icon:"📊"},
+      ]
+    },
+    {id:"comms_grp", label:"Communication", icon:"💬",
+      items:[
+        {id:"noticeboard",  label:"Notice Board",   icon:"📌"},
+        {id:"parentcomms",  label:"Parent Comms",   icon:"📞"},
+        {id:"notifications",label:"Notifications",  icon:"🔔"},
+        {id:"messages",     label:"Messages",       icon:"📨"},
+        {id:"send_sms",     label:"Send SMS",       icon:"📱"},
+        {id:"send_email",   label:"Send Email",     icon:"📧"},
+      ]
+    },
+    {id:"inventory_grp", label:"Inventory", icon:"📦", items:[{id:"inventory",label:"Stock Manager",icon:"🏪"}]},
+    {id:"transport_grp", label:"Transport", icon:"🚌", items:[{id:"transport",label:"Routes & Vehicles",icon:"🚌"}]},
+    {id:"school_life_grp", label:"School Life", icon:"🌟",
+      items:[
+        {id:"events",   label:"Events",   icon:"🎉"},
+        {id:"calendar", label:"Calendar", icon:"📅"},
+      ]
+    },
+    {id:"schoolinfo", label:"School Info", icon:"🏫", single:true, view:"schoolinfo"},
+  ];
+
+  // ── DEAN: academic leadership — results, reports, exam config ──
+  const DEAN_GROUPS = [
+    {id:"dashboard", label:"Dashboard", icon:"▣", single:true, view:"dashboard"},
+    {id:"students_grp", label:"Students Manager", icon:"🎓",
+      items:[
+        {id:"students",   label:"Students List",    icon:"👥"},
+        {id:"monitoring", label:"Health Monitoring",icon:"🏥"},
+        {id:"attendance", label:"Attendance",       icon:"✅"},
+      ]
+    },
+    {id:"academic_grp", label:"Academic Manager", icon:"📖",
+      items:[
+        {id:"dean_settings",    label:"Dean Settings",    icon:"🎓"},
+        {id:"exam_settings",    label:"Exam Settings",    icon:"⚙️"},
+        {id:"exams",            label:"Exam Management",  icon:"📅"},
+        {id:"subject_allocation",label:"Subject Allocation",icon:"📚"},
+        {id:"results",          label:"Record Marks",     icon:"📝"},
+        {id:"edit_marks",       label:"Edit Marks",       icon:"✏️"},
+        {id:"marks_status",     label:"Marks Status",     icon:"📊"},
+        {id:"analytics",        label:"Exam Analysis",    icon:"📈"},
+        {id:"reports",          label:"Report Forms",     icon:"🖨️"},
+        {id:"ai_comments",      label:"AI Comments",      icon:"🤖"},
+        {id:"bulk",             label:"Bulk Operations",  icon:"📦"},
+      ]
+    },
+    {id:"timetable",  label:"Timetable",   icon:"▦", single:true, view:"timetable"},
+    {id:"duty",       label:"Duty Roster", icon:"🛡️", single:true, view:"duty"},
+    {id:"staff_grp", label:"Staff", icon:"👤",
+      items:[
+        {id:"staff",           label:"Staff List",       icon:"👨‍🏫"},
+        {id:"staff_att_report",label:"Staff Attendance", icon:"📊"},
+      ]
+    },
+    {id:"comms_grp", label:"Communication", icon:"💬",
+      items:[
+        {id:"noticeboard", label:"Notice Board", icon:"📌"},
+        {id:"messages",    label:"Messages",     icon:"📨"},
+      ]
+    },
+    {id:"schoolinfo", label:"School Info", icon:"🏫", single:true, view:"schoolinfo"},
+  ];
+
+  // ── NON-TEACHING STAFF: operational tasks only ──
+  const NON_TEACHING_GROUPS = [
+    {id:"dashboard", label:"Dashboard", icon:"▣", single:true, view:"dashboard"},
+    {id:"timeinout",  label:"Attendance Sheet", icon:"🕐", single:true, view:"timeinout"},
+    {id:"duty",       label:"Duty Roster",      icon:"🛡️", single:true, view:"duty"},
+    {id:"inventory_grp", label:"Inventory", icon:"📦", items:[{id:"inventory",label:"Stock Manager",icon:"🏪"}]},
+    {id:"transport_grp", label:"Transport", icon:"🚌",
+      items:[
+        {id:"transport",       label:"Routes & Vehicles", icon:"🚌"},
+        {id:"student_routes",  label:"Student Routes",    icon:"📍"},
+      ]
+    },
+    {id:"comms_grp", label:"Communication", icon:"💬",
+      items:[
+        {id:"noticeboard", label:"Notice Board", icon:"📌"},
+        {id:"messages",    label:"Messages",     icon:"📨"},
+      ]
+    },
+    {id:"schoolinfo", label:"School Info", icon:"🏫", single:true, view:"schoolinfo"},
+  ];
+
+  // ── Determine groups based on role + contactRole + staffType ──
+  function getRoleGroups(u) {
+    if(u.role==="admin") return ADMIN_GROUPS;
+    if(u.role==="parent") return PARENT_GROUPS;
+    const cr = u.contactRole || "teacher";
+    if(cr==="director"||cr==="manager") return ADMIN_GROUPS;
+    if(cr==="secretary") return SECRETARY_GROUPS;
+    if(cr==="dean") return DEAN_GROUPS;
+    if(u.staffType==="non-teaching") return NON_TEACHING_GROUPS;
+    return TEACHER_GROUPS;
+  }
+  const groups = getRoleGroups(user);
 
   // Find which group contains the active view, open it by default
   function findGroupId(v) {
@@ -789,7 +914,13 @@ function Sidebar({view,setView,user,onLogout,logo,collapsed=false,onToggleCollap
         <Logo size={50} src={logo}/>
         <div style={{fontSize:10.5,fontWeight:"bold",lineHeight:1.3,marginTop:8,opacity:.95}}>{SCHOOL.name}</div>
         <div style={{fontSize:9,color:"rgba(255,255,255,0.45)",marginTop:3,letterSpacing:1.2,textTransform:"uppercase"}}>
-          {user.role==="admin"?"Admin Portal":user.role==="teacher"?"Staff Portal":"Parent Portal"}
+          {user.role==="parent" ? "Parent Portal" :
+           user.role==="admin" ? (user.contactRole==="director"?"Director Portal":user.contactRole==="manager"?"Manager Portal":"Admin Portal") :
+           user.contactRole==="dean" ? "Dean of Studies Portal" :
+           user.contactRole==="secretary" ? "Secretary Portal" :
+           user.staffType==="non-teaching" ? "Staff Portal" :
+           myClass ? `Class Teacher — ${myClass}` :
+           "Teacher Portal"}
         </div>
       </div>
 
@@ -1002,10 +1133,10 @@ function Dashboard({students,results,announcements,fees,staff,users,term,setTerm
 // ══════════════════════════════════════════════════════════
 // STUDENTS
 // ══════════════════════════════════════════════════════════
-function StudentsPage({students,setStudents,results,setResults,comments,setComments,fees,setFees,monitoring,setMonitoring,logo}) {
+function StudentsPage({students,setStudents,results,setResults,comments,setComments,fees,setFees,monitoring,setMonitoring,logo,preFilterClass}) {
   const blank={name:"",admNo:"",class:"Grade 7",gender:"Male",photo:"",email:"",parentPassword:"",dob:"",parentName:"",parentPhone:"",address:""};
   const [form,setForm]=useState(blank); const [editId,setEditId]=useState(null);
-  const [search,setSearch]=useState(""); const [filterCls,setFilterCls]=useState("All");
+  const [search,setSearch]=useState(""); const [filterCls,setFilterCls]=useState(preFilterClass&&preFilterClass!=="All"?preFilterClass:"All");
   const [msg,setMsg]=useState({t:"",ok:true}); const [tab,setTab]=useState("list");
   const flash=(t,ok=true)=>{setMsg({t,ok});setTimeout(()=>setMsg({t:"",ok:true}),2800);};
   function doSave(){if(!form.name.trim()||!form.admNo.trim()) return flash("Name and admission number required.",false); if(editId){setStudents(p=>p.map(s=>s.id===editId?{...s,...form}:s));setEditId(null);flash("Learner updated!");}else{if(students.find(s=>s.admNo===form.admNo)) return flash("Admission number already exists.",false); setStudents(p=>[...p,{...form,id:Date.now().toString(),status:"active",enrollDate:new Date().toLocaleDateString("en-KE")}]);flash("Learner added!");} setForm(blank);setTab("list");}
@@ -1422,12 +1553,22 @@ function buildHTMLDoc(title, bodyHTML, logo) {
     *{box-sizing:border-box;}
     body{margin:0;padding:16px;font-family:Georgia,serif;background:white;}
     @media print{
-      @page{margin:8mm;size:A4 landscape;}
+      @page{margin:6mm;size:A4 portrait;}
       .no-print{display:none!important;}
       body{padding:0;margin:0;}
       .print-fit-wrap{
         width:100%;
         overflow:visible;
+      }
+      /* Individual report cards: force single page, scale to fit */
+      div[style*="page-break-after:always"]{
+        page-break-after: always !important;
+        page-break-inside: avoid !important;
+      }
+      /* Scale report content if needed to avoid overflow */
+      div[style*="page-break-inside:avoid"]{
+        page-break-inside: avoid !important;
+        transform-origin: top center;
       }
       .results-table, .grade-table{
         width:100% !important;
@@ -1446,10 +1587,6 @@ function buildHTMLDoc(title, bodyHTML, logo) {
       div[style*="margin-bottom:32px"]{
         transform-origin: top left;
         width: 100%;
-      }
-      /* Force each class table onto its own landscape page */
-      div[style*="page-break-after:always"]{
-        page-break-after: always !important;
       }
     }
     table{border-collapse:collapse;}
@@ -1676,46 +1813,51 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
         <td style="padding:6px 8px;font-size:9px;color:#3b0764;text-align:center;font-weight:bold;" title="${teacherDisplay}">${subInitials}</td>
       </tr>`;
     }).join("");
-    return `<div style="page-break-after:always;padding:16px 20px;max-width:720px;margin:0 auto;position:relative;">
+    return `<div style="page-break-after:always;page-break-inside:avoid;padding:8px 14px;max-width:700px;margin:0 auto;position:relative;font-size:9.5px;">
       ${buildSectionHeader(logo)}
-      <div style="background:#3b0764;color:white;text-align:center;padding:4px 0;font-size:11px;font-weight:bold;border-radius:16px;margin-bottom:10px;letter-spacing:1px;">${examType.toUpperCase()} — ${term.toUpperCase()} ${year}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:10px;margin-bottom:10px;border:1px solid #e2e8f0;border-radius:6px;padding:8px;">
+      <div style="background:#3b0764;color:white;text-align:center;padding:3px 0;font-size:10px;font-weight:bold;border-radius:14px;margin-bottom:7px;letter-spacing:1px;">${examType.toUpperCase()} — ${term.toUpperCase()} ${year}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9.5px;margin-bottom:7px;border:1px solid #e2e8f0;border-radius:6px;padding:5px 8px;">
         <div><b>Name:</b> ${student.name}</div><div><b>Adm. No:</b> ${student.admNo||"—"}</div>
         <div><b>Class:</b> ${student.class}</div><div><b>Gender:</b> ${student.gender||"—"}</div>
         <div><b>Position:</b> <span style="font-weight:bold;color:#3b0764;">${pos} / ${outOf}</span></div>
         <div><b>Total Marks:</b> <span style="font-weight:bold;">${sr.length?total.toFixed(0):"—"}</span></div>
       </div>
-      <table style="width:100%;border-collapse:collapse;font-size:10px;margin-bottom:10px;">
-        <thead><tr style="background:#3b0764;color:white;">${["Subject","Marks","Grade","Points","Remarks","Init."].map(h=>`<th style="padding:6px 8px;text-align:left;">${h}</th>`).join("")}</tr></thead>
+      <table style="width:100%;border-collapse:collapse;font-size:9px;margin-bottom:7px;">
+        <thead><tr style="background:#3b0764;color:white;">${["Subject","Marks","Grade","Points","Remarks","Init."].map(h=>`<th style="padding:4px 6px;text-align:left;">${h}</th>`).join("")}</tr></thead>
         <tbody>${rows}
           <tr style="background:#f5f3ff;font-weight:bold;border-top:2px solid #3b0764;">
-            <td style="padding:6px 8px;">TOTAL</td>
-            <td style="padding:6px 8px;text-align:center;font-size:12px;">${sr.length?total.toFixed(0):"—"}</td>
-            <td colspan="4" style="padding:6px 8px;font-size:9px;color:#64748b;">Sum of all subject marks</td>
+            <td style="padding:4px 6px;">TOTAL</td>
+            <td style="padding:4px 6px;text-align:center;font-size:11px;">${sr.length?total.toFixed(0):"—"}</td>
+            <td colspan="4" style="padding:4px 6px;font-size:8px;color:#64748b;">Sum of all subject marks</td>
           </tr>
           <tr style="background:#f5f3ff;font-weight:bold;">
-            <td style="padding:6px 8px;">MEAN SCORE</td>
-            <td style="padding:6px 8px;text-align:center;font-size:12px;">${avg>0?avg.toFixed(1):"—"}</td>
-            <td style="padding:6px 8px;">${avg>0?`<span style="background:${og.bg};color:${og.col};font-size:9px;padding:2px 6px;border-radius:10px;font-weight:bold;">${og.g}</span>`:"—"}</td>
-            <td style="padding:6px 8px;text-align:center;font-size:10px;">${avg>0?og.pts:"—"}</td>
-            <td colspan="2" style="padding:6px 8px;font-size:9px;">${avg>0?og.lbl:"—"}</td>
+            <td style="padding:4px 6px;">MEAN SCORE</td>
+            <td style="padding:4px 6px;text-align:center;font-size:11px;">${avg>0?avg.toFixed(1):"—"}</td>
+            <td style="padding:4px 6px;">${avg>0?`<span style="background:${og.bg};color:${og.col};font-size:8px;padding:2px 5px;border-radius:10px;font-weight:bold;">${og.g}</span>`:"—"}</td>
+            <td style="padding:4px 6px;text-align:center;font-size:9px;">${avg>0?og.pts:"—"}</td>
+            <td colspan="2" style="padding:4px 6px;font-size:8px;">${avg>0?og.lbl:"—"}</td>
           </tr>
         </tbody>
       </table>
-      <div style="border:1px solid #e2e8f0;border-radius:6px;padding:8px;margin-bottom:10px;font-size:10px;">
+      <div style="border:1px solid #e2e8f0;border-radius:6px;padding:5px 8px;margin-bottom:7px;font-size:9px;">
         <b>Class Teacher's Comment:</b> ${comment?comment.text:"No comment recorded."}
-        ${comment?`<div style="font-size:9px;color:#94a3b8;margin-top:3px;">— ${comment.teacher} (${comment.date})</div>`:""}
+        ${comment?`<div style="font-size:8px;color:#94a3b8;margin-top:2px;">— ${comment.teacher} (${comment.date})</div>`:""}
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:12px;">
-        <div style="text-align:center;"><div style="border-top:1px solid #374151;padding-top:4px;font-size:10px;color:#64748b;">Class Teacher</div><div style="font-size:9px;color:#3b0764;font-weight:bold;margin-top:2px;">${clsTeacher||"_______________"}</div><div style="font-size:8px;color:#94a3b8;margin-top:10px;">Signature & Date</div></div>
-        <div style="text-align:center;"><div style="border-top:1px solid #374151;padding-top:4px;font-size:10px;color:#64748b;">Head Teacher</div><div style="font-size:9px;color:#94a3b8;margin-top:12px;">Signature & Date</div></div>
-        <div style="text-align:center;"><div style="border-top:1px solid #374151;padding-top:4px;font-size:10px;color:#64748b;">Parent/Guardian</div><div style="font-size:9px;color:#94a3b8;margin-top:12px;">Signature & Date</div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:8px;">
+        <div style="text-align:center;"><div style="border-top:1px solid #374151;padding-top:3px;font-size:9px;color:#64748b;">Class Teacher</div><div style="font-size:8px;color:#3b0764;font-weight:bold;margin-top:2px;">${clsTeacher||"_______________"}</div><div style="font-size:7px;color:#94a3b8;margin-top:8px;">Signature & Date</div></div>
+        <div style="text-align:center;"><div style="border-top:1px solid #374151;padding-top:3px;font-size:9px;color:#64748b;">Head Teacher</div><div style="font-size:7px;color:#94a3b8;margin-top:10px;">Signature & Date</div></div>
+        <div style="text-align:center;"><div style="border-top:1px solid #374151;padding-top:3px;font-size:9px;color:#64748b;">Parent/Guardian</div><div style="font-size:7px;color:#94a3b8;margin-top:10px;">Signature & Date</div></div>
       </div>
-      <div style="margin-top:10px;background:#f8fafc;border-radius:6px;padding:6px 10px;">
-        <span style="font-size:8px;font-weight:bold;color:#374151;">CBC Grading: </span>
-        ${[{g:"EE1",r:"90-100"},{g:"EE2",r:"75-89"},{g:"ME1",r:"58-74"},{g:"ME2",r:"41-57"},{g:"AE1",r:"31-40"},{g:"AE2",r:"21-30"},{g:"BE1",r:"11-20"},{g:"BE2",r:"0-10"}].map(({g,r})=>{const gd=getGrade(g==="EE1"?95:g==="EE2"?80:g==="ME1"?65:g==="ME2"?50:g==="AE1"?35:g==="AE2"?25:g==="BE1"?15:5);return`<span style="font-size:8px;background:${gd.bg};color:${gd.col};padding:1px 4px;border-radius:6px;font-weight:bold;margin-right:2px;">${g}:${r}</span>`;}).join("")}
+      <div style="margin-top:7px;background:#f8fafc;border-radius:6px;padding:4px 8px;display:flex;flex-wrap:wrap;align-items:center;gap:3px;">
+        <span style="font-size:7.5px;font-weight:bold;color:#374151;margin-right:2px;">CBC Grading: </span>
+        ${[{g:"EE1",r:"90-100"},{g:"EE2",r:"75-89"},{g:"ME1",r:"58-74"},{g:"ME2",r:"41-57"},{g:"AE1",r:"31-40"},{g:"AE2",r:"21-30"},{g:"BE1",r:"11-20"},{g:"BE2",r:"0-10"}].map(({g,r})=>{const gd=getGrade(g==="EE1"?95:g==="EE2"?80:g==="ME1"?65:g==="ME2"?50:g==="AE1"?35:g==="AE2"?25:g==="BE1"?15:5);return`<span style="font-size:7px;background:${gd.bg};color:${gd.col};padding:1px 3px;border-radius:5px;font-weight:bold;">${g}:${r}</span>`;}).join("")}
       </div>
-      ${buildStampBox()}
+      <div style="display:flex;justify-content:flex-end;align-items:center;margin-top:8px;">
+        <div style="border:2px dashed #3b0764;border-radius:8px;width:150px;height:70px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4px;">
+          <div style="font-size:8px;font-weight:bold;color:#3b0764;letter-spacing:0.5px;">OFFICIAL STAMP</div>
+          <div style="font-size:7px;color:#94a3b8;margin-top:14px;">Date: _______________</div>
+        </div>
+      </div>
     </div>`;
   }
 
@@ -6105,7 +6247,7 @@ function SettingsPage({users,setUsers,logo,setLogo}) {
             <Inp label="PASSWORD *" value={form.password} onChange={v=>setForm({...form,password:v})} placeholder="Set a password" type="password"/>
             <Sel label="ROLE" value={form.role} onChange={v=>setForm({...form,role:v})} options={["teacher","admin"]}/>
             <Sel label="STAFF TYPE" value={form.staffType} onChange={v=>setForm({...form,staffType:v})} options={["teaching","non-teaching"]}/>
-            <Sel label="CONTACT ROLE" value={form.contactRole||"teacher"} onChange={v=>setForm({...form,contactRole:v})} options={["teacher","director","manager","secretary","admin"]}/>
+            <Sel label="CONTACT ROLE" value={form.contactRole||"teacher"} onChange={v=>setForm({...form,contactRole:v})} options={["teacher","dean","secretary","director","manager","admin","non_teaching"]}/>
             <Inp label="SUBJECT/DEPT" value={form.subject} onChange={v=>setForm({...form,subject:v})} placeholder="e.g. Mathematics"/>
           </div>
           {msg.t&&<div style={{marginTop:10,fontSize:13,color:msg.ok?"#1d4ed8":"#b91c1c",fontWeight:"bold"}}>{msg.t}</div>}
@@ -11151,6 +11293,17 @@ export default function App(){
 
   const ctx={user,students,setStudents,results,setResults,comments,setComments,announcements,setAnnouncements,users,setUsers,fees,setFees,staff,setStaff,term,setTerm,year,setYear,examType,setExamType,logo,monitoring,setMonitoring};
 
+  // Compute the class this teacher is assigned to (if any)
+  const myClass = (() => {
+    if(user.role==="admin"||user.role==="parent") return null;
+    const ct = ttSetup?.setupData?.classTeachers || {};
+    const found = Object.entries(ct).find(([, tid]) => {
+      const u = (users||[]).find(u=>u.id===tid);
+      return u && (u.id===user.id || u.name===user.name);
+    });
+    return found ? found[0] : null;
+  })();
+
   const _themeP=localStorage.getItem("tnks_theme")||"light";
   const _fontP=localStorage.getItem("tnks_font")||"Georgia,serif";
   const _sbW=sidebarCollapsed?56:230;
@@ -11159,7 +11312,7 @@ export default function App(){
     <div style={{display:"flex",height:"100vh",fontFamily:_fontP,background:_themeP==="dark"?"#0f172a":"#f1f5f9",position:"relative"}}>
       {_mobileOverlay&&<div onClick={()=>setSidebarCollapsed(true)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:40}}/>}
       <div style={{position:_mobileOverlay?"fixed":"relative",left:0,top:0,bottom:0,zIndex:50,height:"100vh",flexShrink:0,width:_mobileOverlay?230:_sbW,transition:"width .22s ease"}}>
-        <Sidebar view={view} setView={v=>{setView(v);if(isMobile)setSidebarCollapsed(true);}} user={user} onLogout={()=>{setUser(null);setView("dashboard");setSidebarCollapsed(true);}} logo={logo} collapsed={sidebarCollapsed} onToggleCollapse={()=>setSidebarCollapsed(c=>!c)}/>
+        <Sidebar view={view} setView={v=>{setView(v);if(isMobile)setSidebarCollapsed(true);}} user={user} onLogout={()=>{setUser(null);setView("dashboard");setSidebarCollapsed(true);}} logo={logo} collapsed={sidebarCollapsed} onToggleCollapse={()=>setSidebarCollapsed(c=>!c)} myClass={null}/>
       </div>
       <main style={{flex:1,overflowY:"auto",overflowX:"auto",minWidth:0}}>
         {view==="schoolinfo"&&<SchoolInfoPage logo={logo}/>}
@@ -11176,11 +11329,11 @@ export default function App(){
     <div style={{display:"flex",height:"100vh",fontFamily:_appFont2,background:_bg2,position:"relative"}}>
       {_mobileOverlay&&<div onClick={()=>setSidebarCollapsed(true)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:40}}/>}
       <div style={{position:_mobileOverlay?"fixed":"relative",left:0,top:0,bottom:0,zIndex:50,height:"100vh",flexShrink:0,width:_mobileOverlay?230:_sbW,transition:"width .22s ease"}}>
-        <Sidebar view={view} setView={v=>{setView(v);if(isMobile)setSidebarCollapsed(true);}} user={user} onLogout={()=>{setUser(null);setView("dashboard");setSidebarCollapsed(true);}} logo={logo} collapsed={sidebarCollapsed} onToggleCollapse={()=>setSidebarCollapsed(c=>!c)}/>
+        <Sidebar view={view} setView={v=>{setView(v);if(isMobile)setSidebarCollapsed(true);}} user={user} onLogout={()=>{setUser(null);setView("dashboard");setSidebarCollapsed(true);}} logo={logo} collapsed={sidebarCollapsed} onToggleCollapse={()=>setSidebarCollapsed(c=>!c)} myClass={myClass}/>
       </div>
       <main style={{flex:1,overflowY:"auto",overflowX:"auto",minWidth:0}}>
         {view==="dashboard"&&<Dashboard {...ctx}/>}
-        {view==="students"&&<StudentsPage students={students} setStudents={setStudents} results={results} setResults={setResults} comments={comments} setComments={setComments} fees={fees} setFees={setFees} monitoring={monitoring} setMonitoring={setMonitoring} logo={logo}/>}
+        {(view==="students"||view==="my_class")&&<StudentsPage students={students} setStudents={setStudents} results={results} setResults={setResults} comments={comments} setComments={setComments} fees={fees} setFees={setFees} monitoring={monitoring} setMonitoring={setMonitoring} logo={logo} preFilterClass={view==="my_class"?myClass:"All"}/>}
         {view==="admissions"&&<AdmissionsPage students={students} setStudents={setStudents}/>}
         {view==="results"&&<ResultsPage {...ctx}/>}
         {view==="analytics"&&<AnalyticsPage {...ctx}/>}
@@ -11192,8 +11345,8 @@ export default function App(){
         {view==="monitoring"&&<LearnerMonitoringPage students={students} user={user} monitoring={monitoring} setMonitoring={setMonitoring}/>}
         {view==="attendance"&&<AttendancePage {...ctx}/>}
         {view==="timeinout"&&<TimeInOutPage students={students} staff={staff} user={user}/>}
-        {view==="staff"&&user.role==="admin"&&<StaffPage staff={staff} setStaff={setStaff} users={users} setUsers={setUsers}/>}
-        {view==="staff"&&user.role!=="admin"&&<div style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Admin access required.</div>}
+        {view==="staff"&&(user.role==="admin"||["dean","secretary","manager","director"].includes(user.contactRole))&&<StaffPage staff={staff} setStaff={setStaff} users={users} setUsers={setUsers}/>}
+        {view==="staff"&&user.role!=="admin"&&!["dean","secretary","manager","director"].includes(user.contactRole)&&<div style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Access restricted. Contact administrator.</div>}
         {view==="duty"&&<DutyPage staff={staff} user={user} students={students} duties={duties} setDuties={setDuties} teacherAvail={teacherAvail} setTeacherAvail={setTeacherAvail} stuRoster={stuRoster} setStuRoster={setStuRoster}/>}
         {view==="council"&&<CouncilPage students={students} user={user} council={council} setCouncil={setCouncil} stuDuties={stuDuties} setStuDuties={setStuDuties}/>}
         {view==="clubs"&&<ClubsPage students={students} staff={staff} user={user} clubs={clubs} setClubs={setClubs}/>}
@@ -11217,10 +11370,10 @@ export default function App(){
         {view==="schoolinfo"&&<SchoolInfoPage logo={logo}/>}
         {/* ── New components ── */}
         {view==="staff_att_report"&&<StaffAttendanceReport staff={staff} user={user}/>}
-        {view==="dean_settings"&&user.role==="admin"&&<DeanSettingsPage staff={staff} user={user} students={students}/>}
-        {view==="dean_settings"&&user.role!=="admin"&&<div style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Admin access required.</div>}
-        {view==="exam_settings"&&user.role==="admin"&&<ExamSettingsPage user={user}/>}
-        {view==="exam_settings"&&user.role!=="admin"&&<div style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Admin access required.</div>}
+        {view==="dean_settings"&&(user.role==="admin"||user.contactRole==="dean")&&<DeanSettingsPage staff={staff} user={user} students={students}/>}
+        {view==="dean_settings"&&user.role!=="admin"&&user.contactRole!=="dean"&&<div style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Dean or Admin access required.</div>}
+        {view==="exam_settings"&&(user.role==="admin"||user.contactRole==="dean")&&<ExamSettingsPage user={user}/>}
+        {view==="exam_settings"&&user.role!=="admin"&&user.contactRole!=="dean"&&<div style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Dean or Admin access required.</div>}
         {view==="subject_allocation"&&<SubjectAllocationPage staff={staff} user={user} students={students}/>}
         {view==="edit_marks"&&<EditMarksPage students={students} results={results} setResults={setResults} term={term} year={year} examType={examType}/>}
         {view==="marks_status"&&<MarksStatusPage students={students} results={results} term={term} year={year} examType={examType}/>}
