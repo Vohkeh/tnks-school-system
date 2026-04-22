@@ -1149,7 +1149,7 @@ function StudentsPage({students,setStudents,results,setResults,comments,setComme
     setFees(p=>(p||[]).filter(f=>f.studentId!==id));
     setMonitoring(p=>(p||[]).filter(m=>m.studentId!==id));
   }
-  const filtered=students.filter(s=>{const q=search.toLowerCase(); const ex=s.status==="transferred"||s.status==="completed"||s.status==="alumni"; return !ex&&(s.name.toLowerCase().includes(q)||s.admNo.toLowerCase().includes(q))&&(filterCls==="All"||s.class===filterCls);});
+  const filtered=students.filter(s=>{const q=search.toLowerCase(); const ex=s.status==="transferred"||s.status==="completed"||s.status==="alumni"; return !ex&&(s.name.toLowerCase().includes(q)||s.admNo.toLowerCase().includes(q))&&(filterCls==="All"||s.class===filterCls);}).sort((a,b)=>{const na=parseInt((a.admNo||"").replace(/\D/g,""))||0; const nb=parseInt((b.admNo||"").replace(/\D/g,""))||0; return na-nb;});
   const th={textAlign:"left",padding:"10px 12px",fontWeight:"bold",fontSize:11,color:"#7c3aed",background:"#f5f3ff",letterSpacing:.5};
   const td={padding:"9px 12px",fontSize:12,color:"#374151",borderTop:"1px solid #f1f5f9"};
   return (
@@ -1375,7 +1375,7 @@ function ResultsPage({students,results,setResults,comments,setComments,users,ter
   const [msg,setMsg]=useState(""); const [tab,setTab]=useState("entry");
   const [cmMode,setCmMode]=useState(false); const [cmStu,setCmStu]=useState(null); const [cmText,setCmText]=useState(""); const [cmMsg,setCmMsg]=useState("");
   const subs=getSubs(cls); const curSub=sub||subs[0]||"";
-  const clsStu=students.filter(s=>s.class===cls);
+  const clsStu=students.filter(s=>s.class===cls).sort((a,b)=>{const na=parseInt((a.admNo||"").replace(/\D/g,""))||0; const nb=parseInt((b.admNo||"").replace(/\D/g,""))||0; return na-nb;});
   useEffect(()=>{const m={}; clsStu.forEach(s=>{const r=results.find(r=>r.studentId===s.id&&r.class===cls&&r.subject===curSub&&r.term===term&&r.year===year&&r.examType===examType); if(r) m[s.id]=r.marks;}); setMarks(m);},[cls,curSub,term,year,examType,results.length]);
 
   function autoComment(name, avg) {
@@ -1734,7 +1734,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
   const [selId,setSelId]=useState("");
   const [showDl,setShowDl]=useState(false);
   const [printMode,setPrintMode]=useState("results"); // "results" | "grades"
-  const clsStu=students.filter(s=>s.class===cls);
+  const clsStu=students.filter(s=>s.class===cls).sort((a,b)=>{const na=parseInt((a.admNo||"").replace(/\D/g,""))||0; const nb=parseInt((b.admNo||"").replace(/\D/g,""))||0; return na-nb;});
   const sel=selId?students.find(s=>s.id===selId):null;
 
   // Compute class rankings for position column
@@ -2034,7 +2034,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
   function downloadClassExcel(className, mode) {
     loadSheetJS(() => {
       const XL = window.XLSX;
-      const stu = students.filter(s=>s.class===className);
+      const stu = students.filter(s=>s.class===className).sort((a,b)=>{const na=parseInt((a.admNo||"").replace(/\D/g,""))||0; const nb=parseInt((b.admNo||"").replace(/\D/g,""))||0; return na-nb;});
       const { title, colHeaders, rows, teacherRow } = buildExcelData(stu, className, mode);
       const wb = XL.utils.book_new();
       const wsData = [
@@ -2075,7 +2075,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
       const XL = window.XLSX;
       const wb = XL.utils.book_new();
       ALL_CLASSES.forEach(className => {
-        const stu = students.filter(s=>s.class===className);
+        const stu = students.filter(s=>s.class===className).sort((a,b)=>{const na=parseInt((a.admNo||"").replace(/\D/g,""))||0; const nb=parseInt((b.admNo||"").replace(/\D/g,""))||0; return na-nb;});
         if(!stu.length) return;
         const { title, colHeaders, rows, teacherRow } = buildExcelData(stu, className, mode);
         const wsData = [
@@ -2108,7 +2108,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
   }
 
   function printSingle(student){
-    const classStudents=students.filter(s=>s.class===student.class);
+    const classStudents=students.filter(s=>s.class===student.class).sort((a,b)=>{const na=parseInt((a.admNo||"").replace(/\D/g,""))||0; const nb=parseInt((b.admNo||"").replace(/\D/g,""))||0; return na-nb;});
     const ranked=getClassRankings(classStudents);
     printWindow(`Report — ${student.name}`, buildReportHTML(student, ranked), logo);
   }
@@ -2126,7 +2126,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
     printWindow(`All School Reports — ${term} ${year}`, body, logo);
   }
   function printClassResults(className, mode){
-    const stu=students.filter(s=>s.class===className);
+    const stu=students.filter(s=>s.class===className).sort((a,b)=>{const na=parseInt((a.admNo||"").replace(/\D/g,""))||0; const nb=parseInt((b.admNo||"").replace(/\D/g,""))||0; return na-nb;});
     const html=`<div style="page-break-after:always;">${mode==="grades"?buildClassGradesHTML(stu,className):buildClassResultsHTML(stu,className)}</div>`;
     printWindow(`${className} ${mode==="grades"?"Grades":"Results"} — ${term} ${year}`, html, logo);
   }
@@ -2352,7 +2352,7 @@ function FeesPage({students,fees,setFees,user,logo}) {
     printWindow(`Fee Statement — ${student.name}`, buildStudentFeeHTML(student), logo);
   }
   function printClassFee(className){
-    const stu=students.filter(s=>s.class===className);
+    const stu=students.filter(s=>s.class===className).sort((a,b)=>{const na=parseInt((a.admNo||"").replace(/\D/g,""))||0; const nb=parseInt((b.admNo||"").replace(/\D/g,""))||0; return na-nb;});
     const body=stu.map(s=>buildStudentFeeHTML(s)).filter(Boolean).join("");
     if(!body){printWindow(`Fee Statement — ${className}`,"<p style='text-align:center;color:#94a3b8;'>No fee records for this class.</p>",logo);return;}
     printWindow(`Fee Statement — ${className}`, body, logo);
@@ -5404,7 +5404,7 @@ function AttendancePage({students}) {
   const [att,setAtt]=useState({}); const [saved,setSaved]=useState(false);
   const STATUSES=["Present","Absent","Late","Excused"];
   const SC={Present:"#1d4ed8",Absent:"#b91c1c",Late:"#b45309",Excused:"#7c3aed"};
-  const clsStu=students.filter(s=>s.class===cls);
+  const clsStu=students.filter(s=>s.class===cls).sort((a,b)=>{const na=parseInt((a.admNo||"").replace(/\D/g,""))||0; const nb=parseInt((b.admNo||"").replace(/\D/g,""))||0; return na-nb;});
   const markAll=(st)=>{const n={...att}; clsStu.forEach(s=>{n[`${date}-${s.id}`]=st;}); setAtt(n);};
   const present=clsStu.filter(s=>!att[`${date}-${s.id}`]||att[`${date}-${s.id}`]==="Present").length;
   const absent=clsStu.filter(s=>att[`${date}-${s.id}`]==="Absent").length;
