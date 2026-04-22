@@ -1139,7 +1139,7 @@ function StudentsPage({students,setStudents,results,setResults,comments,setComme
   const [search,setSearch]=useState(""); const [filterCls,setFilterCls]=useState(preFilterClass&&preFilterClass!=="All"?preFilterClass:"All");
   const [msg,setMsg]=useState({t:"",ok:true}); const [tab,setTab]=useState("list");
   const flash=(t,ok=true)=>{setMsg({t,ok});setTimeout(()=>setMsg({t:"",ok:true}),2800);};
-  function doSave(){if(!form.name.trim()||!form.admNo.trim()) return flash("Name and admission number required.",false); if(editId){setStudents(p=>p.map(s=>s.id===editId?{...s,...form}:s));setEditId(null);flash("Learner updated!");}else{if(students.find(s=>s.admNo===form.admNo)) return flash("Admission number already exists.",false); setStudents(p=>[...p,{...form,id:Date.now().toString(),status:"active",enrollDate:new Date().toLocaleDateString("en-KE")}]);flash("Learner added!");} setForm(blank);setTab("list");}
+  function doSave(){if(!form.name.trim()||!form.admNo.trim()) return flash("Name and admission number required.",false); const fSave={...form,name:form.name.trim().toUpperCase(),parentName:form.parentName?form.parentName.trim().toUpperCase():form.parentName}; if(editId){setStudents(p=>p.map(s=>s.id===editId?{...s,...fSave}:s));setEditId(null);flash("Learner updated!");}else{if(students.find(s=>s.admNo===form.admNo)) return flash("Admission number already exists.",false); setStudents(p=>[...p,{...fSave,id:Date.now().toString(),status:"active",enrollDate:new Date().toLocaleDateString("en-KE")}]);flash("Learner added!");} setForm(blank);setTab("list");}
   function doEdit(s){setForm({name:s.name,admNo:s.admNo,class:s.class,gender:s.gender||"Male",photo:s.photo||"",email:s.email||"",parentPassword:s.parentPassword||"",dob:s.dob||"",parentName:s.parentName||"",parentPhone:s.parentPhone||"",address:s.address||""});setEditId(s.id);setTab("add");}
   function doDel(id){
     if(!confirm("Delete this learner and ALL their records (results, fees, comments)?")) return;
@@ -1351,7 +1351,7 @@ function AdmissionsPage({students,setStudents}) {
   const [tStu,setTStu]=useState(""); const [tDest,setTDest]=useState(""); const [tReason,setTReason]=useState(""); const [tMsg,setTMsg]=useState("");
   const [search,setSearch]=useState("");
   const flash=(t,ok=true)=>{setMsg({t,ok});setTimeout(()=>setMsg({t:"",ok:true}),3000);};
-  function doAdmit(){if(!form.name||!form.admNo) return flash("Name and Adm. No required.",false); if(students.find(s=>s.admNo===form.admNo)) return flash("Adm. No exists.",false); setStudents(p=>[...p,{...form,id:Date.now().toString(),status:"active",enrollDate:form.date}]); flash("✅ Learner admitted!"); setForm(blank);}
+  function doAdmit(){if(!form.name||!form.admNo) return flash("Name and Adm. No required.",false); if(students.find(s=>s.admNo===form.admNo)) return flash("Adm. No exists.",false); const fAdmit={...form,name:form.name.trim().toUpperCase(),parentName:form.parentName?form.parentName.trim().toUpperCase():form.parentName}; setStudents(p=>[...p,{...fAdmit,id:Date.now().toString(),status:"active",enrollDate:form.date}]); flash("✅ Learner admitted!"); setForm(blank);}
   function doTransfer(){const s=students.find(x=>x.id===tStu); if(!s){setTMsg("Select student.");return;} setStudents(p=>p.map(x=>x.id===tStu?{...x,status:"transferred",transferDest:tDest,transferReason:tReason,transferDate:new Date().toLocaleDateString("en-KE")}:x)); setTMsg("✅ Transfer recorded."); setTStu("");setTDest("");setTReason("");}
   const th={textAlign:"left",padding:"9px 12px",fontWeight:"bold",fontSize:11,color:"#7c3aed",background:"#f5f3ff"};
   const td={padding:"8px 12px",fontSize:12,borderTop:"1px solid #f1f5f9"};
@@ -1375,7 +1375,7 @@ function ResultsPage({students,results,setResults,comments,setComments,users,ter
   const [msg,setMsg]=useState(""); const [tab,setTab]=useState("entry");
   const [cmMode,setCmMode]=useState(false); const [cmStu,setCmStu]=useState(null); const [cmText,setCmText]=useState(""); const [cmMsg,setCmMsg]=useState("");
   const subs=getSubs(cls); const curSub=sub||subs[0]||"";
-  const clsStu=students.filter(s=>s.class===cls).sort((a,b)=>a.name.localeCompare(b.name));
+  const clsStu=students.filter(s=>s.class===cls);
   useEffect(()=>{const m={}; clsStu.forEach(s=>{const r=results.find(r=>r.studentId===s.id&&r.class===cls&&r.subject===curSub&&r.term===term&&r.year===year&&r.examType===examType); if(r) m[s.id]=r.marks;}); setMarks(m);},[cls,curSub,term,year,examType,results.length]);
 
   function autoComment(name, avg) {
@@ -1734,7 +1734,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
   const [selId,setSelId]=useState("");
   const [showDl,setShowDl]=useState(false);
   const [printMode,setPrintMode]=useState("results"); // "results" | "grades"
-  const clsStu=students.filter(s=>s.class===cls).sort((a,b)=>a.name.localeCompare(b.name));
+  const clsStu=students.filter(s=>s.class===cls);
   const sel=selId?students.find(s=>s.id===selId):null;
 
   // Compute class rankings for position column
@@ -2034,7 +2034,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
   function downloadClassExcel(className, mode) {
     loadSheetJS(() => {
       const XL = window.XLSX;
-      const stu = students.filter(s=>s.class===className).sort((a,b)=>a.name.localeCompare(b.name));
+      const stu = students.filter(s=>s.class===className);
       const { title, colHeaders, rows, teacherRow } = buildExcelData(stu, className, mode);
       const wb = XL.utils.book_new();
       const wsData = [
@@ -2075,7 +2075,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
       const XL = window.XLSX;
       const wb = XL.utils.book_new();
       ALL_CLASSES.forEach(className => {
-        const stu = students.filter(s=>s.class===className).sort((a,b)=>a.name.localeCompare(b.name));
+        const stu = students.filter(s=>s.class===className);
         if(!stu.length) return;
         const { title, colHeaders, rows, teacherRow } = buildExcelData(stu, className, mode);
         const wsData = [
@@ -2108,7 +2108,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
   }
 
   function printSingle(student){
-    const classStudents=students.filter(s=>s.class===student.class).sort((a,b)=>a.name.localeCompare(b.name));
+    const classStudents=students.filter(s=>s.class===student.class);
     const ranked=getClassRankings(classStudents);
     printWindow(`Report — ${student.name}`, buildReportHTML(student, ranked), logo);
   }
@@ -2119,20 +2119,20 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
   }
   function printSchool(){
     const body=ALL_CLASSES.map(c=>{
-      const stu=students.filter(s=>s.class===c).sort((a,b)=>a.name.localeCompare(b.name));
+      const stu=students.filter(s=>s.class===c);
       const ranked=getClassRankings(stu);
       return ranked.map(s=>buildReportHTML(s,ranked)).join("");
     }).join("");
     printWindow(`All School Reports — ${term} ${year}`, body, logo);
   }
   function printClassResults(className, mode){
-    const stu=students.filter(s=>s.class===className).sort((a,b)=>a.name.localeCompare(b.name));
+    const stu=students.filter(s=>s.class===className);
     const html=`<div style="page-break-after:always;">${mode==="grades"?buildClassGradesHTML(stu,className):buildClassResultsHTML(stu,className)}</div>`;
     printWindow(`${className} ${mode==="grades"?"Grades":"Results"} — ${term} ${year}`, html, logo);
   }
   function printSchoolResults(mode){
     const html=ALL_CLASSES.map(c=>{
-      const stu=students.filter(s=>s.class===c).sort((a,b)=>a.name.localeCompare(b.name));
+      const stu=students.filter(s=>s.class===c);
       if(!stu.length) return "";
       return `<div style="page-break-after:always;">${mode==="grades"?buildClassGradesHTML(stu,c):buildClassResultsHTML(stu,c)}</div>`;
     }).filter(Boolean).join("");
@@ -2352,14 +2352,14 @@ function FeesPage({students,fees,setFees,user,logo}) {
     printWindow(`Fee Statement — ${student.name}`, buildStudentFeeHTML(student), logo);
   }
   function printClassFee(className){
-    const stu=students.filter(s=>s.class===className).sort((a,b)=>a.name.localeCompare(b.name));
+    const stu=students.filter(s=>s.class===className);
     const body=stu.map(s=>buildStudentFeeHTML(s)).filter(Boolean).join("");
     if(!body){printWindow(`Fee Statement — ${className}`,"<p style='text-align:center;color:#94a3b8;'>No fee records for this class.</p>",logo);return;}
     printWindow(`Fee Statement — ${className}`, body, logo);
   }
   function printSchoolFee(){
     const body=ALL_CLASSES.flatMap(c=>
-      students.filter(s=>s.class===c).sort((a,b)=>a.name.localeCompare(b.name)).map(s=>buildStudentFeeHTML(s))
+      students.filter(s=>s.class===c).map(s=>buildStudentFeeHTML(s))
     ).filter(Boolean).join("");
     if(!body){printWindow("Full School Fee Statement","<p style='text-align:center;color:#94a3b8;'>No fee records.</p>",logo);return;}
     printWindow("Full School Fee Statement", body, logo);
@@ -2468,7 +2468,7 @@ function FeesPage({students,fees,setFees,user,logo}) {
             <div><label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:3}}>STUDENT *</label>
               <select value={form.studentId} onChange={e=>setForm({...form,studentId:e.target.value})} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px",fontSize:13,fontFamily:F}}>
                 <option value="">-- Select student --</option>
-                {students.sort((a,b)=>a.name.localeCompare(b.name)).map(s=><option key={s.id} value={s.id}>{s.name} ({s.class})</option>)}
+                {students.map(s=><option key={s.id} value={s.id}>{s.name} ({s.class})</option>)}
               </select>
             </div>
             <Sel label="FEE TYPE" value={form.feeType} onChange={v=>setForm({...form,feeType:v})} options={["School Fees","Activity Fees","Transport","Lunch","Uniform","Books","Exam Fee","Other"]}/>
@@ -5404,7 +5404,7 @@ function AttendancePage({students}) {
   const [att,setAtt]=useState({}); const [saved,setSaved]=useState(false);
   const STATUSES=["Present","Absent","Late","Excused"];
   const SC={Present:"#1d4ed8",Absent:"#b91c1c",Late:"#b45309",Excused:"#7c3aed"};
-  const clsStu=students.filter(s=>s.class===cls).sort((a,b)=>a.name.localeCompare(b.name));
+  const clsStu=students.filter(s=>s.class===cls);
   const markAll=(st)=>{const n={...att}; clsStu.forEach(s=>{n[`${date}-${s.id}`]=st;}); setAtt(n);};
   const present=clsStu.filter(s=>!att[`${date}-${s.id}`]||att[`${date}-${s.id}`]==="Present").length;
   const absent=clsStu.filter(s=>att[`${date}-${s.id}`]==="Absent").length;
@@ -6839,7 +6839,7 @@ function LearnerMonitoringPage({students,user,monitoring,setMonitoring}) {
             <div><label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:3}}>LEARNER *</label>
               <select value={form.studentId} onChange={e=>setForm({...form,studentId:e.target.value})} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px",fontSize:13,fontFamily:F}}>
                 <option value="">-- Select learner --</option>
-                {students.sort((a,b)=>a.name.localeCompare(b.name)).map(s=><option key={s.id} value={s.id}>{s.name} ({s.class})</option>)}
+                {students.map(s=><option key={s.id} value={s.id}>{s.name} ({s.class})</option>)}
               </select>
             </div>
             <Sel label="TYPE *" value={form.type} onChange={v=>setForm({...form,type:v,status:""})} options={MONITORING_TYPES}/>
@@ -7425,7 +7425,7 @@ function BulkOperationsPage({ students, setStudents, results, setResults, fees, 
 
   function parseBulkMarks() {
     const lines = bulkMarksText.trim().split("\n").filter(Boolean);
-    const clsStudents = students.filter(s => s.class === bulkCls).sort((a, b) => a.name.localeCompare(b.name));
+    const clsStudents = students.filter(s => s.class === bulkCls);
     const subs = getSubs(bulkCls);
     const parsed = [];
     let errors = [];
@@ -8364,7 +8364,7 @@ function TransportPage({ students, setStudents, user, transportRoutes, setTransp
             <label style={{ fontSize: 11, fontWeight: "bold", color: "#374151", display: "block", marginBottom: 3 }}>STUDENT</label>
             <select value={assignId} onChange={e => setAssignId(e.target.value)} style={{ width: "100%", border: "1.5px solid #e2e8f0", borderRadius: 8, padding: "8px 10px", fontSize: 13, fontFamily: "Georgia,serif" }}>
               <option value="">-- Select student --</option>
-              {students.filter(s => s.status !== "transferred").sort((a, b) => a.name.localeCompare(b.name)).map(s => <option key={s.id} value={s.id}>{s.name} ({s.class}) {s.busRoute ? `[Currently: ${s.busRoute}]` : ""}</option>)}
+              {students.filter(s => s.status !== "transferred").map(s => <option key={s.id} value={s.id}>{s.name} ({s.class}) {s.busRoute ? `[Currently: ${s.busRoute}]` : ""}</option>)}
             </select>
           </div>
           <Btn onClick={assignStudent} v="blue">Assign to {selRoute}</Btn>
@@ -8389,7 +8389,7 @@ function TransportPage({ students, setStudents, user, transportRoutes, setTransp
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead><tr>{["#", "Name", "Class", "Adm No", "Parent", "Phone", user.role === "admin" ? "Action" : ""].filter(Boolean).map(h => <th key={h} style={th}>{h}</th>)}</tr></thead>
             <tbody>
-              {busStudents(selRoute).length ? busStudents(selRoute).sort((a, b) => a.name.localeCompare(b.name)).map((s, i) => <tr key={s.id} style={{ background: i % 2 === 0 ? "white" : "#fafafa" }}>
+              {busStudents(selRoute).length ? busStudents(selRoute).map((s, i) => <tr key={s.id} style={{ background: i % 2 === 0 ? "white" : "#fafafa" }}>
                 <td style={{ ...td, color: "#94a3b8" }}>{i + 1}</td>
                 <td style={{ ...td, fontWeight: "bold" }}>{s.name}</td>
                 <td style={td}>{s.class}</td>
@@ -8513,7 +8513,7 @@ function ParentCommPage({ students, staff, user, parentComms, setParentComms }) 
           <div><label style={{ fontSize: 11, fontWeight: "bold", color: "#374151", display: "block", marginBottom: 3 }}>STUDENT *</label>
             <select value={form.studentId} onChange={e => setForm({ ...form, studentId: e.target.value })} style={{ width: "100%", border: "1.5px solid #e2e8f0", borderRadius: 8, padding: "8px", fontSize: 13, fontFamily: "Georgia,serif" }}>
               <option value="">-- Select --</option>
-              {students.sort((a, b) => a.name.localeCompare(b.name)).map(s => <option key={s.id} value={s.id}>{s.name} ({s.class})</option>)}
+              {students.map(s => <option key={s.id} value={s.id}>{s.name} ({s.class})</option>)}
             </select>
           </div>
           <Sel label="TYPE" value={form.type} onChange={v => setForm({ ...form, type: v })} options={Object.keys(TYPE_COLORS)} />
@@ -9808,7 +9808,7 @@ function PromissoryNotesPage({ students, user }) {
           <div><label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:3}}>STUDENT *</label>
             <select value={form.studentId} onChange={e=>setForm(p=>({...p,studentId:e.target.value}))} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px",fontSize:13,fontFamily:F}}>
               <option value="">-- Select --</option>
-              {students.sort((a,b)=>a.name.localeCompare(b.name)).map(s=><option key={s.id} value={s.id}>{s.name} ({s.class})</option>)}
+              {students.map(s=><option key={s.id} value={s.id}>{s.name} ({s.class})</option>)}
             </select></div>
           <Inp label="AMOUNT PROMISED (KES) *" value={form.amount} onChange={v=>setForm(p=>({...p,amount:v}))} type="number" placeholder="0"/>
           <Inp label="PAYMENT DUE DATE *" value={form.dueDate} onChange={v=>setForm(p=>({...p,dueDate:v}))} type="date"/>
@@ -10453,7 +10453,7 @@ function StudentRoutesPage({ students, setStudents, user }) {
           </div>
           {routeStudents.length ? <table style={{width:"100%",borderCollapse:"collapse"}}>
             <thead><tr>{["#","Name","Class","Action"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
-            <tbody>{routeStudents.sort((a,b)=>a.name.localeCompare(b.name)).map((s,i)=><tr key={s.id} style={{background:i%2===0?"white":"#fafafa"}}>
+            <tbody>{routeStudents.map((s,i)=><tr key={s.id} style={{background:i%2===0?"white":"#fafafa"}}>
               <td style={{...td,color:"#94a3b8"}}>{i+1}</td>
               <td style={{...td,fontWeight:"bold"}}>{s.name}</td>
               <td style={td}>{s.class}</td>
@@ -11099,11 +11099,18 @@ export default function App(){
     const gName=gFonts[font];
     if(gName){const id="tnks-gfont";let el=document.getElementById(id);if(!el){el=document.createElement("link");el.id=id;el.rel="stylesheet";document.head.appendChild(el);}el.href=`https://fonts.googleapis.com/css2?family=${gName}:wght@400;600;700&display=swap`;}
   },[]);
-  // Restore session on refresh
-  const [user,setUser]=useState(()=>{try{const s=localStorage.getItem("tnks_user");return s?JSON.parse(s):null;}catch{return null;}});
-  const [view,setView]=useState(()=>localStorage.getItem("tnks_view")||"dashboard");
+  // Do NOT restore session on refresh — always require login on page load
+  const [user,setUser]=useState(null);
+  const [view,setView]=useState("dashboard");
   useEffect(()=>{if(user){localStorage.setItem("tnks_user",JSON.stringify(user));}else{localStorage.removeItem("tnks_user");localStorage.removeItem("tnks_view");}},[user]);
   useEffect(()=>{if(user)localStorage.setItem("tnks_view",view);},[view,user]);
+  // Log out when the user leaves / closes the tab
+  useEffect(()=>{
+    function handleLeave(){setUser(null);}
+    window.addEventListener("beforeunload",handleLeave);
+    document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")setUser(null);});
+    return()=>{window.removeEventListener("beforeunload",handleLeave);};
+  },[]);
   const [users,setUsers]=useState(DEFAULT_USERS);
   const [students,setStudents]=useState([]);
   const [results,setResults]=useState([]);
