@@ -6880,7 +6880,7 @@ function LearnerMonitoringPage({students,user,monitoring,setMonitoring}) {
             <div><label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:3}}>LEARNER *</label>
               <select value={form.studentId} onChange={e=>setForm({...form,studentId:e.target.value})} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px",fontSize:13,fontFamily:F}}>
                 <option value="">-- Select learner --</option>
-                {sortStudentsByAdm(students.filter(s=>pnGrade==="All"||s.class===pnGrade)).map(s=><option key={s.id} value={s.id}>{s.name} ({s.admNo||"—"}) — {s.class}</option>)}
+                {sortStudentsByAdm(students.filter(s=>filterCls==="All"||s.class===filterCls)).map(s=><option key={s.id} value={s.id}>{s.name} ({s.admNo||"—"}) — {s.class}</option>)}
               </select>
             </div>
             <Sel label="TYPE *" value={form.type} onChange={v=>setForm({...form,type:v,status:""})} options={MONITORING_TYPES}/>
