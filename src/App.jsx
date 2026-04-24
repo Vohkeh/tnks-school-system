@@ -116,6 +116,42 @@ const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday"];
 const WEEKEND_DAYS = ["Saturday","Sunday"];
 const CC = ["#7c3aed","#1d4ed8","#b45309","#b91c1c","#7c3aed","#0e7490","#be185d","#1e3a8a","#7c3aed","#9333ea"];
 const STUDENT_TYPES = ["Day Scholar","Boarder","Bus (Route A)","Bus (Route B)","Bus (Route C)"];
+
+// ── Helper: sort students by admission number (middle segment TNKS/NNN/YEAR)
+function sortStudentsByAdm(arr){
+  return [...arr].sort((a,b)=>{
+    const p1=(a.admNo||"").split("/"); const p2=(b.admNo||"").split("/");
+    const n1=parseInt(p1[1])||parseInt(p1[p1.length-1])||0;
+    const n2=parseInt(p2[1])||parseInt(p2[p2.length-1])||0;
+    return n1-n2;
+  });
+}
+// ── GradeStudentSelect: grade filter + sorted student dropdown in one widget
+function GradeStudentSelect({students,value,onChange,label="STUDENT",placeholder="-- Select student --",style={}}){
+  const [gradeF,setGradeF]=React.useState("All");
+  const visible=sortStudentsByAdm(students).filter(s=>gradeF==="All"||s.class===gradeF);
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:6,...style}}>
+      <div style={{display:"flex",gap:6,alignItems:"flex-end"}}>
+        <div style={{flex:1}}>
+          <label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:3}}>{label} *</label>
+          <select value={value} onChange={e=>onChange(e.target.value)} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px",fontSize:13,fontFamily:"Georgia,serif"}}>
+            <option value="">{placeholder}</option>
+            {visible.map(s=><option key={s.id} value={s.id}>{s.name} ({s.admNo||"—"}) — {s.class}</option>)}
+          </select>
+        </div>
+        <div style={{minWidth:120}}>
+          <label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:3}}>GRADE</label>
+          <select value={gradeF} onChange={e=>setGradeF(e.target.value)} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px",fontSize:12,fontFamily:"Georgia,serif"}}>
+            <option value="All">All Grades</option>
+            {["PP1","PP2","Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"].map(g=><option key={g} value={g}>{g}</option>)}
+          </select>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const HEALTH_STATUSES = ["Healthy","Sick - In School","Sick - Sent Home","Hospitalised","Recovering"];
 const DISCIPLINE_LEVELS = ["Good","Minor Issue","Warning","Suspension Risk","Suspended","Expelled"];
 const MONITORING_TYPES = ["Health","Discipline","Absent - Home","Absent - Sick","Absent - Other","Late","Left Early"];
@@ -1149,13 +1185,13 @@ function StudentsPage({students,setStudents,results,setResults,comments,setComme
     setFees(p=>(p||[]).filter(f=>f.studentId!==id));
     setMonitoring(p=>(p||[]).filter(m=>m.studentId!==id));
   }
-  const filtered=students.filter(s=>{const q=search.toLowerCase(); const ex=s.status==="transferred"||s.status==="completed"||s.status==="alumni"; return !ex&&(s.name.toLowerCase().includes(q)||s.admNo.toLowerCase().includes(q))&&(filterCls==="All"||s.class===filterCls);}).sort((a,b)=>{const na=parseInt((a.admNo||"").replace(/\D/g,""))||0; const nb=parseInt((b.admNo||"").replace(/\D/g,""))||0; return na-nb;});
+  const filtered=sortStudentsByAdm(students.filter(s=>{const q=search.toLowerCase(); const ex=s.status==="transferred"||s.status==="completed"||s.status==="alumni"; return !ex&&(s.name.toLowerCase().includes(q)||s.admNo.toLowerCase().includes(q))&&(filterCls==="All"||s.class===filterCls);}));
   const th={textAlign:"left",padding:"10px 12px",fontWeight:"bold",fontSize:11,color:"#7c3aed",background:"#f5f3ff",letterSpacing:.5};
   const td={padding:"9px 12px",fontSize:12,color:"#374151",borderTop:"1px solid #f1f5f9"};
   return (
     <div style={{padding:24}}>
       <PageH title="Students" sub="Manage all learners"><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{[["list","📋 List"],["add","➕ Add"],["idcards","🪪 ID Cards"]].map(([t,l])=><Btn key={t} onClick={()=>{setTab(t);if(t==="add"&&!editId)setForm(blank);}} v={tab===t?"primary":"ghost"} style={{fontSize:12}}>{l}</Btn>)}</div></PageH>
-      {tab==="add"&&<Card style={{marginBottom:20}}><div style={{fontWeight:"bold",color:"#1e293b",marginBottom:14,fontSize:14}}>{editId?"Edit Learner":"Add New Learner"}</div><div style={{marginBottom:14}}><PhotoUp value={form.photo} onChange={v=>setForm({...form,photo:v})}/></div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}><Inp label="FULL NAME *" value={form.name} onChange={v=>setForm({...form,name:v})} placeholder="Full name"/><Inp label="ADM. NUMBER *" value={form.admNo} onChange={v=>setForm({...form,admNo:v})} placeholder="NKS/2025/001"/><Sel label="CLASS" value={form.class} onChange={v=>setForm({...form,class:v})} options={ALL_CLASSES}/><Sel label="GENDER" value={form.gender} onChange={v=>setForm({...form,gender:v})} options={["Male","Female"]}/><Inp label="DATE OF BIRTH" value={form.dob} onChange={v=>setForm({...form,dob:v})} placeholder="DD/MM/YYYY"/><Inp label="PARENT/GUARDIAN" value={form.parentName} onChange={v=>setForm({...form,parentName:v})} placeholder="Parent full name"/><Inp label="PARENT PHONE" value={form.parentPhone} onChange={v=>setForm({...form,parentPhone:v})} placeholder="+254 7..."/><Inp label="HOME ADDRESS" value={form.address} onChange={v=>setForm({...form,address:v})} placeholder="Village/Location"/></div><div style={{marginTop:12,paddingTop:12,borderTop:"1px dashed #e2e8f0"}}><div style={{fontSize:12,fontWeight:"bold",color:"#3b0764",marginBottom:10}}>👨‍👩‍👧 Parent Portal Access</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="LEARNER EMAIL (parent login)" value={form.email} onChange={v=>setForm({...form,email:v})} placeholder="john@gmail.com" type="email"/><Inp label="PARENT PASSWORD" value={form.parentPassword} onChange={v=>setForm({...form,parentPassword:v})} placeholder="Set password" type="password"/></div></div>{msg.t&&<div style={{marginTop:10,fontSize:13,color:msg.ok?"#1d4ed8":"#b91c1c",fontWeight:"bold"}}>{msg.t}</div>}<div style={{display:"flex",gap:8,marginTop:14}}><Btn onClick={doSave} v="primary">{editId?"Update":"Add Learner"}</Btn>{editId&&<Btn onClick={()=>{setEditId(null);setForm(blank);setTab("list");}} v="ghost">Cancel</Btn>}</div></Card>}
+      {tab==="add"&&<Card style={{marginBottom:20}}><div style={{fontWeight:"bold",color:"#1e293b",marginBottom:14,fontSize:14}}>{editId?"Edit Learner":"Add New Learner"}</div><div style={{marginBottom:14}}><PhotoUp value={form.photo} onChange={v=>setForm({...form,photo:v})}/></div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}><Inp label="FULL NAME *" value={form.name} onChange={v=>setForm({...form,name:v})} placeholder="Full name"/><Inp label="ADM. NUMBER *" value={form.admNo} onChange={v=>setForm({...form,admNo:v})} placeholder="TNKS/001/2025"/><Sel label="CLASS" value={form.class} onChange={v=>setForm({...form,class:v})} options={ALL_CLASSES}/><Sel label="GENDER" value={form.gender} onChange={v=>setForm({...form,gender:v})} options={["Male","Female"]}/><Inp label="DATE OF BIRTH" value={form.dob} onChange={v=>setForm({...form,dob:v})} placeholder="DD/MM/YYYY"/><Inp label="PARENT/GUARDIAN" value={form.parentName} onChange={v=>setForm({...form,parentName:v})} placeholder="Parent full name"/><Inp label="PARENT PHONE" value={form.parentPhone} onChange={v=>setForm({...form,parentPhone:v})} placeholder="+254 7..."/><Inp label="HOME ADDRESS" value={form.address} onChange={v=>setForm({...form,address:v})} placeholder="Village/Location"/></div><div style={{marginTop:12,paddingTop:12,borderTop:"1px dashed #e2e8f0"}}><div style={{fontSize:12,fontWeight:"bold",color:"#3b0764",marginBottom:10}}>👨‍👩‍👧 Parent Portal Access</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="LEARNER EMAIL (parent login)" value={form.email} onChange={v=>setForm({...form,email:v})} placeholder="john@gmail.com" type="email"/><Inp label="PARENT PASSWORD" value={form.parentPassword} onChange={v=>setForm({...form,parentPassword:v})} placeholder="Set password" type="password"/></div></div>{msg.t&&<div style={{marginTop:10,fontSize:13,color:msg.ok?"#1d4ed8":"#b91c1c",fontWeight:"bold"}}>{msg.t}</div>}<div style={{display:"flex",gap:8,marginTop:14}}><Btn onClick={doSave} v="primary">{editId?"Update":"Add Learner"}</Btn>{editId&&<Btn onClick={()=>{setEditId(null);setForm(blank);setTab("list");}} v="ghost">Cancel</Btn>}</div></Card>}
       {tab==="list"&&<><div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by name or adm. no..." style={{flex:1,minWidth:200,border:"1.5px solid #e2e8f0",borderRadius:9,padding:"8px 12px",fontSize:13,fontFamily:F,outline:"none"}}/><Sel value={filterCls} onChange={setFilterCls} options={["All",...ALL_CLASSES]}/><span style={{fontSize:12,color:"#64748b"}}>{filtered.length} learner(s)</span></div><Card style={{padding:0}}><div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}><thead><tr>{["","#","Adm.No","Name","Class","Gender","Parent","Portal","Actions"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>{filtered.length?filtered.map((s,i)=><tr key={s.id} style={{background:i%2===0?"white":"#fafafa"}}><td style={{...td,width:46}}><Avatar name={s.name} photo={s.photo} size={34}/></td><td style={{...td,color:"#94a3b8"}}>{i+1}</td><td style={{...td,fontFamily:"monospace",fontSize:11}}>{s.admNo}</td><td style={{...td,fontWeight:"bold"}}>{s.name}</td><td style={td}><span style={{background:"#f5f3ff",color:"#7c3aed",fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:"bold"}}>{s.class}</span></td><td style={td}>{s.gender||"—"}</td><td style={{...td,fontSize:11}}>{s.parentName||"—"}</td><td style={td}>{s.email?<span style={{fontSize:10,color:"#1d4ed8"}}>✅</span>:<span style={{fontSize:10,color:"#94a3b8"}}>—</span>}</td><td style={td}><button onClick={()=>doEdit(s)} style={{color:"#7c3aed",background:"none",border:"none",cursor:"pointer",fontSize:12,marginRight:8}}>Edit</button><button onClick={()=>doDel(s.id)} style={{color:"#b91c1c",background:"none",border:"none",cursor:"pointer",fontSize:12}}>Del</button></td></tr>):<tr><td colSpan={9} style={{padding:40,textAlign:"center",color:"#94a3b8"}}>No learners found.</td></tr>}</tbody></table></div></Card></>}
       {tab==="idcards"&&<StudentIDCards students={students} filterCls={filterCls} setFilterCls={setFilterCls} logo={logo}/>}
     </div>
@@ -1169,14 +1205,14 @@ function StudentIDCards({students, filterCls, setFilterCls, logo}) {
   const [idYear, setIdYear] = useState(String(new Date().getFullYear()));
   const [layout, setLayout] = useState("grid"); // grid | single
 
-  const toShow = students.filter(s =>
+  const toShow = sortStudentsByAdm(students.filter(s =>
     (filterCls==="All" || s.class===filterCls) &&
     (selStu==="All" || s.id===selStu) &&
     s.status !== "transferred"
   );
 
   function printIDCard(s) {
-    const barsHTML = (s.admNo||"NKS/0000/001").split("").map((ch,i) =>
+    const barsHTML = (s.admNo||"TNKS/0000/001").split("").map((ch,i) =>
       `<div style="display:inline-block;width:${i%3===0?3:2}px;height:28px;background:#3b0764;margin-right:1px;vertical-align:middle;"></div>`
     ).join("");
 
@@ -1207,7 +1243,7 @@ function StudentIDCards({students, filterCls, setFilterCls, logo}) {
         </div>
         <div style="background:white;margin:0 8px 6px;border-radius:4px;padding:4px 6px;text-align:center;">
           ${barsHTML}
-          <div style="font-size:7px;color:#3b0764;margin-top:2px;letter-spacing:1.2px;">${s.admNo||"NKS/0000/001"}</div>
+          <div style="font-size:7px;color:#3b0764;margin-top:2px;letter-spacing:1.2px;">${s.admNo||"TNKS/0000/001"}</div>
         </div>
         <div style="background:rgba(0,0,0,.25);padding:4px 10px;display:flex;justify-content:space-between;">
           <span style="font-size:6.5px;opacity:.8;">LEARNER ID CARD</span>
@@ -1322,7 +1358,7 @@ function StudentIDCards({students, filterCls, setFilterCls, logo}) {
               {/* Barcode strip */}
               <div style={{background:"white",margin:"0 8px 8px",borderRadius:4,padding:"3px 6px",textAlign:"center"}}>
                 <div style={{display:"flex",justifyContent:"center",gap:"1px",marginBottom:2}}>
-                  {(s.admNo||"NKS/001").split("").map((c,i)=><div key={i} style={{width:i%3===0?3:2,height:20,background:"#3b0764"}}/>)}
+                  {(s.admNo||"TNKS/001").split("").map((c,i)=><div key={i} style={{width:i%3===0?3:2,height:20,background:"#3b0764"}}/>)}
                 </div>
                 <div style={{fontSize:7,color:"#3b0764",letterSpacing:1}}>{s.admNo||"—"}</div>
               </div>
@@ -1348,6 +1384,8 @@ function StudentIDCards({students, filterCls, setFilterCls, logo}) {
 function AdmissionsPage({students,setStudents}) {
   const blank={name:"",admNo:"",class:"Grade 1",gender:"Male",dob:"",parentName:"",parentPhone:"",prevSchool:"",date:new Date().toLocaleDateString("en-KE"),type:"new"};
   const [form,setForm]=useState(blank); const [msg,setMsg]=useState({t:"",ok:true}); const [tab,setTab]=useState("admit");
+  const [filterReg,setFilterReg]=useState("All"); const [filterTrn,setFilterTrn]=useState("All");
+  const [tGrade,setTGrade]=useState("All");
   const [tStu,setTStu]=useState(""); const [tDest,setTDest]=useState(""); const [tReason,setTReason]=useState(""); const [tMsg,setTMsg]=useState("");
   const [search,setSearch]=useState("");
   const flash=(t,ok=true)=>{setMsg({t,ok});setTimeout(()=>setMsg({t:"",ok:true}),3000);};
@@ -1359,10 +1397,10 @@ function AdmissionsPage({students,setStudents}) {
     <div style={{padding:24}}>
       <PageH title="Admissions & Transfers" sub="New admissions, re-admissions and transfers"/>
       <div style={{display:"flex",gap:8,marginBottom:18}}>{[["admit","📋 Admit"],["transfer","🔄 Transfer Out"],["register","📜 Register"],["transferred","📤 Transferred"]].map(([t,l])=><Btn key={t} onClick={()=>setTab(t)} v={tab===t?"primary":"ghost"} style={{fontSize:12}}>{l}</Btn>)}</div>
-      {tab==="admit"&&<Card><div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>New Admission / Re-Admission</div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}><Inp label="FULL NAME *" value={form.name} onChange={v=>setForm({...form,name:v})} placeholder="Learner name"/><Inp label="ADM. NUMBER *" value={form.admNo} onChange={v=>setForm({...form,admNo:v})} placeholder="NKS/2025/001"/><Sel label="CLASS" value={form.class} onChange={v=>setForm({...form,class:v})} options={ALL_CLASSES}/><Sel label="GENDER" value={form.gender} onChange={v=>setForm({...form,gender:v})} options={["Male","Female"]}/><Inp label="DATE OF BIRTH" value={form.dob} onChange={v=>setForm({...form,dob:v})} placeholder="DD/MM/YYYY"/><Inp label="ADMISSION DATE" value={form.date} onChange={v=>setForm({...form,date:v})} placeholder="DD/MM/YYYY"/><Inp label="PARENT/GUARDIAN" value={form.parentName} onChange={v=>setForm({...form,parentName:v})} placeholder="Parent name"/><Inp label="PARENT PHONE" value={form.parentPhone} onChange={v=>setForm({...form,parentPhone:v})} placeholder="+254 7..."/><Inp label="PREVIOUS SCHOOL" value={form.prevSchool} onChange={v=>setForm({...form,prevSchool:v})} placeholder="Prev school"/><Sel label="ADMISSION TYPE" value={form.type} onChange={v=>setForm({...form,type:v})} options={["new","re-admission","transfer-in"]}/></div>{msg.t&&<div style={{marginTop:10,fontSize:13,color:msg.ok?"#1d4ed8":"#b91c1c",fontWeight:"bold"}}>{msg.t}</div>}<div style={{marginTop:14}}><Btn onClick={doAdmit} v="blue">✅ Admit Learner</Btn></div></Card>}
-      {tab==="transfer"&&<Card><div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>Transfer Out / Withdrawal</div><div style={{display:"grid",gap:12}}><div><label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:4}}>SELECT STUDENT</label><select value={tStu} onChange={e=>setTStu(e.target.value)} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px",fontSize:13,fontFamily:F}}><option value="">-- Select student --</option>{students.filter(s=>s.status!=="transferred").map(s=><option key={s.id} value={s.id}>{s.name} ({s.admNo}) — {s.class}</option>)}</select></div><Inp label="DESTINATION SCHOOL" value={tDest} onChange={setTDest} placeholder="School transferring to"/><Textarea label="REASON" value={tReason} onChange={setTReason} placeholder="Reason for transfer..."/></div>{tMsg&&<div style={{marginTop:10,fontSize:13,color:"#1d4ed8",fontWeight:"bold"}}>{tMsg}</div>}<div style={{marginTop:14}}><Btn onClick={doTransfer} v="amber">🔄 Record Transfer</Btn></div></Card>}
-      {tab==="register"&&<><div style={{marginBottom:12}}><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search..." style={{border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px 12px",fontSize:13,fontFamily:F,outline:"none",width:280}}/></div><Card style={{padding:0}}><div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}><thead><tr>{["#","Adm.No","Name","Class","Gender","Date Admitted","Type","Status"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>{students.filter(s=>s.enrollDate&&(!search||s.name.toLowerCase().includes(search.toLowerCase())||s.admNo.toLowerCase().includes(search.toLowerCase()))).map((s,i)=><tr key={s.id} style={{background:i%2===0?"white":"#fafafa"}}><td style={{...td,color:"#94a3b8"}}>{i+1}</td><td style={{...td,fontFamily:"monospace",fontSize:11}}>{s.admNo}</td><td style={{...td,fontWeight:"bold"}}>{s.name}</td><td style={td}>{s.class}</td><td style={td}>{s.gender||"—"}</td><td style={td}>{s.enrollDate||"—"}</td><td style={td}><span style={{fontSize:10,background:"#f5f3ff",color:"#7c3aed",padding:"2px 8px",borderRadius:20,fontWeight:"bold"}}>{s.type||"new"}</span></td><td style={td}><span style={{fontSize:10,background:s.status==="active"?"#f5f3ff":"#fef2f2",color:s.status==="active"?"#1d4ed8":"#b91c1c",padding:"2px 8px",borderRadius:20,fontWeight:"bold"}}>{s.status||"active"}</span></td></tr>)}</tbody></table></div></Card></>}
-      {tab==="transferred"&&<Card style={{padding:0}}><div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}><thead><tr>{["Name","Class","Transfer To","Reason","Date"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>{students.filter(s=>s.status==="transferred").length?students.filter(s=>s.status==="transferred").map((s,i)=><tr key={s.id} style={{background:i%2===0?"white":"#fafafa"}}><td style={{...td,fontWeight:"bold"}}>{s.name}</td><td style={td}>{s.class}</td><td style={td}>{s.transferDest||"—"}</td><td style={td}>{s.transferReason||"—"}</td><td style={td}>{s.transferDate||"—"}</td></tr>):<tr><td colSpan={5} style={{padding:30,textAlign:"center",color:"#94a3b8"}}>No transfers recorded.</td></tr>}</tbody></table></div></Card>}
+      {tab==="admit"&&<Card><div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>New Admission / Re-Admission</div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}><Inp label="FULL NAME *" value={form.name} onChange={v=>setForm({...form,name:v})} placeholder="Learner name"/><Inp label="ADM. NUMBER *" value={form.admNo} onChange={v=>setForm({...form,admNo:v})} placeholder="TNKS/001/2025"/><Sel label="CLASS" value={form.class} onChange={v=>setForm({...form,class:v})} options={ALL_CLASSES}/><Sel label="GENDER" value={form.gender} onChange={v=>setForm({...form,gender:v})} options={["Male","Female"]}/><Inp label="DATE OF BIRTH" value={form.dob} onChange={v=>setForm({...form,dob:v})} placeholder="DD/MM/YYYY"/><Inp label="ADMISSION DATE" value={form.date} onChange={v=>setForm({...form,date:v})} placeholder="DD/MM/YYYY"/><Inp label="PARENT/GUARDIAN" value={form.parentName} onChange={v=>setForm({...form,parentName:v})} placeholder="Parent name"/><Inp label="PARENT PHONE" value={form.parentPhone} onChange={v=>setForm({...form,parentPhone:v})} placeholder="+254 7..."/><Inp label="PREVIOUS SCHOOL" value={form.prevSchool} onChange={v=>setForm({...form,prevSchool:v})} placeholder="Prev school"/><Sel label="ADMISSION TYPE" value={form.type} onChange={v=>setForm({...form,type:v})} options={["new","re-admission","transfer-in"]}/></div>{msg.t&&<div style={{marginTop:10,fontSize:13,color:msg.ok?"#1d4ed8":"#b91c1c",fontWeight:"bold"}}>{msg.t}</div>}<div style={{marginTop:14}}><Btn onClick={doAdmit} v="blue">✅ Admit Learner</Btn></div></Card>}
+      {tab==="transfer"&&<Card><div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>Transfer Out / Withdrawal</div><div style={{display:"grid",gap:12}}><div><div style={{display:"flex",gap:6,marginBottom:4,alignItems:"center"}}><label style={{fontSize:11,fontWeight:"bold",color:"#374151",flex:1}}>SELECT STUDENT</label><select value={tGrade} onChange={e=>setTGrade(e.target.value)} style={{border:"1.5px solid #e2e8f0",borderRadius:8,padding:"4px 8px",fontSize:12,fontFamily:F}}><option value="All">All Grades</option>{ALL_CLASSES.map(g=><option key={g} value={g}>{g}</option>)}</select></div><select value={tStu} onChange={e=>setTStu(e.target.value)} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px",fontSize:13,fontFamily:F}}><option value="">-- Select student --</option>{sortStudentsByAdm(students.filter(s=>s.status!=="transferred"&&(tGrade==="All"||s.class===tGrade))).map(s=><option key={s.id} value={s.id}>{s.name} ({s.admNo||"—"}) — {s.class}</option>)}</select></div><Inp label="DESTINATION SCHOOL" value={tDest} onChange={setTDest} placeholder="School transferring to"/><Textarea label="REASON" value={tReason} onChange={setTReason} placeholder="Reason for transfer..."/></div>{tMsg&&<div style={{marginTop:10,fontSize:13,color:"#1d4ed8",fontWeight:"bold"}}>{tMsg}</div>}<div style={{marginTop:14}}><Btn onClick={doTransfer} v="amber">🔄 Record Transfer</Btn></div></Card>}
+      {tab==="register"&&<><div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Search name or adm. no..." style={{flex:1,minWidth:200,border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px 12px",fontSize:13,fontFamily:F,outline:"none"}}/><Sel value={filterReg} onChange={setFilterReg} options={["All",...ALL_CLASSES]}/></div><Card style={{padding:0}}><div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}><thead><tr>{["#","Adm.No","Name","Class","Gender","Date Admitted","Type","Status"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>{sortStudentsByAdm(students.filter(s=>s.enrollDate&&(filterReg==="All"||s.class===filterReg)&&(!search||s.name.toLowerCase().includes(search.toLowerCase())||s.admNo.toLowerCase().includes(search.toLowerCase())))).map((s,i)=><tr key={s.id} style={{background:i%2===0?"white":"#fafafa"}}><td style={{...td,color:"#94a3b8"}}>{i+1}</td><td style={{...td,fontFamily:"monospace",fontSize:11}}>{s.admNo}</td><td style={{...td,fontWeight:"bold"}}>{s.name}</td><td style={td}>{s.class}</td><td style={td}>{s.gender||"—"}</td><td style={td}>{s.enrollDate||"—"}</td><td style={td}><span style={{fontSize:10,background:"#f5f3ff",color:"#7c3aed",padding:"2px 8px",borderRadius:20,fontWeight:"bold"}}>{s.type||"new"}</span></td><td style={td}><span style={{fontSize:10,background:s.status==="active"?"#f5f3ff":"#fef2f2",color:s.status==="active"?"#1d4ed8":"#b91c1c",padding:"2px 8px",borderRadius:20,fontWeight:"bold"}}>{s.status||"active"}</span></td></tr>)}</tbody></table></div></Card></>}
+      {tab==="transferred"&&<><div style={{display:"flex",gap:8,marginBottom:12,alignItems:"center"}}><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Search..." style={{flex:1,minWidth:160,border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px 12px",fontSize:13,fontFamily:F,outline:"none"}}/><Sel value={filterTrn} onChange={setFilterTrn} options={["All",...ALL_CLASSES]}/></div><Card style={{padding:0}}><div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}><thead><tr>{["Name","Class","Transfer To","Reason","Date"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>{students.filter(s=>s.status==="transferred").length?sortStudentsByAdm(students.filter(s=>s.status==="transferred"&&(filterTrn==="All"||s.class===filterTrn)&&(!search||s.name.toLowerCase().includes(search.toLowerCase())))).map((s,i)=><tr key={s.id} style={{background:i%2===0?"white":"#fafafa"}}><td style={{...td,fontWeight:"bold"}}>{s.name}</td><td style={td}>{s.class}</td><td style={td}>{s.transferDest||"—"}</td><td style={td}>{s.transferReason||"—"}</td><td style={td}>{s.transferDate||"—"}</td></tr>):<tr><td colSpan={5} style={{padding:30,textAlign:"center",color:"#94a3b8"}}>No transfers recorded.</td></tr>}</tbody></table></div></Card></>}
     </div>
   );
 }
@@ -1375,7 +1413,7 @@ function ResultsPage({students,results,setResults,comments,setComments,users,ter
   const [msg,setMsg]=useState(""); const [tab,setTab]=useState("entry");
   const [cmMode,setCmMode]=useState(false); const [cmStu,setCmStu]=useState(null); const [cmText,setCmText]=useState(""); const [cmMsg,setCmMsg]=useState("");
   const subs=getSubs(cls); const curSub=sub||subs[0]||"";
-  const clsStu=students.filter(s=>s.class===cls).sort((a,b)=>{const na=parseInt((a.admNo||"").replace(/\D/g,""))||0; const nb=parseInt((b.admNo||"").replace(/\D/g,""))||0; return na-nb;});
+  const clsStu=students.filter(s=>s.class===cls).sort((a,b)=>{const _p=(x,i)=>{const s=(x||"").split("/");return parseInt(s[1])||parseInt(s[s.length-1])||0;}; const na=_p(a.admNo); const nb=_p(b.admNo); return na-nb;});
   useEffect(()=>{const m={}; clsStu.forEach(s=>{const r=results.find(r=>r.studentId===s.id&&r.class===cls&&r.subject===curSub&&r.term===term&&r.year===year&&r.examType===examType); if(r) m[s.id]=r.marks;}); setMarks(m);},[cls,curSub,term,year,examType,results.length]);
 
   function autoComment(name, avg) {
@@ -1734,7 +1772,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
   const [selId,setSelId]=useState("");
   const [showDl,setShowDl]=useState(false);
   const [printMode,setPrintMode]=useState("results"); // "results" | "grades"
-  const clsStu=students.filter(s=>s.class===cls).sort((a,b)=>{const na=parseInt((a.admNo||"").replace(/\D/g,""))||0; const nb=parseInt((b.admNo||"").replace(/\D/g,""))||0; return na-nb;});
+  const clsStu=students.filter(s=>s.class===cls).sort((a,b)=>{const _p=(x,i)=>{const s=(x||"").split("/");return parseInt(s[1])||parseInt(s[s.length-1])||0;}; const na=_p(a.admNo); const nb=_p(b.admNo); return na-nb;});
   const sel=selId?students.find(s=>s.id===selId):null;
 
   // Compute class rankings for position column
@@ -2034,7 +2072,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
   function downloadClassExcel(className, mode) {
     loadSheetJS(() => {
       const XL = window.XLSX;
-      const stu = students.filter(s=>s.class===className).sort((a,b)=>{const na=parseInt((a.admNo||"").replace(/\D/g,""))||0; const nb=parseInt((b.admNo||"").replace(/\D/g,""))||0; return na-nb;});
+      const stu = students.filter(s=>s.class===className).sort((a,b)=>{const _p=(x,i)=>{const s=(x||"").split("/");return parseInt(s[1])||parseInt(s[s.length-1])||0;}; const na=_p(a.admNo); const nb=_p(b.admNo); return na-nb;});
       const { title, colHeaders, rows, teacherRow } = buildExcelData(stu, className, mode);
       const wb = XL.utils.book_new();
       const wsData = [
@@ -2075,7 +2113,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
       const XL = window.XLSX;
       const wb = XL.utils.book_new();
       ALL_CLASSES.forEach(className => {
-        const stu = students.filter(s=>s.class===className).sort((a,b)=>{const na=parseInt((a.admNo||"").replace(/\D/g,""))||0; const nb=parseInt((b.admNo||"").replace(/\D/g,""))||0; return na-nb;});
+        const stu = students.filter(s=>s.class===className).sort((a,b)=>{const _p=(x,i)=>{const s=(x||"").split("/");return parseInt(s[1])||parseInt(s[s.length-1])||0;}; const na=_p(a.admNo); const nb=_p(b.admNo); return na-nb;});
         if(!stu.length) return;
         const { title, colHeaders, rows, teacherRow } = buildExcelData(stu, className, mode);
         const wsData = [
@@ -2108,7 +2146,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
   }
 
   function printSingle(student){
-    const classStudents=students.filter(s=>s.class===student.class).sort((a,b)=>{const na=parseInt((a.admNo||"").replace(/\D/g,""))||0; const nb=parseInt((b.admNo||"").replace(/\D/g,""))||0; return na-nb;});
+    const classStudents=students.filter(s=>s.class===student.class).sort((a,b)=>{const _p=(x,i)=>{const s=(x||"").split("/");return parseInt(s[1])||parseInt(s[s.length-1])||0;}; const na=_p(a.admNo); const nb=_p(b.admNo); return na-nb;});
     const ranked=getClassRankings(classStudents);
     printWindow(`Report — ${student.name}`, buildReportHTML(student, ranked), logo);
   }
@@ -2126,7 +2164,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
     printWindow(`All School Reports — ${term} ${year}`, body, logo);
   }
   function printClassResults(className, mode){
-    const stu=students.filter(s=>s.class===className).sort((a,b)=>{const na=parseInt((a.admNo||"").replace(/\D/g,""))||0; const nb=parseInt((b.admNo||"").replace(/\D/g,""))||0; return na-nb;});
+    const stu=students.filter(s=>s.class===className).sort((a,b)=>{const _p=(x,i)=>{const s=(x||"").split("/");return parseInt(s[1])||parseInt(s[s.length-1])||0;}; const na=_p(a.admNo); const nb=_p(b.admNo); return na-nb;});
     const html=`<div style="page-break-after:always;">${mode==="grades"?buildClassGradesHTML(stu,className):buildClassResultsHTML(stu,className)}</div>`;
     printWindow(`${className} ${mode==="grades"?"Grades":"Results"} — ${term} ${year}`, html, logo);
   }
@@ -2277,6 +2315,7 @@ function ReportCard({student,results,comments,term,year,examType,isParent,logo,s
 // FEES MANAGER (with auto-calculated balance)
 // ══════════════════════════════════════════════════════════
 function FeesPage({students,fees,setFees,user,logo}) {
+  const [fAddGrade, setFAddGrade] = React.useState("All");
   const blank={studentId:"",feeType:"School Fees",term:"Term 1",year:String(new Date().getFullYear()),amount:"",paid:"",payMethod:"Cash",payDate:new Date().toLocaleDateString("en-KE"),receipt:""};
   const [form,setForm]=useState(blank);
   const [msg,setMsg]=useState({t:"",ok:true});
@@ -2352,7 +2391,7 @@ function FeesPage({students,fees,setFees,user,logo}) {
     printWindow(`Fee Statement — ${student.name}`, buildStudentFeeHTML(student), logo);
   }
   function printClassFee(className){
-    const stu=students.filter(s=>s.class===className).sort((a,b)=>{const na=parseInt((a.admNo||"").replace(/\D/g,""))||0; const nb=parseInt((b.admNo||"").replace(/\D/g,""))||0; return na-nb;});
+    const stu=students.filter(s=>s.class===className).sort((a,b)=>{const _p=(x,i)=>{const s=(x||"").split("/");return parseInt(s[1])||parseInt(s[s.length-1])||0;}; const na=_p(a.admNo); const nb=_p(b.admNo); return na-nb;});
     const body=stu.map(s=>buildStudentFeeHTML(s)).filter(Boolean).join("");
     if(!body){printWindow(`Fee Statement — ${className}`,"<p style='text-align:center;color:#94a3b8;'>No fee records for this class.</p>",logo);return;}
     printWindow(`Fee Statement — ${className}`, body, logo);
@@ -2465,10 +2504,10 @@ function FeesPage({students,fees,setFees,user,logo}) {
           <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:4,fontSize:15}}>➕ Add Fee Record</div>
           <div style={{fontSize:12,color:"#64748b",marginBottom:14}}>💡 Balance is auto-calculated: <b>Balance = Amount Due − Amount Paid</b></div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}>
-            <div><label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:3}}>STUDENT *</label>
+            <div><div style={{display:"flex",gap:6,alignItems:"center",marginBottom:3}}><label style={{fontSize:11,fontWeight:"bold",color:"#374151",flex:1}}>STUDENT *</label><select value={fAddGrade} onChange={e=>setFAddGrade(e.target.value)} style={{border:"1.5px solid #e2e8f0",borderRadius:8,padding:"4px 8px",fontSize:11,fontFamily:F}}><option value="All">All Grades</option>{ALL_CLASSES.map(g=><option key={g} value={g}>{g}</option>)}</select></div>
               <select value={form.studentId} onChange={e=>setForm({...form,studentId:e.target.value})} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px",fontSize:13,fontFamily:F}}>
                 <option value="">-- Select student --</option>
-                {students.map(s=><option key={s.id} value={s.id}>{s.name} ({s.class})</option>)}
+                {sortStudentsByAdm(students.filter(s=>fAddGrade==="All"||s.class===fAddGrade)).map(s=><option key={s.id} value={s.id}>{s.name} ({s.admNo||"—"}) — {s.class}</option>)}
               </select>
             </div>
             <Sel label="FEE TYPE" value={form.feeType} onChange={v=>setForm({...form,feeType:v})} options={["School Fees","Activity Fees","Transport","Lunch","Uniform","Books","Exam Fee","Other"]}/>
@@ -5404,7 +5443,7 @@ function AttendancePage({students}) {
   const [att,setAtt]=useState({}); const [saved,setSaved]=useState(false);
   const STATUSES=["Present","Absent","Late","Excused"];
   const SC={Present:"#1d4ed8",Absent:"#b91c1c",Late:"#b45309",Excused:"#7c3aed"};
-  const clsStu=students.filter(s=>s.class===cls).sort((a,b)=>{const na=parseInt((a.admNo||"").replace(/\D/g,""))||0; const nb=parseInt((b.admNo||"").replace(/\D/g,""))||0; return na-nb;});
+  const clsStu=students.filter(s=>s.class===cls).sort((a,b)=>{const _p=(x,i)=>{const s=(x||"").split("/");return parseInt(s[1])||parseInt(s[s.length-1])||0;}; const na=_p(a.admNo); const nb=_p(b.admNo); return na-nb;});
   const markAll=(st)=>{const n={...att}; clsStu.forEach(s=>{n[`${date}-${s.id}`]=st;}); setAtt(n);};
   const present=clsStu.filter(s=>!att[`${date}-${s.id}`]||att[`${date}-${s.id}`]==="Present").length;
   const absent=clsStu.filter(s=>att[`${date}-${s.id}`]==="Absent").length;
@@ -5460,7 +5499,7 @@ function StaffPage({staff,setStaff,users,setUsers}) {
     <div style={{padding:24}}>
       <PageH title="Staff Manager" sub="Teaching and non-teaching staff records"><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{[["list","📋 Staff List"],["add","➕ Add Staff"],["former","🚪 Former Staff"]].map(([t,l])=><Btn key={t} onClick={()=>{setTab(t);if(t==="add"&&!editId)setForm(blank);}} v={tab===t?"primary":"ghost"} style={{fontSize:12}}>{l}</Btn>)}</div></PageH>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12,marginBottom:18}}><Stat icon="👨‍🏫" label="Teaching" value={(staff||[]).filter(s=>s.staffType==="teaching").length} color="#7c3aed"/><Stat icon="👷" label="Non-Teaching" value={(staff||[]).filter(s=>s.staffType==="non-teaching").length} color="#b45309"/><Stat icon="👥" label="Total Staff" value={(staff||[]).length} color="#7c3aed"/></div>
-      {tab==="add"&&<Card style={{marginBottom:20}}><div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>{editId?"Edit Staff Member":"Add New Staff Member"}</div><div style={{marginBottom:14}}><PhotoUp value={form.photo} onChange={v=>setForm({...form,photo:v})}/></div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}><Inp label="FULL NAME *" value={form.name} onChange={v=>setForm({...form,name:v})} placeholder="Full name"/><Inp label="STAFF ID *" value={form.staffId} onChange={v=>setForm({...form,staffId:v})} placeholder="NKS/S/001"/><Sel label="STAFF TYPE" value={form.staffType} onChange={v=>setForm({...form,staffType:v})} options={["teaching","non-teaching"]}/><Sel label="SYSTEM ROLE" value={form.role} onChange={v=>setForm({...form,role:v})} options={["teacher","admin"]}/><Inp label="SUBJECT/DEPT *" value={form.subject} onChange={v=>setForm({...form,subject:v})} placeholder="e.g. Mathematics"/><Inp label="PHONE" value={form.phone} onChange={v=>setForm({...form,phone:v})} placeholder="+254 7..."/><Inp label="EMAIL" value={form.email} onChange={v=>setForm({...form,email:v})} placeholder="email@tnks.sc.ke" type="email"/><Inp label="DATE OF BIRTH" value={form.dob} onChange={v=>setForm({...form,dob:v})} placeholder="DD/MM/YYYY"/><Inp label="DATE JOINED" value={form.joinDate} onChange={v=>setForm({...form,joinDate:v})} placeholder="DD/MM/YYYY"/><Inp label="QUALIFICATION" value={form.qualification} onChange={v=>setForm({...form,qualification:v})} placeholder="e.g. B.Ed"/></div><div style={{marginTop:12,paddingTop:12,borderTop:"1px dashed #e2e8f0"}}><div style={{fontSize:12,fontWeight:"bold",color:"#3b0764",marginBottom:10}}>🔐 System Login Credentials</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="USERNAME" value={form.username} onChange={v=>setForm({...form,username:v})} placeholder="e.g. purity"/><Inp label="PASSWORD" value={form.password} onChange={v=>setForm({...form,password:v})} placeholder="Set password" type="password"/></div></div>{msg.t&&<div style={{marginTop:10,fontSize:13,color:msg.ok?"#1d4ed8":"#b91c1c",fontWeight:"bold"}}>{msg.t}</div>}<div style={{display:"flex",gap:8,marginTop:14}}><Btn onClick={doSave} v="primary">{editId?"Update Staff":"Add Staff"}</Btn>{editId&&<Btn onClick={()=>{setEditId(null);setForm(blank);setTab("list");}} v="ghost">Cancel</Btn>}</div></Card>}
+      {tab==="add"&&<Card style={{marginBottom:20}}><div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>{editId?"Edit Staff Member":"Add New Staff Member"}</div><div style={{marginBottom:14}}><PhotoUp value={form.photo} onChange={v=>setForm({...form,photo:v})}/></div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}><Inp label="FULL NAME *" value={form.name} onChange={v=>setForm({...form,name:v})} placeholder="Full name"/><Inp label="STAFF ID *" value={form.staffId} onChange={v=>setForm({...form,staffId:v})} placeholder="TNKS/S/001"/><Sel label="STAFF TYPE" value={form.staffType} onChange={v=>setForm({...form,staffType:v})} options={["teaching","non-teaching"]}/><Sel label="SYSTEM ROLE" value={form.role} onChange={v=>setForm({...form,role:v})} options={["teacher","admin"]}/><Inp label="SUBJECT/DEPT *" value={form.subject} onChange={v=>setForm({...form,subject:v})} placeholder="e.g. Mathematics"/><Inp label="PHONE" value={form.phone} onChange={v=>setForm({...form,phone:v})} placeholder="+254 7..."/><Inp label="EMAIL" value={form.email} onChange={v=>setForm({...form,email:v})} placeholder="email@tnks.sc.ke" type="email"/><Inp label="DATE OF BIRTH" value={form.dob} onChange={v=>setForm({...form,dob:v})} placeholder="DD/MM/YYYY"/><Inp label="DATE JOINED" value={form.joinDate} onChange={v=>setForm({...form,joinDate:v})} placeholder="DD/MM/YYYY"/><Inp label="QUALIFICATION" value={form.qualification} onChange={v=>setForm({...form,qualification:v})} placeholder="e.g. B.Ed"/></div><div style={{marginTop:12,paddingTop:12,borderTop:"1px dashed #e2e8f0"}}><div style={{fontSize:12,fontWeight:"bold",color:"#3b0764",marginBottom:10}}>🔐 System Login Credentials</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="USERNAME" value={form.username} onChange={v=>setForm({...form,username:v})} placeholder="e.g. purity"/><Inp label="PASSWORD" value={form.password} onChange={v=>setForm({...form,password:v})} placeholder="Set password" type="password"/></div></div>{msg.t&&<div style={{marginTop:10,fontSize:13,color:msg.ok?"#1d4ed8":"#b91c1c",fontWeight:"bold"}}>{msg.t}</div>}<div style={{display:"flex",gap:8,marginTop:14}}><Btn onClick={doSave} v="primary">{editId?"Update Staff":"Add Staff"}</Btn>{editId&&<Btn onClick={()=>{setEditId(null);setForm(blank);setTab("list");}} v="ghost">Cancel</Btn>}</div></Card>}
       {tab==="list"&&<><div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search staff..." style={{flex:1,minWidth:200,border:"1.5px solid #e2e8f0",borderRadius:9,padding:"8px 12px",fontSize:13,fontFamily:F,outline:"none"}}/><Sel value={filterType} onChange={setFilterType} options={["All","teaching","non-teaching"]}/></div><Card style={{padding:0}}><div style={{padding:"10px 16px",background:"#fef3c7",borderBottom:"1px solid #fde68a",fontSize:12,color:"#92400e"}}>🔑 <b>Admin view:</b> Usernames and passwords shown so you can share login credentials with staff. Keep this page confidential.</div><div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:900}}><thead><tr>{["","#","Staff ID","Name","Type","Subject","Username","Password","Phone","Qual","Actions"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>{filtered.length?filtered.map((s,i)=>{const acct=users.find(u=>u.username===s.username);const pw=acct?.password||s.password||"—";return(<tr key={s.id} style={{background:i%2===0?"white":"#fafafa"}}><td style={{...td,width:44}}><Avatar name={s.name} photo={s.photo} size={32}/></td><td style={{...td,color:"#94a3b8"}}>{i+1}</td><td style={{...td,fontFamily:"monospace",fontSize:11}}>{s.staffId}</td><td style={{...td,fontWeight:"bold"}}>{s.name}</td><td style={td}><span style={{background:s.staffType==="teaching"?"#f5f3ff":"#f5f3ff",color:s.staffType==="teaching"?"#7c3aed":"#1d4ed8",fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:"bold"}}>{s.staffType}</span></td><td style={td}>{s.subject||"—"}</td><td style={{...td,fontFamily:"monospace",fontSize:11,color:"#7c3aed"}}>{s.username||"—"}</td><td style={{...td,fontFamily:"monospace",fontSize:12,color:"#7c3aed",fontWeight:"bold"}}>{pw}</td><td style={td}>{s.phone||"—"}</td><td style={{...td,fontSize:11}}>{s.qualification||"—"}</td><td style={td}><button onClick={()=>doEdit(s)} style={{color:"#7c3aed",background:"none",border:"none",cursor:"pointer",fontSize:12,marginRight:8}}>Edit</button><button onClick={()=>{if(confirm(`Mark ${s.name} as former staff?`)) setStaff(p=>p.map(x=>x.id===s.id?{...x,status:"former",exitDate:new Date().toLocaleDateString("en-KE")}:x));}} style={{color:"#b45309",background:"none",border:"none",cursor:"pointer",fontSize:12,marginRight:8}}>Exit</button><button onClick={()=>doDel(s.id)} style={{color:"#b91c1c",background:"none",border:"none",cursor:"pointer",fontSize:12}}>Del</button></td></tr>);}):<tr><td colSpan={11} style={{padding:40,textAlign:"center",color:"#94a3b8"}}>No staff records.</td></tr>}</tbody></table></div></Card><div style={{marginTop:10,padding:"10px 14px",background:"#f5f3ff",borderRadius:10,fontSize:12,color:"#7c3aed"}}>💡 <b>Tip:</b> For pre-loaded/default staff accounts, go to <b>⚙️ Settings → Staff Accounts</b> to view their passwords too.</div></>}
       {tab==="former"&&(()=>{
         const formerStaff=(staff||[]).filter(s=>s.status==="former");
@@ -5735,6 +5774,8 @@ function CouncilPage({students,user,council,setCouncil,stuDuties,setStuDuties}) 
   const [dForm,setDForm]=useState({studentId:"",dutyType:"Dining Hall",day:"Monday",term:"Term 1"});
   const [msg,setMsg]=useState({t:"",ok:true});
   const flash=(t,ok=true)=>{setMsg({t,ok});setTimeout(()=>setMsg({t:"",ok:true}),2500);};
+  const [cGrade,setCGrade]=useState("All"); const [dGrade,setDGrade]=useState("All");
+  const [cSearch,setCSearch]=useState(""); const [dSearch,setDSearch]=useState("");
   function addCouncil(){if(!cForm.studentId) return flash("Select a student.",false); if(council.find(c=>c.position===cForm.position&&c.year===cForm.year)) return flash("Position already filled for this year.",false); const s=students.find(x=>x.id===cForm.studentId); setCouncil(p=>[...p,{...cForm,id:Date.now().toString(),studentName:s?.name||"—",studentClass:s?.class||"—"}]); flash("✅ Council member added!"); setCForm({...cForm,studentId:""});}
   function addDuty(){if(!dForm.studentId) return flash("Select a student.",false); const s=students.find(x=>x.id===dForm.studentId); setStuDuties(p=>[...p,{...dForm,id:Date.now().toString(),studentName:s?.name||"—",studentClass:s?.class||"—"}]); flash("✅ Duty assigned!"); setDForm({...dForm,studentId:""});}
   const today=DAYS[new Date().getDay()-1]||"Monday";
@@ -5749,8 +5790,8 @@ function CouncilPage({students,user,council,setCouncil,stuDuties,setStuDuties}) 
       {tab==="council"&&<Card style={{padding:0}}><div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}><thead><tr>{["#","Student","Class","Position","Year",user?.role==="admin"?"Action":""].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>{council.length?council.map((c,i)=><tr key={c.id} style={{background:i%2===0?"white":"#fafafa"}}><td style={{...td,color:"#94a3b8"}}>{i+1}</td><td style={{...td,fontWeight:"bold"}}>{c.studentName}</td><td style={td}>{c.studentClass}</td><td style={td}><span style={{background:"linear-gradient(135deg,#3b0764,#1d4ed8)",color:"white",fontSize:11,padding:"3px 10px",borderRadius:20,fontWeight:"bold"}}>{c.position}</span></td><td style={td}>{c.year}</td>{user?.role==="admin"&&<td style={td}><button onClick={()=>setCouncil(p=>p.filter(x=>x.id!==c.id))} style={{color:"#b91c1c",background:"none",border:"none",cursor:"pointer",fontSize:12}}>Remove</button></td>}</tr>):<tr><td colSpan={7} style={{padding:40,textAlign:"center",color:"#94a3b8"}}>No council members yet.</td></tr>}</tbody></table></div></Card>}
       {tab==="dutyboard"&&<div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:650}}><thead><tr style={{background:"#3b0764"}}>{["Duty Type",...DAYS].map(h=><th key={h} style={{padding:"10px 12px",color:"white",fontSize:12,textAlign:"left"}}>{h}</th>)}</tr></thead><tbody>{STUDENT_DUTIES.map((dt,i)=><tr key={dt} style={{background:i%2===0?"white":"#fafafa"}}><td style={{padding:"10px 12px",fontWeight:"bold",fontSize:12,color:"#3b0764",borderRight:"2px solid #f5f3ff"}}>{dt}</td>{DAYS.map(day=>{const d=stuDuties.filter(x=>x.day===day&&x.dutyType===dt); return(<td key={day} style={{padding:"8px 12px",verticalAlign:"top"}}>{d.length?d.map(x=><div key={x.id} style={{background:"#f5f3ff",borderRadius:6,padding:"4px 8px",marginBottom:4,fontSize:11}}><div style={{fontWeight:"bold",color:"#1d4ed8"}}>{x.studentName}</div><div style={{color:"#64748b"}}>{x.studentClass}</div>{user?.role==="admin"&&<button onClick={()=>setStuDuties(p=>p.filter(y=>y.id!==x.id))} style={{background:"none",border:"none",color:"#b91c1c",cursor:"pointer",fontSize:10,padding:0}}>✕</button>}</div>):<span style={{fontSize:11,color:"#cbd5e1"}}>—</span>}</td>);})}</tr>)}</tbody></table></div>}
       {tab==="todayduty"&&<><div style={{background:"linear-gradient(135deg,#1d4ed8,#1e3a8a)",borderRadius:14,padding:"16px 20px",marginBottom:16,color:"white",display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><div style={{fontSize:14,fontWeight:"bold"}}>Today: {today}</div><div style={{fontSize:12,opacity:.8}}>{new Date().toLocaleDateString("en-KE",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</div></div><div style={{fontSize:36}}>🎖️</div></div>{todayD.length?<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:10}}>{todayD.map(d=><Card key={d.id} style={{borderLeft:"4px solid #1d4ed8",padding:"12px 16px"}}><div style={{fontWeight:"bold",color:"#3b0764"}}>{d.studentName}</div><div style={{fontSize:12,color:"#64748b"}}>{d.studentClass}</div><span style={{fontSize:11,background:"#f5f3ff",color:"#1d4ed8",padding:"2px 10px",borderRadius:20,fontWeight:"bold"}}>{d.dutyType}</span></Card>)}</div>:<Empty icon="🎖️" text="No student duties for today"/>}</>}
-      {tab==="addcouncil"&&user?.role==="admin"&&<Card><div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>Add Council Member / Prefect</div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12}}><div><label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:3}}>STUDENT *</label><select value={cForm.studentId} onChange={e=>setCForm({...cForm,studentId:e.target.value})} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px",fontSize:13,fontFamily:F}}><option value="">-- Select student --</option>{students.map(s=><option key={s.id} value={s.id}>{s.name} ({s.class})</option>)}</select></div><Sel label="POSITION" value={cForm.position} onChange={v=>setCForm({...cForm,position:v})} options={COUNCIL_POSITIONS}/><Sel label="YEAR" value={cForm.year} onChange={v=>setCForm({...cForm,year:v})} options={YEARS}/></div>{msg.t&&<div style={{marginTop:10,fontSize:13,color:msg.ok?"#1d4ed8":"#b91c1c",fontWeight:"bold"}}>{msg.t}</div>}<div style={{marginTop:14}}><Btn onClick={addCouncil} v="primary">🎖️ Add to Council</Btn></div></Card>}
-      {tab==="addduty"&&user?.role==="admin"&&<Card><div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>Assign Duty to Student</div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12}}><div><label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:3}}>STUDENT *</label><select value={dForm.studentId} onChange={e=>setDForm({...dForm,studentId:e.target.value})} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px",fontSize:13,fontFamily:F}}><option value="">-- Select student --</option>{students.map(s=><option key={s.id} value={s.id}>{s.name} ({s.class})</option>)}</select></div><Sel label="DUTY TYPE" value={dForm.dutyType} onChange={v=>setDForm({...dForm,dutyType:v})} options={STUDENT_DUTIES}/><Sel label="DAY" value={dForm.day} onChange={v=>setDForm({...dForm,day:v})} options={DAYS}/><Sel label="TERM" value={dForm.term} onChange={v=>setDForm({...dForm,term:v})} options={TERMS}/></div>{msg.t&&<div style={{marginTop:10,fontSize:13,color:msg.ok?"#1d4ed8":"#b91c1c",fontWeight:"bold"}}>{msg.t}</div>}<div style={{marginTop:14}}><Btn onClick={addDuty} v="blue">➕ Assign Duty</Btn></div></Card>}
+      {tab==="addcouncil"&&user?.role==="admin"&&<Card><div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>Add Council Member / Prefect</div><div style={{display:"grid",gap:12}}><GradeStudentSelect students={students} value={cForm.studentId} onChange={v=>setCForm({...cForm,studentId:v})} label="STUDENT"/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Sel label="POSITION" value={cForm.position} onChange={v=>setCForm({...cForm,position:v})} options={COUNCIL_POSITIONS}/><Sel label="YEAR" value={cForm.year} onChange={v=>setCForm({...cForm,year:v})} options={YEARS}/></div></div>{msg.t&&<div style={{marginTop:10,fontSize:13,color:msg.ok?"#1d4ed8":"#b91c1c",fontWeight:"bold"}}>{msg.t}</div>}<div style={{marginTop:14}}><Btn onClick={addCouncil} v="primary">🎖️ Add to Council</Btn></div></Card>}
+      {tab==="addduty"&&user?.role==="admin"&&<Card><div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>Assign Duty to Student</div><div style={{display:"grid",gap:12}}><GradeStudentSelect students={students} value={dForm.studentId} onChange={v=>setDForm({...dForm,studentId:v})} label="STUDENT"/><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12}}><Sel label="DUTY TYPE" value={dForm.dutyType} onChange={v=>setDForm({...dForm,dutyType:v})} options={STUDENT_DUTIES}/><Sel label="DAY" value={dForm.day} onChange={v=>setDForm({...dForm,day:v})} options={DAYS}/><Sel label="TERM" value={dForm.term} onChange={v=>setDForm({...dForm,term:v})} options={TERMS}/></div></div>{msg.t&&<div style={{marginTop:10,fontSize:13,color:msg.ok?"#1d4ed8":"#b91c1c",fontWeight:"bold"}}>{msg.t}</div>}<div style={{marginTop:14}}><Btn onClick={addDuty} v="blue">➕ Assign Duty</Btn></div></Card>}
     </div>
   );
 }
@@ -5803,7 +5844,7 @@ function LibraryPage({books,setBooks,borrows,setBorrows}) {
       )}
       {tab==="add"&&<Card style={{marginBottom:18}}><div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14}}>Add New Book to Inventory</div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}><Inp label="TITLE *" value={form.title} onChange={v=>setForm({...form,title:v})} placeholder="Book title"/><Inp label="AUTHOR" value={form.author} onChange={v=>setForm({...form,author:v})} placeholder="Author name"/><Inp label="ISBN" value={form.isbn} onChange={v=>setForm({...form,isbn:v})} placeholder="ISBN number"/><Sel label="CATEGORY" value={form.category} onChange={v=>setForm({...form,category:v})} options={["Reference","Novel","Textbook","Science","History","Religious","Arts","Biography","Other"]}/><Inp label="COPIES" value={form.copies} onChange={v=>setForm({...form,copies:v})} placeholder="1" type="number"/><Inp label="SHELF LOCATION" value={form.shelf} onChange={v=>setForm({...form,shelf:v})} placeholder="e.g. A-3"/><Inp label="PUBLISHER" value={form.publisher} onChange={v=>setForm({...form,publisher:v})} placeholder="Publisher"/><Inp label="YEAR" value={form.year} onChange={v=>setForm({...form,year:v})} placeholder="2024"/></div>{msg.t&&<div style={{marginTop:10,fontSize:13,color:msg.ok?"#1d4ed8":"#b91c1c",fontWeight:"bold"}}>{msg.t}</div>}<div style={{marginTop:14}}><Btn onClick={doAdd} v="blue">➕ Add Book</Btn></div></Card>}
       {tab==="catalogue"&&<Card style={{padding:0}}><div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:700}}><thead><tr>{["#","Title","Author","ISBN","Category","Shelf","Copies","Available"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>{books.length?books.map((b,i)=><tr key={b.id} style={{background:i%2===0?"white":"#fafafa"}}><td style={{...td,color:"#94a3b8"}}>{i+1}</td><td style={{...td,fontWeight:"bold"}}>{b.title}</td><td style={td}>{b.author||"—"}</td><td style={{...td,fontFamily:"monospace",fontSize:11}}>{b.isbn||"—"}</td><td style={td}>{b.category}</td><td style={td}>{b.shelf||"—"}</td><td style={td}>{b.copies}</td><td style={td}><span style={{fontWeight:"bold",color:b.available>0?"#1d4ed8":"#b91c1c"}}>{b.available}</span></td></tr>):<tr><td colSpan={8} style={{padding:30,textAlign:"center",color:"#94a3b8"}}>No books added yet.</td></tr>}</tbody></table></div></Card>}
-      {tab==="issue"&&<Card><div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14}}>Book Circulation — Issue / Reserve</div><div style={{display:"grid",gap:12}}><div><label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:3}}>SELECT BOOK</label><select value={bbId} onChange={e=>setBbId(e.target.value)} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px",fontSize:13,fontFamily:F}}><option value="">-- Select book --</option>{books.map(b=><option key={b.id} value={b.id}>{b.title} — {b.author||"—"} (Avail: {b.available}/{b.copies})</option>)}</select></div><Inp label="STUDENT ADM. NO" value={bStu} onChange={setBStu} placeholder="e.g. NKS/2025/001"/><Inp label="DUE DATE" value={bDue} onChange={setBDue} type="date"/></div>{msg.t&&<div style={{marginTop:10,fontSize:13,color:msg.ok?"#1d4ed8":"#b91c1c",fontWeight:"bold"}}>{msg.t}</div>}<div style={{marginTop:14,display:"flex",gap:8}}><Btn onClick={doBorrow} v="blue">📤 Issue Book</Btn><Btn onClick={doReserve} v="purple">🔖 Reserve Instead</Btn></div></Card>}
+      {tab==="issue"&&<Card><div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14}}>Book Circulation — Issue / Reserve</div><div style={{display:"grid",gap:12}}><div><label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:3}}>SELECT BOOK</label><select value={bbId} onChange={e=>setBbId(e.target.value)} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px",fontSize:13,fontFamily:F}}><option value="">-- Select book --</option>{books.map(b=><option key={b.id} value={b.id}>{b.title} — {b.author||"—"} (Avail: {b.available}/{b.copies})</option>)}</select></div><Inp label="STUDENT ADM. NO" value={bStu} onChange={setBStu} placeholder="e.g. TNKS/2025/001"/><Inp label="DUE DATE" value={bDue} onChange={setBDue} type="date"/></div>{msg.t&&<div style={{marginTop:10,fontSize:13,color:msg.ok?"#1d4ed8":"#b91c1c",fontWeight:"bold"}}>{msg.t}</div>}<div style={{marginTop:14,display:"flex",gap:8}}><Btn onClick={doBorrow} v="blue">📤 Issue Book</Btn><Btn onClick={doReserve} v="purple">🔖 Reserve Instead</Btn></div></Card>}
       {tab==="issued"&&<Card style={{padding:0}}><div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:650}}><thead><tr>{["#","Book","Student","Issued","Due","Status","Fine","Action"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>{borrows.length?borrows.map((b,i)=>{const overdue=b.status==="issued"&&b.dueDate&&new Date(b.dueDate)<new Date();return(<tr key={b.id} style={{background:overdue?"#fef9f9":i%2===0?"white":"#fafafa"}}><td style={{...td,color:"#94a3b8"}}>{i+1}</td><td style={{...td,fontWeight:"bold"}}>{b.bookTitle}</td><td style={td}>{b.studentId}</td><td style={td}>{b.issueDate}</td><td style={{...td,color:overdue?"#b91c1c":"inherit",fontWeight:overdue?"bold":"normal"}}>{b.dueDate||"—"}</td><td style={td}><span style={{fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:"bold",background:b.status==="returned"?"#f5f3ff":overdue?"#fee2e2":"#fef3c7",color:b.status==="returned"?"#1d4ed8":overdue?"#b91c1c":"#b45309"}}>{overdue?"OVERDUE":b.status}</span></td><td style={td}>{b.fine>0?<span style={{color:"#b91c1c",fontWeight:"bold"}}>KES {b.fine}</span>:"—"}</td><td style={td}>{b.status==="issued"&&<button onClick={()=>retBook(b.id)} style={{background:"#1d4ed8",color:"white",border:"none",borderRadius:6,padding:"3px 10px",fontSize:11,cursor:"pointer",fontFamily:F}}>Return</button>}</td></tr>);}):<tr><td colSpan={8} style={{padding:30,textAlign:"center",color:"#94a3b8"}}>No books issued.</td></tr>}</tbody></table></div></Card>}
       {tab==="reservations"&&<Card style={{padding:0}}><div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:500}}><thead><tr>{["#","Book","Student","Date","Status","Action"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>{reserves.length?reserves.map((r,i)=><tr key={r.id} style={{background:i%2===0?"white":"#fafafa"}}><td style={{...td,color:"#94a3b8"}}>{i+1}</td><td style={{...td,fontWeight:"bold"}}>{r.bookTitle}</td><td style={td}>{r.studentId}</td><td style={td}>{r.date}</td><td style={td}><span style={{fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:"bold",background:r.status==="pending"?"#fef3c7":"#f5f3ff",color:r.status==="pending"?"#b45309":"#1d4ed8"}}>{r.status}</span></td><td style={td}><button onClick={()=>setReserves(p=>p.map(x=>x.id===r.id?{...x,status:"fulfilled"}:x))} style={{color:"#1d4ed8",background:"none",border:"none",cursor:"pointer",fontSize:12,marginRight:8}}>Fulfill</button><button onClick={()=>setReserves(p=>p.filter(x=>x.id!==r.id))} style={{color:"#b91c1c",background:"none",border:"none",cursor:"pointer",fontSize:12}}>Cancel</button></td></tr>):<tr><td colSpan={6} style={{padding:30,textAlign:"center",color:"#94a3b8"}}>No reservations.</td></tr>}</tbody></table></div></Card>}
       {tab==="fines"&&<><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,marginBottom:14}}><Stat icon="💰" label="Total Fines" value={`KES ${totalFines.toLocaleString()}`} color="#b91c1c"/><Stat icon="⚠️" label="Overdue Books" value={overdueList.length} color="#b45309"/></div><Card style={{padding:0}}><div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:500}}><thead><tr>{["Book","Student","Due Date","Days Overdue","Fine (KES)","Status"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>{borrows.filter(b=>b.fine>0||b.dueDate&&b.status==="issued"&&new Date(b.dueDate)<new Date()).map((b,i)=>{const days=b.dueDate?Math.max(0,Math.ceil((new Date()-new Date(b.dueDate))/(1000*60*60*24))):0;return(<tr key={b.id} style={{background:i%2===0?"white":"#fafafa"}}><td style={{...td,fontWeight:"bold"}}>{b.bookTitle}</td><td style={td}>{b.studentId}</td><td style={{...td,color:"#b91c1c"}}>{b.dueDate||"—"}</td><td style={{...td,color:"#b91c1c",fontWeight:"bold"}}>{days} days</td><td style={{...td,fontWeight:"bold",color:"#b91c1c"}}>KES {b.fine||days*10}</td><td style={td}><span style={{fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:"bold",background:b.status==="returned"?"#f5f3ff":"#fee2e2",color:b.status==="returned"?"#1d4ed8":"#b91c1c"}}>{b.status==="returned"?"Paid":b.status.toUpperCase()}</span></td></tr>);})} {borrows.filter(b=>b.fine>0||b.dueDate&&b.status==="issued"&&new Date(b.dueDate)<new Date()).length===0&&<tr><td colSpan={6} style={{padding:30,textAlign:"center",color:"#94a3b8"}}>No fines recorded.</td></tr>}</tbody></table></div></Card><div style={{marginTop:10,fontSize:12,color:"#64748b"}}>💡 Fines are calculated at <b>KES 10 per day</b> overdue and recorded automatically on book return.</div></>}
@@ -6839,7 +6880,7 @@ function LearnerMonitoringPage({students,user,monitoring,setMonitoring}) {
             <div><label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:3}}>LEARNER *</label>
               <select value={form.studentId} onChange={e=>setForm({...form,studentId:e.target.value})} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px",fontSize:13,fontFamily:F}}>
                 <option value="">-- Select learner --</option>
-                {students.map(s=><option key={s.id} value={s.id}>{s.name} ({s.class})</option>)}
+                {sortStudentsByAdm(students.filter(s=>pnGrade==="All"||s.class===pnGrade)).map(s=><option key={s.id} value={s.id}>{s.name} ({s.admNo||"—"}) — {s.class}</option>)}
               </select>
             </div>
             <Sel label="TYPE *" value={form.type} onChange={v=>setForm({...form,type:v,status:""})} options={MONITORING_TYPES}/>
@@ -7447,8 +7488,8 @@ function BulkOperationsPage({ students, setStudents, results, setResults, fees, 
   }
 
   const sampleCSV = `name,admno,class,gender,parentname,phone
-John Kamau,NKS/2025/001,Grade 7,Male,James Kamau,+254 712 000001
-Mary Wanjiku,NKS/2025/002,Grade 7,Female,Jane Wanjiku,+254 712 000002`;
+John Kamau,TNKS/2025/001,Grade 7,Male,James Kamau,+254 712 000001
+Mary Wanjiku,TNKS/2025/002,Grade 7,Female,Jane Wanjiku,+254 712 000002`;
 
   const subs = getSubs(bulkCls);
 
@@ -7510,10 +7551,10 @@ Mary Wanjiku,NKS/2025/002,Grade 7,Female,Jane Wanjiku,+254 712 000002`;
           <Sel label="YEAR" value={bulkYear} onChange={setBulkYear} options={YEARS} />
         </div>
         <div style={{ marginBottom: 8, fontSize: 11, color: "#94a3b8", fontFamily: "monospace", background: "#f8fafc", padding: "8px 12px", borderRadius: 6 }}>
-          Example row: NKS/2025/001,85,72,90,88,75,80,65<br />
+          Example row: TNKS/2025/001,85,72,90,88,75,80,65<br />
           (admno then one mark per subject in order above)
         </div>
-        <Textarea label="PASTE MARKS DATA" value={bulkMarksText} onChange={setBulkMarksText} placeholder={"NKS/2025/001,85,72,90,88,75,80,65\nNKS/2025/002,70,68,55,..."} rows={8} />
+        <Textarea label="PASTE MARKS DATA" value={bulkMarksText} onChange={setBulkMarksText} placeholder={"TNKS/2025/001,85,72,90,88,75,80,65\nTNKS/2025/002,70,68,55,..."} rows={8} />
         {bulkMarksMsg.t && <div style={{ marginTop: 10, fontSize: 13, color: bulkMarksMsg.ok ? "#1d4ed8" : "#b91c1c", fontWeight: "bold" }}>{bulkMarksMsg.t}</div>}
         <div style={{ marginTop: 14 }}><Btn onClick={parseBulkMarks} v="blue">💾 Save All Marks</Btn></div>
       </Card>}
@@ -7867,7 +7908,8 @@ function AlumniPage({ students, setStudents, user }) {
   const [msg, setMsg] = useState({ t: "", ok: true });
   const flash = (t, ok = true) => { setMsg({ t, ok }); setTimeout(() => setMsg({ t: "", ok: true }), 2500); };
 
-  const alumni = students.filter(s => s.status === "transferred" || s.status === "alumni" || s.status === "completed");
+  const [alumSearch, setAlumSearch] = useState(""); const [alumGrade, setAlumGrade] = useState("All");
+  const alumni = sortStudentsByAdm(students.filter(s => (s.status === "transferred" || s.status === "alumni" || s.status === "completed") && (alumGrade==="All"||s.class===alumGrade) && (!alumSearch||s.name.toLowerCase().includes(alumSearch.toLowerCase())||( s.admNo||"").toLowerCase().includes(alumSearch.toLowerCase()))));
   const exitYears = [...new Set(alumni.map(s => s.exitYear || s.transferDate?.split("/")[2] || "Unknown"))].sort().reverse();
 
   function markCompleted(id) {
@@ -8054,6 +8096,7 @@ function SchoolCalendarPage({ events, setEvents, user }) {
 // 7. CLUBS & ACTIVITIES
 // ══════════════════════════════════════════════════════════
 function ClubsPage({ students, staff, user, clubs, setClubs }) {
+  const [clubGrade, setClubGrade] = React.useState("All");
   const blank = { name: "", category: "Academic", description: "", patron: "", meetingDay: "Tuesday", meetingTime: "16:30", venue: "", maxMembers: 30 };
   const [form, setForm] = useState(blank);
   const [tab, setTab] = useState("clubs");
@@ -8146,7 +8189,7 @@ function ClubsPage({ students, staff, user, clubs, setClubs }) {
           <div style={{ marginBottom: 14, display: "flex", gap: 8 }}>
             <select value={joinStudentId} onChange={e => setJoinStudentId(e.target.value)} style={{ flex: 1, border: "1.5px solid #e2e8f0", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "Georgia,serif" }}>
               <option value="">-- Add student --</option>
-              {students.filter(s => !(sel.members || []).includes(s.id)).map(s => <option key={s.id} value={s.id}>{s.name} ({s.class})</option>)}
+              {sortStudentsByAdm(students.filter(s => !(sel.members || []).includes(s.id) && (clubGrade==="All"||s.class===clubGrade))).map(s => <option key={s.id} value={s.id}>{s.name} ({s.admNo||"—"}) — {s.class}</option>)}
             </select>
             <Btn onClick={addMember} v="blue" style={{ fontSize: 12 }}>Add</Btn>
           </div>
@@ -8172,6 +8215,7 @@ function ClubsPage({ students, staff, user, clubs, setClubs }) {
 // 8. TRANSPORT MANAGEMENT
 // ══════════════════════════════════════════════════════════
 function TransportPage({ students, setStudents, user, transportRoutes, setTransportRoutes, busMonitoring, setBusMonitoring }) {
+  const [tpGrade, setTpGrade] = React.useState("All");
   const ROUTES = ["Route A", "Route B", "Route C"];
   const ROUTE_COLORS = { "Route A": "#7c3aed", "Route B": "#1d4ed8", "Route C": "#b45309" };
   const ROUTE_FARES = { "Route A": 15000, "Route B": 16500, "Route C": 18000 };
@@ -8364,7 +8408,7 @@ function TransportPage({ students, setStudents, user, transportRoutes, setTransp
             <label style={{ fontSize: 11, fontWeight: "bold", color: "#374151", display: "block", marginBottom: 3 }}>STUDENT</label>
             <select value={assignId} onChange={e => setAssignId(e.target.value)} style={{ width: "100%", border: "1.5px solid #e2e8f0", borderRadius: 8, padding: "8px 10px", fontSize: 13, fontFamily: "Georgia,serif" }}>
               <option value="">-- Select student --</option>
-              {students.filter(s => s.status !== "transferred").map(s => <option key={s.id} value={s.id}>{s.name} ({s.class}) {s.busRoute ? `[Currently: ${s.busRoute}]` : ""}</option>)}
+              {sortStudentsByAdm(students.filter(s => s.status !== "transferred" && (tpGrade==="All"||s.class===tpGrade))).map(s => <option key={s.id} value={s.id}>{s.name} ({s.admNo||"—"}) — {s.class} {s.busRoute ? `[Currently: ${s.busRoute}]` : ""}</option>)}
             </select>
           </div>
           <Btn onClick={assignStudent} v="blue">Assign to {selRoute}</Btn>
@@ -8513,7 +8557,7 @@ function ParentCommPage({ students, staff, user, parentComms, setParentComms }) 
           <div><label style={{ fontSize: 11, fontWeight: "bold", color: "#374151", display: "block", marginBottom: 3 }}>STUDENT *</label>
             <select value={form.studentId} onChange={e => setForm({ ...form, studentId: e.target.value })} style={{ width: "100%", border: "1.5px solid #e2e8f0", borderRadius: 8, padding: "8px", fontSize: 13, fontFamily: "Georgia,serif" }}>
               <option value="">-- Select --</option>
-              {students.map(s => <option key={s.id} value={s.id}>{s.name} ({s.class})</option>)}
+              {sortStudentsByAdm(students.filter(s=>filterCls==="All"||s.class===filterCls)).map(s => <option key={s.id} value={s.id}>{s.name} ({s.admNo||"—"}) — {s.class}</option>)}
             </select>
           </div>
           <Sel label="TYPE" value={form.type} onChange={v => setForm({ ...form, type: v })} options={Object.keys(TYPE_COLORS)} />
@@ -8813,6 +8857,7 @@ function PayrollPage({ staff, user }) {
 // POCKET MONEY MODULE — Student digital wallet
 // ══════════════════════════════════════════════════════════
 function PocketMoneyPage({ students, user }) {
+  const [pmGrade, setPmGrade] = React.useState("All");
   const F = getAppFont();
   const [accounts, setAccounts] = useState([]);
   const [tab, setTab] = useState("accounts");
@@ -8869,7 +8914,7 @@ function PocketMoneyPage({ students, user }) {
             <div><label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:4}}>STUDENT *</label>
               <select value={selStu} onChange={e=>setSelStu(e.target.value)} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px",fontSize:13,fontFamily:F}}>
                 <option value="">-- Select student --</option>
-                {students.map(s=><option key={s.id} value={s.id}>{s.name} — {s.class}</option>)}
+                {sortStudentsByAdm(students.filter(s=>pmGrade==="All"||s.class===pmGrade)).map(s=><option key={s.id} value={s.id}>{s.name} ({s.admNo||"—"}) — {s.class}</option>)}
               </select>
             </div>
             <Sel label="TRANSACTION TYPE" value={txType} onChange={setTxType} options={["Deposit","Withdrawal"]}/>
@@ -9769,6 +9814,7 @@ function FinanceSettingsPage({ user }) {
 // PROMISSORY NOTES
 // ══════════════════════════════════════════════════════════
 function PromissoryNotesPage({ students, user }) {
+  const [pnGrade, setPnGrade] = React.useState("All");
   const F = getAppFont();
   const blank = { studentId:"", amount:"", dueDate:"", reason:"", guarantor:"", guarantorPhone:"", status:"Active" };
   const [notes, setNotes] = useState([]);
@@ -9808,7 +9854,7 @@ function PromissoryNotesPage({ students, user }) {
           <div><label style={{fontSize:11,fontWeight:"bold",color:"#374151",display:"block",marginBottom:3}}>STUDENT *</label>
             <select value={form.studentId} onChange={e=>setForm(p=>({...p,studentId:e.target.value}))} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px",fontSize:13,fontFamily:F}}>
               <option value="">-- Select --</option>
-              {students.map(s=><option key={s.id} value={s.id}>{s.name} ({s.class})</option>)}
+              {sortStudentsByAdm(students.filter(s=>pnGrade==="All"||s.class===pnGrade)).map(s=><option key={s.id} value={s.id}>{s.name} ({s.admNo||"—"}) — {s.class}</option>)}
             </select></div>
           <Inp label="AMOUNT PROMISED (KES) *" value={form.amount} onChange={v=>setForm(p=>({...p,amount:v}))} type="number" placeholder="0"/>
           <Inp label="PAYMENT DUE DATE *" value={form.dueDate} onChange={v=>setForm(p=>({...p,dueDate:v}))} type="date"/>
