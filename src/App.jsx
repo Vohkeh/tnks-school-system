@@ -121,8 +121,8 @@ const STUDENT_TYPES = ["Day Scholar","Boarder","Bus (Route A)","Bus (Route B)","
 function sortStudentsByAdm(arr){
   return [...arr].sort((a,b)=>{
     const p1=(a.admNo||"").split("/"); const p2=(b.admNo||"").split("/");
-    const n1=parseInt(p1[1])||parseInt(p1[p1.length-1])||0;
-    const n2=parseInt(p2[1])||parseInt(p2[p2.length-1])||0;
+    const n1=parseInt(p1[p1.length-1])||0;
+    const n2=parseInt(p2[p2.length-1])||0;
     return n1-n2;
   });
 }
