@@ -1209,7 +1209,7 @@ function StudentIDCards({students, filterCls, setFilterCls, logo}) {
     (filterCls==="All" || s.class===filterCls) &&
     (selStu==="All" || s.id===selStu) &&
     s.status !== "transferred"
-  );
+  ));
 
   function printIDCard(s) {
     const barsHTML = (s.admNo||"TNKS/0000/001").split("").map((ch,i) =>
