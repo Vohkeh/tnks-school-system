@@ -11152,6 +11152,13 @@ const [view,setView]=useState(()=>{try{return localStorage.getItem("tnks_view")|
 useEffect(()=>{if(user){localStorage.setItem("tnks_user",JSON.stringify(user));}else{localStorage.removeItem("tnks_user");localStorage.removeItem("tnks_view");localStorage.removeItem("tnks_last_active");}},[user]);
 useEffect(()=>{if(user)localStorage.setItem("tnks_view",view);},[view,user]);
 useEffect(()=>{
+  useEffect(()=>{
+  // Prevent back button from closing the app
+  window.history.pushState(null,"",window.location.href);
+  window.addEventListener("popstate",()=>{
+    window.history.pushState(null,"",window.location.href);
+  });
+},[]);
   // Check inactivity on load
   const last=parseInt(localStorage.getItem("tnks_last_active")||"0");
   if(last && Date.now()-last > SESSION_TIMEOUT){setUser(null);return;}
