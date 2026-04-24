@@ -11145,30 +11145,26 @@ export default function App(){
     const gName=gFonts[font];
     if(gName){const id="tnks-gfont";let el=document.getElementById(id);if(!el){el=document.createElement("link");el.id=id;el.rel="stylesheet";document.head.appendChild(el);}el.href=`https://fonts.googleapis.com/css2?family=${gName}:wght@400;600;700&display=swap`;}
   },[]);
-  // Session: persist login, auto-logout after 30min inactivity
+// Session: persist login, auto-logout after 30min inactivity
 const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 const [user,setUser]=useState(()=>{try{const u=localStorage.getItem("tnks_user");return u?JSON.parse(u):null;}catch{return null;}});
 const [view,setView]=useState(()=>{try{return localStorage.getItem("tnks_view")||"dashboard";}catch{return "dashboard";}});
 useEffect(()=>{if(user){localStorage.setItem("tnks_user",JSON.stringify(user));}else{localStorage.removeItem("tnks_user");localStorage.removeItem("tnks_view");localStorage.removeItem("tnks_last_active");}},[user]);
 useEffect(()=>{if(user)localStorage.setItem("tnks_view",view);},[view,user]);
 useEffect(()=>{
-  useEffect(()=>{
-  // Prevent back button from closing the app
   window.history.pushState(null,"",window.location.href);
   window.addEventListener("popstate",()=>{
     window.history.pushState(null,"",window.location.href);
   });
 },[]);
-  // Check inactivity on load
+useEffect(()=>{
   const last=parseInt(localStorage.getItem("tnks_last_active")||"0");
   if(last && Date.now()-last > SESSION_TIMEOUT){setUser(null);return;}
-  // Update last active on user interaction
   const touch=()=>localStorage.setItem("tnks_last_active",Date.now().toString());
   touch();
   window.addEventListener("click",touch);
   window.addEventListener("keydown",touch);
   window.addEventListener("touchstart",touch);
-  // Check every minute if session expired
   const timer=setInterval(()=>{
     const t=parseInt(localStorage.getItem("tnks_last_active")||"0");
     if(t && Date.now()-t > SESSION_TIMEOUT) setUser(null);
@@ -11180,7 +11176,7 @@ useEffect(()=>{
     clearInterval(timer);
   };
 },[]);
-  const [users,setUsers]=useState(DEFAULT_USERS);
+const [users,setUsers]=useState(DEFAULT_USERS);
   const [students,setStudents]=useState([]);
   const [results,setResults]=useState([]);
   const [comments,setComments]=useState([]);
