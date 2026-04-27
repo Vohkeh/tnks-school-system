@@ -519,8 +519,8 @@ function Btn({onClick,v="primary",children,full,style={}}) {
 function Inp({label,value,onChange,placeholder,type="text",style={}}) {
   return <div><label style={{fontSize:Math.max(10,FS-2),fontWeight:"bold",color:"#374151",display:"block",marginBottom:3,letterSpacing:.5}}>{label}</label><input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px 12px",fontSize:FS,outline:"none",boxSizing:"border-box",fontFamily:F,...style}} /></div>;
 }
-function Sel({label,value,onChange,options,style={}}) {
-  return <div>{label&&<label style={{fontSize:Math.max(10,FS-2),fontWeight:"bold",color:"#374151",display:"block",marginBottom:3,letterSpacing:.5}}>{label}</label>}<select value={value} onChange={e=>onChange(e.target.value)} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px 10px",fontSize:FS,background:"white",cursor:"pointer",fontFamily:F,...style}}>{options.map(o=><option key={o} value={o}>{o}</option>)}</select></div>;
+function Sel({label,value,onChange,options,labels,style={}}) {
+  return <div>{label&&<label style={{fontSize:Math.max(10,FS-2),fontWeight:"bold",color:"#374151",display:"block",marginBottom:3,letterSpacing:.5}}>{label}</label>}<select value={value} onChange={e=>onChange(e.target.value)} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px 10px",fontSize:FS,background:"white",cursor:"pointer",fontFamily:F,...style}}>{options.map((o,i)=><option key={o} value={o}>{labels?labels[i]||o:o}</option>)}</select></div>;
 }
 function Textarea({label,value,onChange,placeholder,rows=3}) {
   return <div>{label&&<label style={{fontSize:Math.max(10,FS-2),fontWeight:"bold",color:"#374151",display:"block",marginBottom:3}}>{label}</label>}<textarea value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} rows={rows} style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"8px 12px",fontSize:FS,fontFamily:F,resize:"vertical",boxSizing:"border-box",outline:"none"}} /></div>;
@@ -9632,7 +9632,243 @@ function MarksStatusPage({ students, results, term, year, examType }) {
 }
 
 // ══════════════════════════════════════════════════════════
-// HOMEWORK (Online Classes)
+// ONLINE CLASSES (Video Classes)
+// ══════════════════════════════════════════════════════════
+function OnlineClassesPage({ students, staff, user }) {
+  const F = getAppFont();
+  const blankClass = { title:"", cls:"Grade 7", subject:"", date:"", time:"", duration:"60", platform:"Google Meet", link:"", teacherName:user.name, description:"", status:"Scheduled" };
+  const [classes, setClasses] = useState([]);
+  const [recordings, setRecordings] = useState([]);
+  const [form, setForm] = useState(blankClass);
+  const [recForm, setRecForm] = useState({ classId:"", title:"", url:"", date:"", notes:"" });
+  const [tab, setTab] = useState("upcoming");
+  const [msg, setMsg] = useState({ t:"", ok:true });
+
+  useEffect(() => {
+    load("tnks_online_classes").then(d=>{ if(d) setClasses(d); });
+    load("tnks_class_recordings").then(d=>{ if(d) setRecordings(d); });
+  }, []);
+  useEffect(() => { save("tnks_online_classes", classes); }, [classes]);
+  useEffect(() => { save("tnks_class_recordings", recordings); }, [recordings]);
+
+  const flash = (t, ok=true) => { setMsg({t,ok}); setTimeout(()=>setMsg({t:"",ok:true}),3000); };
+
+  const PLATFORMS = ["Google Meet","Microsoft Teams","Zoom","Jitsi Meet","Skype","WhatsApp Video Call","YouTube Live"];
+  const DURATIONS = ["30","45","60","90","120"];
+
+  function doAdd() {
+    if(!form.title||!form.subject||!form.date||!form.time||!form.link)
+      return flash("Title, subject, date, time and meeting link are required.",false);
+    setClasses(p=>[...p, {...form, id:Date.now().toString(), createdAt:new Date().toLocaleDateString("en-KE")}]);
+    flash("✅ Online class scheduled!"); setForm(blankClass); setTab("upcoming");
+  }
+
+  function doUpdateStatus(id, status) {
+    setClasses(p=>p.map(c=>c.id===id?{...c,status}:c));
+  }
+
+  function doAddRecording() {
+    if(!recForm.classId||!recForm.url) return flash("Select a class and provide the recording URL.",false);
+    const cls = classes.find(c=>c.id===recForm.classId);
+    setRecordings(p=>[...p, {...recForm, id:Date.now().toString(), className:cls?.title||"", addedAt:new Date().toLocaleString("en-KE")}]);
+    flash("✅ Recording added!"); setRecForm({ classId:"", title:"", url:"", date:"", notes:"" });
+  }
+
+  const upcoming = [...classes].filter(c=>c.status==="Scheduled").sort((a,b)=>new Date(a.date+" "+a.time)-new Date(b.date+" "+b.time));
+  const past = [...classes].filter(c=>c.status!=="Scheduled").sort((a,b)=>new Date(b.date)-new Date(a.date));
+
+  const statusColor = { Scheduled:"#1d4ed8", Live:"#b91c1c", Completed:"#166534", Cancelled:"#64748b" };
+  const statusBg = { Scheduled:"#eff6ff", Live:"#fef2f2", Completed:"#f0fdf4", Cancelled:"#f8fafc" };
+
+  return (
+    <div style={{padding:24}}>
+      <PageH title="🎥 Online Classes" sub="Schedule and manage virtual lessons for all classes">
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          {[["upcoming","📅 Upcoming"],["schedule","➕ Schedule Class"],["recordings","🎬 Recordings"],["howto","📖 How It Works"]].map(([t,l])=>
+            <Btn key={t} onClick={()=>setTab(t)} v={tab===t?"primary":"ghost"} style={{fontSize:12}}>{l}</Btn>
+          )}
+        </div>
+      </PageH>
+
+      {/* Stats */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12,marginBottom:20}}>
+        <Stat icon="📅" label="Scheduled" value={classes.filter(c=>c.status==="Scheduled").length} color="#1d4ed8"/>
+        <Stat icon="🔴" label="Live Now" value={classes.filter(c=>c.status==="Live").length} color="#b91c1c"/>
+        <Stat icon="✅" label="Completed" value={classes.filter(c=>c.status==="Completed").length} color="#166534"/>
+        <Stat icon="🎬" label="Recordings" value={recordings.length} color="#7c3aed"/>
+      </div>
+
+      {/* HOW IT WORKS */}
+      {tab==="howto" && <div style={{display:"grid",gap:16}}>
+        <Card style={{borderLeft:"4px solid #7c3aed"}}>
+          <div style={{fontWeight:"bold",color:"#3b0764",fontSize:16,marginBottom:12}}>📖 How Online Classes Are Conducted</div>
+          <div style={{display:"grid",gap:10,fontSize:13,color:"#374151"}}>
+            <div style={{background:"#f5f3ff",borderRadius:8,padding:"12px 16px"}}>
+              <div style={{fontWeight:"bold",color:"#7c3aed",marginBottom:6}}>🗓️ Step 1 — Scheduling</div>
+              <div>Teachers schedule a class using the "Schedule Class" tab at least 24 hours in advance. They provide the subject, class, date, time, platform and a meeting link.</div>
+            </div>
+            <div style={{background:"#eff6ff",borderRadius:8,padding:"12px 16px"}}>
+              <div style={{fontWeight:"bold",color:"#1d4ed8",marginBottom:6}}>📢 Step 2 — Notification</div>
+              <div>Once scheduled, parents and students are automatically notified via SMS and the Parent Portal. The meeting link is shared through the school's communication channels and the notice board.</div>
+            </div>
+            <div style={{background:"#f0fdf4",borderRadius:8,padding:"12px 16px"}}>
+              <div style={{fontWeight:"bold",color:"#166534",marginBottom:6}}>💻 Step 3 — Joining the Class</div>
+              <div>Students click the meeting link at the scheduled time. Classes are conducted on platforms like <b>Google Meet, Zoom, or Microsoft Teams</b>. Students must join with their camera on (where possible) and remain muted unless called upon.</div>
+            </div>
+            <div style={{background:"#fef3c7",borderRadius:8,padding:"12px 16px"}}>
+              <div style={{fontWeight:"bold",color:"#b45309",marginBottom:6}}>📋 Step 4 — Class Rules</div>
+              <ul style={{margin:0,paddingLeft:18,lineHeight:1.8}}>
+                <li>Join 5 minutes before start time</li>
+                <li>Use your full name when joining (e.g., John Kamau — Grade 7)</li>
+                <li>Mute your microphone unless asked to speak</li>
+                <li>No recording without teacher's permission</li>
+                <li>Be in a quiet environment and dressed appropriately</li>
+                <li>Raise a virtual hand or type in chat to ask questions</li>
+              </ul>
+            </div>
+            <div style={{background:"#fdf2f8",borderRadius:8,padding:"12px 16px"}}>
+              <div style={{fontWeight:"bold",color:"#be185d",marginBottom:6}}>🎬 Step 5 — Recordings</div>
+              <div>All classes are recorded and uploaded to the Recordings tab within 24 hours. Students who missed the live session can watch the recording. Recording links are also shared on the Parent Portal.</div>
+            </div>
+          </div>
+        </Card>
+
+        <Card style={{borderLeft:"4px solid #1d4ed8"}}>
+          <div style={{fontWeight:"bold",color:"#1d4ed8",fontSize:14,marginBottom:10}}>📱 Recommended Platforms</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:10}}>
+            {[
+              {name:"Google Meet",icon:"🟢",desc:"Free, works on any device. Best for Kenya."},
+              {name:"Microsoft Teams",icon:"🔵",desc:"Good for large groups. Available via Office 365."},
+              {name:"Zoom",icon:"🟣",desc:"Excellent video quality. 40-min limit on free plan."},
+              {name:"Jitsi Meet",icon:"🟡",desc:"Fully free, no account needed. Open source."},
+              {name:"WhatsApp Video",icon:"🟢",desc:"Easy for parents. Limited to 8 participants."},
+              {name:"YouTube Live",icon:"🔴",desc:"Best for large audiences. Recordings auto-saved."},
+            ].map(p=><div key={p.name} style={{background:"#f8fafc",borderRadius:8,padding:"10px 12px"}}>
+              <div style={{fontWeight:"bold",fontSize:12}}>{p.icon} {p.name}</div>
+              <div style={{fontSize:11,color:"#64748b",marginTop:3}}>{p.desc}</div>
+            </div>)}
+          </div>
+        </Card>
+      </div>}
+
+      {/* SCHEDULE NEW CLASS */}
+      {tab==="schedule" && <Card style={{marginBottom:16}}>
+        <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>📅 Schedule New Online Class</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:12}}>
+          <Inp label="CLASS TITLE *" value={form.title} onChange={v=>setForm(p=>({...p,title:v}))} placeholder="e.g. Algebra Review Lesson"/>
+          <Sel label="CLASS *" value={form.cls} onChange={v=>setForm(p=>({...p,cls:v}))} options={ALL_CLASSES}/>
+          <Inp label="SUBJECT *" value={form.subject} onChange={v=>setForm(p=>({...p,subject:v}))} placeholder="e.g. Mathematics"/>
+          <Inp label="DATE *" value={form.date} onChange={v=>setForm(p=>({...p,date:v}))} type="date"/>
+          <Inp label="TIME *" value={form.time} onChange={v=>setForm(p=>({...p,time:v}))} type="time"/>
+          <Sel label="DURATION (mins)" value={form.duration} onChange={v=>setForm(p=>({...p,duration:v}))} options={DURATIONS}/>
+          <Sel label="PLATFORM *" value={form.platform} onChange={v=>setForm(p=>({...p,platform:v}))} options={PLATFORMS}/>
+          <Inp label="MEETING LINK *" value={form.link} onChange={v=>setForm(p=>({...p,link:v}))} placeholder="https://meet.google.com/..."/>
+          <Inp label="TEACHER/HOST" value={form.teacherName} onChange={v=>setForm(p=>({...p,teacherName:v}))} placeholder="Teacher name"/>
+        </div>
+        <div style={{marginTop:12}}>
+          <Textarea label="CLASS DESCRIPTION / AGENDA" value={form.description} onChange={v=>setForm(p=>({...p,description:v}))} placeholder="Briefly describe what will be covered in this session..." rows={3}/>
+        </div>
+        {msg.t&&<div style={{marginTop:10,fontSize:13,fontWeight:"bold",color:msg.ok?"#1d4ed8":"#b91c1c"}}>{msg.t}</div>}
+        <div style={{marginTop:14}}><Btn onClick={doAdd} v="primary">📅 Schedule Class</Btn></div>
+      </Card>}
+
+      {/* UPCOMING CLASSES */}
+      {tab==="upcoming" && <>
+        {upcoming.length===0 ? <Empty icon="🎥" text="No upcoming classes scheduled. Click '➕ Schedule Class' to add one."/> :
+        <div style={{display:"grid",gap:12}}>
+          {upcoming.map(c=>(
+            <Card key={c.id} style={{borderLeft:`4px solid ${statusColor[c.status]||"#7c3aed"}`}}>
+              <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+                <div style={{flex:1}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                    <span style={{fontWeight:"bold",color:"#3b0764",fontSize:14}}>{c.title}</span>
+                    <span style={{fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:"bold",background:statusBg[c.status],color:statusColor[c.status]}}>{c.status}</span>
+                  </div>
+                  <div style={{fontSize:12,color:"#64748b"}}>
+                    📚 {c.cls} · {c.subject} &nbsp;|&nbsp; 📅 {c.date} at {c.time} ({c.duration} min) &nbsp;|&nbsp; 👨‍🏫 {c.teacherName}
+                  </div>
+                  <div style={{fontSize:12,color:"#64748b",marginTop:2}}>💻 {c.platform}</div>
+                  {c.description&&<div style={{fontSize:12,color:"#374151",marginTop:6,fontStyle:"italic"}}>{c.description}</div>}
+                  <a href={c.link} target="_blank" rel="noreferrer" style={{display:"inline-block",marginTop:8,fontSize:12,fontWeight:"bold",color:"white",background:"#7c3aed",padding:"6px 14px",borderRadius:8,textDecoration:"none"}}>🔗 Join Class</a>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:6,alignItems:"flex-end"}}>
+                  {["Scheduled","Live","Completed","Cancelled"].map(s=>
+                    <button key={s} onClick={()=>doUpdateStatus(c.id,s)} style={{fontSize:10,padding:"3px 10px",borderRadius:20,border:`1px solid ${statusColor[s]}`,background:c.status===s?statusColor[s]:"white",color:c.status===s?"white":statusColor[s],cursor:"pointer",fontFamily:F}}>
+                      {s}
+                    </button>
+                  )}
+                  <button onClick={()=>setClasses(p=>p.filter(x=>x.id!==c.id))} style={{color:"#b91c1c",background:"none",border:"none",cursor:"pointer",fontSize:12,marginTop:4}}>🗑️</button>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>}
+
+        {past.length>0&&<>
+          <div style={{fontWeight:"bold",color:"#64748b",fontSize:13,marginTop:24,marginBottom:10}}>📦 Past Classes</div>
+          <div style={{display:"grid",gap:10}}>
+            {past.map(c=>(
+              <Card key={c.id} style={{borderLeft:"4px solid #cbd5e1",opacity:0.85}}>
+                <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+                  <div>
+                    <span style={{fontWeight:"bold",color:"#475569",fontSize:13}}>{c.title}</span>
+                    <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>{c.cls} · {c.subject} · {c.date} {c.time} · {c.teacherName}</div>
+                  </div>
+                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                    <span style={{fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:"bold",background:statusBg[c.status]||"#f8fafc",color:statusColor[c.status]||"#64748b"}}>{c.status}</span>
+                    <button onClick={()=>setClasses(p=>p.filter(x=>x.id!==c.id))} style={{color:"#b91c1c",background:"none",border:"none",cursor:"pointer",fontSize:12}}>🗑️</button>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </>}
+      </>}
+
+      {/* RECORDINGS */}
+      {tab==="recordings" && <div style={{display:"grid",gap:16}}>
+        <Card>
+          <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:14,fontSize:14}}>➕ Add Recording</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:12}}>
+            <Sel label="LINK TO CLASS" value={recForm.classId} onChange={v=>setRecForm(p=>({...p,classId:v}))}
+              options={["", ...classes.map(c=>c.id)]}
+              labels={["-- Select Class --", ...classes.map(c=>`${c.title} (${c.cls} · ${c.date})`)]}/>
+            <Inp label="RECORDING TITLE" value={recForm.title} onChange={v=>setRecForm(p=>({...p,title:v}))} placeholder="e.g. Grade 7 Algebra — 14 Jan"/>
+            <Inp label="RECORDING URL *" value={recForm.url} onChange={v=>setRecForm(p=>({...p,url:v}))} placeholder="https://drive.google.com/... or YouTube link"/>
+            <Inp label="DATE UPLOADED" value={recForm.date} onChange={v=>setRecForm(p=>({...p,date:v}))} type="date"/>
+          </div>
+          <div style={{marginTop:10}}>
+            <Textarea label="NOTES" value={recForm.notes} onChange={v=>setRecForm(p=>({...p,notes:v}))} placeholder="Any notes about this recording..." rows={2}/>
+          </div>
+          {msg.t&&<div style={{marginTop:10,fontSize:13,fontWeight:"bold",color:msg.ok?"#1d4ed8":"#b91c1c"}}>{msg.t}</div>}
+          <div style={{marginTop:12}}><Btn onClick={doAddRecording} v="primary">🎬 Add Recording</Btn></div>
+        </Card>
+        {recordings.length===0?<Empty icon="🎬" text="No recordings uploaded yet. Add one above."/>:
+        <div style={{display:"grid",gap:10}}>
+          {[...recordings].reverse().map(r=>(
+            <Card key={r.id} style={{borderLeft:"4px solid #7c3aed"}}>
+              <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+                <div>
+                  <div style={{fontWeight:"bold",color:"#3b0764",fontSize:13}}>{r.title||r.className}</div>
+                  <div style={{fontSize:11,color:"#64748b",marginTop:2}}>{r.className&&`Class: ${r.className}`} {r.date&&`· Uploaded: ${r.date}`}</div>
+                  {r.notes&&<div style={{fontSize:11,color:"#374151",marginTop:4,fontStyle:"italic"}}>{r.notes}</div>}
+                  <a href={r.url} target="_blank" rel="noreferrer" style={{display:"inline-block",marginTop:8,fontSize:12,fontWeight:"bold",color:"white",background:"#1d4ed8",padding:"5px 14px",borderRadius:8,textDecoration:"none"}}>▶️ Watch Recording</a>
+                </div>
+                <div style={{fontSize:11,color:"#94a3b8",textAlign:"right"}}>
+                  <div>{r.addedAt}</div>
+                  <button onClick={()=>setRecordings(p=>p.filter(x=>x.id!==r.id))} style={{color:"#b91c1c",background:"none",border:"none",cursor:"pointer",fontSize:12,marginTop:8}}>🗑️</button>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>}
+      </div>}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// HOMEWORK
 // ══════════════════════════════════════════════════════════
 function HomeworkPage({ students, staff, user }) {
   const F = getAppFont();
@@ -9669,8 +9905,8 @@ function HomeworkPage({ students, staff, user }) {
   return (
     <div style={{padding:24}}>
       <PageH title="📝 Homework" sub="Assign and track student homework">
-        <div style={{display:"flex",gap:6}}>
-          {[["list","📋 Assignments"],["add","➕ Assign"],["submissions","📤 Submissions"]].map(([t,l])=>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          {[["list","📋 Assignments"],["add","➕ Assign"],["submissions","📤 Submissions"],["howto","📖 How It Works"]].map(([t,l])=>
             <Btn key={t} onClick={()=>{setTab(t);if(t==="add")setForm(blank);}} v={tab===t?"primary":"ghost"} style={{fontSize:12}}>{l}</Btn>
           )}
         </div>
@@ -9760,6 +9996,45 @@ function HomeworkPage({ students, staff, user }) {
           })}
         </div>
       </>}
+
+      {tab==="howto" && <div style={{display:"grid",gap:16}}>
+        <Card style={{borderLeft:"4px solid #7c3aed"}}>
+          <div style={{fontWeight:"bold",color:"#3b0764",fontSize:16,marginBottom:12}}>📖 How Homework Is Conducted</div>
+          <div style={{display:"grid",gap:10,fontSize:13,color:"#374151"}}>
+            <div style={{background:"#f5f3ff",borderRadius:8,padding:"12px 16px"}}>
+              <div style={{fontWeight:"bold",color:"#7c3aed",marginBottom:6}}>📝 Step 1 — Assignment Posted</div>
+              <div>Teachers post homework assignments through this portal. Each assignment includes the subject, class, due date, full instructions, and an optional resource link (e.g. a PDF, YouTube video, or Google Drive link).</div>
+            </div>
+            <div style={{background:"#eff6ff",borderRadius:8,padding:"12px 16px"}}>
+              <div style={{fontWeight:"bold",color:"#1d4ed8",marginBottom:6}}>📢 Step 2 — Notification to Parents</div>
+              <div>Parents are notified through the Parent Portal and via SMS. The notice board also displays current assignments. Parents are expected to ensure their child completes the work by the due date.</div>
+            </div>
+            <div style={{background:"#f0fdf4",borderRadius:8,padding:"12px 16px"}}>
+              <div style={{fontWeight:"bold",color:"#166534",marginBottom:6}}>📚 Step 3 — Student Completes Homework</div>
+              <div>Students complete the homework at home or during evening study sessions (for boarders). They may use the resource link provided by the teacher to guide them. Boarders complete homework during the <b>7:00–8:00 PM study period</b>.</div>
+            </div>
+            <div style={{background:"#fef3c7",borderRadius:8,padding:"12px 16px"}}>
+              <div style={{fontWeight:"bold",color:"#b45309",marginBottom:6}}>✅ Step 4 — Submission</div>
+              <div>Students hand in physical work books or exercise books to the teacher the following morning before first lesson. For online submissions, teachers use the <b>Submissions tab</b> to mark students as having submitted. Digital files can be shared via the resource link.</div>
+            </div>
+            <div style={{background:"#fdf2f8",borderRadius:8,padding:"12px 16px"}}>
+              <div style={{fontWeight:"bold",color:"#be185d",marginBottom:6}}>⚠️ Late / Missing Homework Policy</div>
+              <ul style={{margin:0,paddingLeft:18,lineHeight:1.8}}>
+                <li>Students who miss the deadline are flagged in the <b>Submissions</b> tab</li>
+                <li>Teachers must follow up with the student and parent within 24 hours</li>
+                <li>Repeated non-submission triggers a monitoring entry via the Learner Monitoring module</li>
+                <li>Parents can view outstanding homework on the Parent Portal</li>
+              </ul>
+            </div>
+            <div style={{background:"#f0fdf4",borderRadius:8,padding:"12px 16px"}}>
+              <div style={{fontWeight:"bold",color:"#166534",marginBottom:6}}>🏠 Boarders' Homework Schedule</div>
+              <div style={{display:"grid",gridTemplateColumns:"auto 1fr",gap:"4px 12px",marginTop:4,fontSize:12}}>
+                {[["19:00–22:00","Evening Studies — Main homework session"],["05:00–06:30","Morning — Review completed work"],["During class","Teacher feedback and corrections"]].map(([t,a])=><><div key={t} style={{fontWeight:"bold",color:"#1d4ed8",fontFamily:"monospace"}}>{t}</div><div key={a} style={{color:"#374151"}}>{a}</div></>)}
+              </div>
+            </div>
+          </div>
+        </Card>
+      </div>}
     </div>
   );
 }
@@ -11450,7 +11725,7 @@ const [users,setUsers]=useState(DEFAULT_USERS);
         {view==="edit_marks"&&<EditMarksPage students={students} results={results} setResults={setResults} term={term} year={year} examType={examType}/>}
         {view==="marks_status"&&<MarksStatusPage students={students} results={results} term={term} year={year} examType={examType}/>}
         {view==="homework"&&<HomeworkPage students={students} staff={staff} user={user}/>}
-        {view==="videoclasses"&&<div style={{padding:40,textAlign:"center",color:"#94a3b8",fontSize:18}}>🎥 Video Classes — Coming Soon</div>}
+        {view==="videoclasses"&&<OnlineClassesPage students={students} staff={staff} user={user}/>}
         {view==="finance_settings"&&user.role==="admin"&&<FinanceSettingsPage user={user}/>}
         {view==="finance_settings"&&user.role!=="admin"&&<div style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Admin access required.</div>}
         {view==="promissory_notes"&&<PromissoryNotesPage students={students} user={user}/>}
