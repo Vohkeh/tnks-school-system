@@ -8462,7 +8462,7 @@ function TransportPage({ students, setStudents, user, transportRoutes: _transpor
                   <div style={{ width: `${Math.min(pct, 100)}%`, height: "100%", borderRadius: 99, background: pct > 90 ? "#b91c1c" : routeColor(route) }} />
                 </div>
                 <div style={{ fontSize: 10, color: "#94a3b8" }}>{pct}% full</div>
-                {user.role === "admin" && <button onClick={() => { setEditRoute(isEditing ? null : route); setEditStopIdx(null); setNewStop(""); }} style={{ marginTop: 8, background: isEditing ? "#ede9fe" : "#f5f3ff", color: isEditing ? "#1d4ed8" : "#7c3aed", border: "none", borderRadius: 7, padding: "5px 12px", cursor: "pointer", fontSize: 11, fontFamily: "Georgia,serif", fontWeight: "bold" }}>{isEditing ? "✓ Done" : "✏️ Edit"}</button><button onClick={()=>deleteRoute(route)} style={{marginTop:4,background:"none",color:"#b91c1c",border:"none",cursor:"pointer",fontSize:10,fontFamily:"Georgia,serif"}}>🗑️ Delete Route</button>}
+                {user.role === "admin" && <div><button onClick={() => { setEditRoute(isEditing ? null : route); setEditStopIdx(null); setNewStop(""); }} style={{ marginTop: 8, background: isEditing ? "#ede9fe" : "#f5f3ff", color: isEditing ? "#1d4ed8" : "#7c3aed", border: "none", borderRadius: 7, padding: "5px 12px", cursor: "pointer", fontSize: 11, fontFamily: "Georgia,serif", fontWeight: "bold" }}>{isEditing ? "✓ Done" : "✏️ Edit"}</button><button onClick={() => deleteRoute(route)} style={{ marginTop: 4, background: "none", color: "#b91c1c", border: "none", cursor: "pointer", fontSize: 10, fontFamily: "Georgia,serif" }}>🗑️ Delete Route</button></div>}
               </div>
             </div>
           </Card>;
