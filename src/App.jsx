@@ -115,7 +115,7 @@ const EXAM_TYPES = ["Opener Exam","Midterm Exam","End Term Exam"];
 const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday"];
 const WEEKEND_DAYS = ["Saturday","Sunday"];
 const CC = ["#7c3aed","#1d4ed8","#b45309","#b91c1c","#7c3aed","#0e7490","#be185d","#1e3a8a","#7c3aed","#9333ea"];
-const STUDENT_TYPES = ["Day Scholar","Boarder","Bus (Route A)","Bus (Route B)","Bus (Route C)"];
+const STUDENT_TYPES = ["Day Scholar","Boarder"];
 
 // ── Helper: sort students by admission number (middle segment TNKS/NNN/YEAR)
 function sortStudentsByAdm(arr){
@@ -1175,13 +1175,13 @@ function Dashboard({students,results,announcements,fees,staff,users,term,setTerm
 // STUDENTS
 // ══════════════════════════════════════════════════════════
 function StudentsPage({students,setStudents,results,setResults,comments,setComments,fees,setFees,monitoring,setMonitoring,logo,preFilterClass}) {
-  const blank={name:"",admNo:"",class:"Grade 7",gender:"Male",photo:"",email:"",parentPassword:"",dob:"",parentName:"",parentPhone:"",address:""};
+  const blank={name:"",admNo:"",class:"Grade 7",gender:"Male",photo:"",studentType:"Day Scholar",email:"",parentPassword:"",dob:"",parentName:"",parentPhone:"",address:""};
   const [form,setForm]=useState(blank); const [editId,setEditId]=useState(null);
   const [search,setSearch]=useState(""); const [filterCls,setFilterCls]=useState(preFilterClass&&preFilterClass!=="All"?preFilterClass:"All");
   const [msg,setMsg]=useState({t:"",ok:true}); const [tab,setTab]=useState("list");
   const flash=(t,ok=true)=>{setMsg({t,ok});setTimeout(()=>setMsg({t:"",ok:true}),2800);};
   function doSave(){if(!form.name.trim()||!form.admNo.trim()) return flash("Name and admission number required.",false); const fSave={...form,name:form.name.trim().toUpperCase(),parentName:form.parentName?form.parentName.trim().toUpperCase():form.parentName}; if(editId){setStudents(p=>p.map(s=>s.id===editId?{...s,...fSave}:s));setEditId(null);flash("Learner updated!");}else{if(students.find(s=>s.admNo===form.admNo)) return flash("Admission number already exists.",false); setStudents(p=>[...p,{...fSave,id:Date.now().toString(),status:"active",enrollDate:new Date().toLocaleDateString("en-KE")}]);flash("Learner added!");} setForm(blank);setTab("list");}
-  function doEdit(s){setForm({name:s.name,admNo:s.admNo,class:s.class,gender:s.gender||"Male",photo:s.photo||"",email:s.email||"",parentPassword:s.parentPassword||"",dob:s.dob||"",parentName:s.parentName||"",parentPhone:s.parentPhone||"",address:s.address||""});setEditId(s.id);setTab("add");}
+  function doEdit(s){setForm({name:s.name,admNo:s.admNo,class:s.class,gender:s.gender||"Male",photo:s.photo||"",studentType:s.studentType||"Day Scholar",email:s.email||"",parentPassword:s.parentPassword||"",dob:s.dob||"",parentName:s.parentName||"",parentPhone:s.parentPhone||"",address:s.address||""});setEditId(s.id);setTab("add");}
   function doDel(id){
     if(!confirm("Delete this learner and ALL their records (results, fees, comments)?")) return;
     setStudents(p=>p.filter(s=>s.id!==id));
@@ -1196,8 +1196,8 @@ function StudentsPage({students,setStudents,results,setResults,comments,setComme
   return (
     <div style={{padding:24}}>
       <PageH title="Students" sub="Manage all learners"><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{[["list","📋 List"],["add","➕ Add"],["idcards","🪪 ID Cards"]].map(([t,l])=><Btn key={t} onClick={()=>{setTab(t);if(t==="add"&&!editId)setForm(blank);}} v={tab===t?"primary":"ghost"} style={{fontSize:12}}>{l}</Btn>)}</div></PageH>
-      {tab==="add"&&<Card style={{marginBottom:20}}><div style={{fontWeight:"bold",color:"#1e293b",marginBottom:14,fontSize:14}}>{editId?"Edit Learner":"Add New Learner"}</div><div style={{marginBottom:14}}><PhotoUp value={form.photo} onChange={v=>setForm({...form,photo:v})}/></div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}><Inp label="FULL NAME *" value={form.name} onChange={v=>setForm({...form,name:v})} placeholder="Full name"/><Inp label="ADM. NUMBER *" value={form.admNo} onChange={v=>setForm({...form,admNo:v})} placeholder="TNKS/001/2025"/><Sel label="CLASS" value={form.class} onChange={v=>setForm({...form,class:v})} options={ALL_CLASSES}/><Sel label="GENDER" value={form.gender} onChange={v=>setForm({...form,gender:v})} options={["Male","Female"]}/><Inp label="DATE OF BIRTH" value={form.dob} onChange={v=>setForm({...form,dob:v})} placeholder="DD/MM/YYYY"/><Inp label="PARENT/GUARDIAN" value={form.parentName} onChange={v=>setForm({...form,parentName:v})} placeholder="Parent full name"/><Inp label="PARENT PHONE" value={form.parentPhone} onChange={v=>setForm({...form,parentPhone:v})} placeholder="+254 7..."/><Inp label="HOME ADDRESS" value={form.address} onChange={v=>setForm({...form,address:v})} placeholder="Village/Location"/></div><div style={{marginTop:12,paddingTop:12,borderTop:"1px dashed #e2e8f0"}}><div style={{fontSize:12,fontWeight:"bold",color:"#3b0764",marginBottom:10}}>👨‍👩‍👧 Parent Portal Access</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="LEARNER EMAIL (parent login)" value={form.email} onChange={v=>setForm({...form,email:v})} placeholder="john@gmail.com" type="email"/><Inp label="PARENT PASSWORD" value={form.parentPassword} onChange={v=>setForm({...form,parentPassword:v})} placeholder="Set password" type="password"/></div></div>{msg.t&&<div style={{marginTop:10,fontSize:13,color:msg.ok?"#1d4ed8":"#b91c1c",fontWeight:"bold"}}>{msg.t}</div>}<div style={{display:"flex",gap:8,marginTop:14}}><Btn onClick={doSave} v="primary">{editId?"Update":"Add Learner"}</Btn>{editId&&<Btn onClick={()=>{setEditId(null);setForm(blank);setTab("list");}} v="ghost">Cancel</Btn>}</div></Card>}
-      {tab==="list"&&<><div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by name or adm. no..." style={{flex:1,minWidth:200,border:"1.5px solid #e2e8f0",borderRadius:9,padding:"8px 12px",fontSize:13,fontFamily:F,outline:"none"}}/><Sel value={filterCls} onChange={setFilterCls} options={["All",...ALL_CLASSES]}/><span style={{fontSize:12,color:"#64748b"}}>{filtered.length} learner(s)</span></div><Card style={{padding:0}}><div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}><thead><tr>{["","#","Adm.No","Name","Class","Gender","Parent","Portal","Actions"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>{filtered.length?filtered.map((s,i)=><tr key={s.id} style={{background:i%2===0?"white":"#fafafa"}}><td style={{...td,width:46}}><Avatar name={s.name} photo={s.photo} size={34}/></td><td style={{...td,color:"#94a3b8"}}>{i+1}</td><td style={{...td,fontFamily:"monospace",fontSize:11}}>{s.admNo}</td><td style={{...td,fontWeight:"bold"}}>{s.name}</td><td style={td}><span style={{background:"#f5f3ff",color:"#7c3aed",fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:"bold"}}>{s.class}</span></td><td style={td}>{s.gender||"—"}</td><td style={{...td,fontSize:11}}>{s.parentName||"—"}</td><td style={td}>{s.email?<span style={{fontSize:10,color:"#1d4ed8"}}>✅</span>:<span style={{fontSize:10,color:"#94a3b8"}}>—</span>}</td><td style={td}><button onClick={()=>doEdit(s)} style={{color:"#7c3aed",background:"none",border:"none",cursor:"pointer",fontSize:12,marginRight:8}}>Edit</button><button onClick={()=>doDel(s.id)} style={{color:"#b91c1c",background:"none",border:"none",cursor:"pointer",fontSize:12}}>Del</button></td></tr>):<tr><td colSpan={9} style={{padding:40,textAlign:"center",color:"#94a3b8"}}>No learners found.</td></tr>}</tbody></table></div></Card></>}
+      {tab==="add"&&<Card style={{marginBottom:20}}><div style={{fontWeight:"bold",color:"#1e293b",marginBottom:14,fontSize:14}}>{editId?"Edit Learner":"Add New Learner"}</div><div style={{marginBottom:14}}><PhotoUp value={form.photo} onChange={v=>setForm({...form,photo:v})}/></div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}><Inp label="FULL NAME *" value={form.name} onChange={v=>setForm({...form,name:v})} placeholder="Full name"/><Inp label="ADM. NUMBER *" value={form.admNo} onChange={v=>setForm({...form,admNo:v})} placeholder="TNKS/001/2025"/><Sel label="CLASS" value={form.class} onChange={v=>setForm({...form,class:v})} options={ALL_CLASSES}/><Sel label="GENDER" value={form.gender} onChange={v=>setForm({...form,gender:v})} options={["Male","Female"]}/><Sel label="STUDENT TYPE" value={form.studentType||"Day Scholar"} onChange={v=>setForm({...form,studentType:v})} options={["Day Scholar","Boarder"]}/><Inp label="DATE OF BIRTH" value={form.dob} onChange={v=>setForm({...form,dob:v})} placeholder="DD/MM/YYYY"/><Inp label="PARENT/GUARDIAN" value={form.parentName} onChange={v=>setForm({...form,parentName:v})} placeholder="Parent full name"/><Inp label="PARENT PHONE" value={form.parentPhone} onChange={v=>setForm({...form,parentPhone:v})} placeholder="+254 7..."/><Inp label="HOME ADDRESS" value={form.address} onChange={v=>setForm({...form,address:v})} placeholder="Village/Location"/></div><div style={{marginTop:12,paddingTop:12,borderTop:"1px dashed #e2e8f0"}}><div style={{fontSize:12,fontWeight:"bold",color:"#3b0764",marginBottom:10}}>👨‍👩‍👧 Parent Portal Access</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="LEARNER EMAIL (parent login)" value={form.email} onChange={v=>setForm({...form,email:v})} placeholder="john@gmail.com" type="email"/><Inp label="PARENT PASSWORD" value={form.parentPassword} onChange={v=>setForm({...form,parentPassword:v})} placeholder="Set password" type="password"/></div></div>{msg.t&&<div style={{marginTop:10,fontSize:13,color:msg.ok?"#1d4ed8":"#b91c1c",fontWeight:"bold"}}>{msg.t}</div>}<div style={{display:"flex",gap:8,marginTop:14}}><Btn onClick={doSave} v="primary">{editId?"Update":"Add Learner"}</Btn>{editId&&<Btn onClick={()=>{setEditId(null);setForm(blank);setTab("list");}} v="ghost">Cancel</Btn>}</div></Card>}
+      {tab==="list"&&<><div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by name or adm. no..." style={{flex:1,minWidth:200,border:"1.5px solid #e2e8f0",borderRadius:9,padding:"8px 12px",fontSize:13,fontFamily:F,outline:"none"}}/><Sel value={filterCls} onChange={setFilterCls} options={["All",...ALL_CLASSES]}/><span style={{fontSize:12,color:"#64748b"}}>{filtered.length} learner(s)</span></div><Card style={{padding:0}}><div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}><thead><tr>{["","#","Adm.No","Name","Class","Type","Gender","Parent","Portal","Actions"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>{filtered.length?filtered.map((s,i)=><tr key={s.id} style={{background:i%2===0?"white":"#fafafa"}}><td style={{...td,width:46}}><Avatar name={s.name} photo={s.photo} size={34}/></td><td style={{...td,color:"#94a3b8"}}>{i+1}</td><td style={{...td,fontFamily:"monospace",fontSize:11}}>{s.admNo}</td><td style={{...td,fontWeight:"bold"}}>{s.name}</td><td style={td}><span style={{background:"#f5f3ff",color:"#7c3aed",fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:"bold"}}>{s.class}</span></td><td style={td}><span style={{fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:"bold",background:s.studentType==="Boarder"?"#fef3c7":(s.studentType||"Day Scholar")==="Day Scholar"?"#f0fdf4":"#eff6ff",color:s.studentType==="Boarder"?"#b45309":(s.studentType||"Day Scholar")==="Day Scholar"?"#166534":"#1d4ed8"}}>{s.studentType||"Day Scholar"}</span></td><td style={td}>{s.gender||"—"}</td><td style={{...td,fontSize:11}}>{s.parentName||"—"}</td><td style={td}>{s.email?<span style={{fontSize:10,color:"#1d4ed8"}}>✅</span>:<span style={{fontSize:10,color:"#94a3b8"}}>—</span>}</td><td style={td}><button onClick={()=>doEdit(s)} style={{color:"#7c3aed",background:"none",border:"none",cursor:"pointer",fontSize:12,marginRight:8}}>Edit</button><button onClick={()=>doDel(s.id)} style={{color:"#b91c1c",background:"none",border:"none",cursor:"pointer",fontSize:12}}>Del</button></td></tr>):<tr><td colSpan={9} style={{padding:40,textAlign:"center",color:"#94a3b8"}}>No learners found.</td></tr>}</tbody></table></div></Card></>}
       {tab==="idcards"&&<StudentIDCards students={students} filterCls={filterCls} setFilterCls={setFilterCls} logo={logo}/>}
     </div>
   );
@@ -8220,17 +8220,60 @@ function ClubsPage({ students, staff, user, clubs, setClubs }) {
 // 8. TRANSPORT MANAGEMENT
 // ══════════════════════════════════════════════════════════
 function TransportPage({ students, setStudents, user, transportRoutes: _transportRoutes, setTransportRoutes, busMonitoring, setBusMonitoring }) {
+  const PALETTE = ["#7c3aed","#1d4ed8","#b45309","#166534","#be185d","#0891b2"];
   const DEFAULT_ROUTES = {
-    "Route A":{driver:"",vehicle:"",capacity:40,destinations:["Meru Town","Mukothima Junction","School Gate"],timeDeparted:"",timeArrived:""},
-    "Route B":{driver:"",vehicle:"",capacity:40,destinations:["Gatunga","Igamba","School Gate"],timeDeparted:"",timeArrived:""},
-    "Route C":{driver:"",vehicle:"",capacity:40,destinations:["Tharaka","Nkondi","School Gate"],timeDeparted:"",timeArrived:""},
+    "Route A":{driver:"",vehicle:"",capacity:40,fare:15000,color:"#7c3aed",destinations:["Meru Town","Mukothima Junction","School Gate"],timeDeparted:"",timeArrived:""},
+    "Route B":{driver:"",vehicle:"",capacity:40,fare:16500,color:"#1d4ed8",destinations:["Gatunga","Igamba","School Gate"],timeDeparted:"",timeArrived:""},
+    "Route C":{driver:"",vehicle:"",capacity:40,fare:18000,color:"#b45309",destinations:["Tharaka","Nkondi","School Gate"],timeDeparted:"",timeArrived:""},
   };
-  const transportRoutes = (_transportRoutes && typeof _transportRoutes === "object" && _transportRoutes["Route A"])
+  // Always ensure we have a valid object; migrate old keys that lack color/fare
+  const rawRoutes = (_transportRoutes && typeof _transportRoutes === "object" && Object.keys(_transportRoutes).length > 0)
     ? _transportRoutes : DEFAULT_ROUTES;
+  const transportRoutes = Object.fromEntries(
+    Object.entries(rawRoutes).map(([k,v],i) => [k, {
+      driver:"", vehicle:"", capacity:40, fare:15000,
+      color: PALETTE[i % PALETTE.length],
+      destinations:[], timeDeparted:"", timeArrived:"",
+      ...v,
+      color: v.color || PALETTE[i % PALETTE.length],
+      fare: v.fare || 15000,
+    }])
+  );
   const [tpGrade, setTpGrade] = React.useState("All");
-  const ROUTES = ["Route A", "Route B", "Route C"];
-  const ROUTE_COLORS = { "Route A": "#7c3aed", "Route B": "#1d4ed8", "Route C": "#b45309" };
-  const ROUTE_FARES = { "Route A": 15000, "Route B": 16500, "Route C": 18000 };
+  const ROUTES = Object.keys(transportRoutes);
+  // For backwards compat with old busRoute values
+  const routeColor = (r) => transportRoutes[r]?.color || PALETTE[ROUTES.indexOf(r) % PALETTE.length] || "#7c3aed";
+  const routeFare  = (r) => transportRoutes[r]?.fare || 15000;
+  // Add / rename route helpers
+  const [newRouteName, setNewRouteName] = React.useState("");
+  const [renameMap, setRenameMap] = React.useState({}); // { oldName: newNameBeingTyped }
+  function addRoute() {
+    const name = newRouteName.trim();
+    if (!name || transportRoutes[name]) return flash("Enter a unique route name.", false);
+    const color = PALETTE[ROUTES.length % PALETTE.length];
+    setTransportRoutes(p => ({ ...p, [name]: { driver:"", vehicle:"", capacity:40, fare:15000, color, destinations:[], timeDeparted:"", timeArrived:"" } }));
+    setNewRouteName(""); flash("✅ Route added!");
+  }
+  function deleteRoute(route) {
+    if (busStudents(route).length > 0) return flash(`Remove all students from ${route} before deleting.`, false);
+    setTransportRoutes(p => { const n = {...p}; delete n[route]; return n; });
+    flash(`🗑️ ${route} deleted.`);
+  }
+  function renameRoute(oldName) {
+    const newName = (renameMap[oldName]||"").trim();
+    if (!newName || newName === oldName) return setRenameMap(p=>({...p,[oldName]:undefined}));
+    if (transportRoutes[newName]) return flash("A route with that name already exists.", false);
+    // Update transportRoutes key
+    setTransportRoutes(p => {
+      const n = {};
+      for (const [k,v] of Object.entries(p)) { n[k===oldName?newName:k] = v; }
+      return n;
+    });
+    // Update students on this route
+    setStudents(p => p.map(s => s.busRoute===oldName ? {...s, busRoute:newName, studentType:`Bus (${newName})`} : s));
+    setRenameMap(p=>({...p,[oldName]:undefined}));
+    flash(`✅ Renamed to "${newName}"`);
+  }
   const [tab, setTab] = useState("routes");
   const [selRoute, setSelRoute] = useState("Route A");
   const [assignId, setAssignId] = useState("");
@@ -8252,13 +8295,12 @@ function TransportPage({ students, setStudents, user, transportRoutes: _transpor
     const cap = transportRoutes[selRoute]?.capacity || 40;
     const current = busStudents(selRoute).length;
     if (current >= cap) return flash(`⚠️ ${selRoute} is full (${cap} learners max).`, false);
-    const routeKey = `Bus (${selRoute})`;
-    setStudents(p => p.map(s => s.id === assignId ? { ...s, studentType: routeKey, busRoute: selRoute } : s));
+    setStudents(p => p.map(s => s.id === assignId ? { ...s, busRoute: selRoute } : s));
     setAssignId(""); flash(`✅ ${stu.name} assigned to ${selRoute}!`);
   }
 
   function removeFromBus(id) {
-    setStudents(p => p.map(s => s.id === id ? { ...s, studentType: "Day Scholar", busRoute: "" } : s));
+    setStudents(p => p.map(s => s.id === id ? { ...s, busRoute: "" } : s));
   }
 
   function updateRoute(route, field, val) {
@@ -8295,8 +8337,8 @@ function TransportPage({ students, setStudents, user, transportRoutes: _transpor
     setBusMonitoring(p => p.filter(x => x.id !== id));
   }
 
-  const busStudents = (route) => students.filter(s => s.busRoute === route || s.studentType === `Bus (${route})`);
-  const unassigned = students.filter(s => !s.busRoute && s.studentType !== "Boarder");
+  const busStudents = (route) => students.filter(s => s.busRoute === route);
+  const unassigned = students.filter(s => !s.busRoute && (s.studentType||"Day Scholar") === "Day Scholar");
   const monLogs = (busMonitoring || []);
 
   const th = { textAlign: "left", padding: "9px 12px", fontWeight: "bold", fontSize: 11, color: "#7c3aed", background: "#f5f3ff" };
@@ -8309,7 +8351,7 @@ function TransportPage({ students, setStudents, user, transportRoutes: _transpor
         {ROUTES.map(r => {
           const count = busStudents(r).length;
           const cap = transportRoutes[r]?.capacity || 40;
-          return <Stat key={r} icon="🚌" label={r} value={`${count}/${cap}`} color={ROUTE_COLORS[r]} sub={`KES ${ROUTE_FARES[r].toLocaleString()}/term`} />;
+          return <Stat key={r} icon="🚌" label={r} value={`${count}/${cap}`} color={routeColor(r)} sub={`KES ${routeFare(r).toLocaleString()}/term`} />;
         })}
         <Stat icon="👥" label="Unassigned" value={unassigned.length} color="#64748b" sub="not on bus" />
         <Stat icon="📋" label="Bus Logs" value={monLogs.length} color="#7c3aed" sub="movements recorded" />
@@ -8331,10 +8373,14 @@ function TransportPage({ students, setStudents, user, transportRoutes: _transpor
           const cap = r.capacity || 40;
           const pct = Math.round(count / cap * 100);
           const isEditing = editRoute === route;
-          return <Card key={route} style={{ borderLeft: `4px solid ${ROUTE_COLORS[route]}` }}>
+          return <Card key={route} style={{ borderLeft: `4px solid ${routeColor(route)}` }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
               <div style={{ flex: 1, minWidth: 260 }}>
-                <div style={{ fontWeight: "bold", color: "#3b0764", fontSize: 15, marginBottom: 6 }}>{route}</div>
+                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+                  {renameMap[route]!==undefined
+                    ? <><input autoFocus value={renameMap[route]||""} onChange={e=>setRenameMap(p=>({...p,[route]:e.target.value}))} onKeyDown={e=>e.key==="Enter"&&renameRoute(route)} style={{fontWeight:"bold",fontSize:14,border:"1.5px solid #c4b5fd",borderRadius:6,padding:"3px 8px",fontFamily:"Georgia,serif",width:160}}/><button onClick={()=>renameRoute(route)} style={{background:"#7c3aed",color:"white",border:"none",borderRadius:6,padding:"3px 10px",cursor:"pointer",fontSize:12,fontFamily:"Georgia,serif"}}>✓</button><button onClick={()=>setRenameMap(p=>({...p,[route]:undefined}))} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:6,padding:"3px 8px",cursor:"pointer",fontSize:12,fontFamily:"Georgia,serif"}}>✕</button></>
+                    : <><span style={{fontWeight:"bold",color:"#3b0764",fontSize:15}}>{route}</span>{user.role==="admin"&&<button onClick={()=>setRenameMap(p=>({...p,[route]:route}))} style={{background:"none",border:"none",cursor:"pointer",color:"#94a3b8",fontSize:11,padding:0}} title="Rename route">✏️</button>}</>}
+                </div>
 
                 {/* Driver */}
                 <div style={{ fontSize: 12, color: "#64748b", marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
@@ -8359,6 +8405,18 @@ function TransportPage({ students, setStudents, user, transportRoutes: _transpor
                     ? <input type="number" min={1} max={100} value={cap} onChange={e => updateRoute(route, "capacity", Math.min(100, Math.max(1, parseInt(e.target.value) || 40)))} style={{ border: "1.5px solid #c4b5fd", borderRadius: 6, padding: "3px 8px", fontSize: 12, fontFamily: "Georgia,serif", width: 80 }} />
                     : <b>{cap} learners</b>}
                 </div>
+                {/* Fare */}
+                <div style={{ fontSize: 12, color: "#64748b", marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                  <span>💰 Term Fare (KES):</span>
+                  {isEditing
+                    ? <input type="number" min={0} value={r.fare||15000} onChange={e => updateRoute(route, "fare", parseInt(e.target.value)||0)} style={{ border: "1.5px solid #c4b5fd", borderRadius: 6, padding: "3px 8px", fontSize: 12, fontFamily: "Georgia,serif", width: 100 }} />
+                    : <b>KES {(r.fare||15000).toLocaleString()}</b>}
+                </div>
+                {/* Color */}
+                {isEditing && <div style={{ fontSize: 12, color: "#64748b", marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>
+                  <span>🎨 Route Color:</span>
+                  {PALETTE.map(c=><button key={c} onClick={()=>updateRoute(route,"color",c)} style={{width:20,height:20,borderRadius:"50%",background:c,border:r.color===c?"3px solid #000":"2px solid #ddd",cursor:"pointer",padding:0}}/>)}
+                </div>}
 
                 {/* Time Departed */}
                 <div style={{ fontSize: 12, color: "#64748b", marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
@@ -8398,18 +8456,28 @@ function TransportPage({ students, setStudents, user, transportRoutes: _transpor
 
               {/* Right panel: stats + edit button */}
               <div style={{ textAlign: "center", minWidth: 100 }}>
-                <div style={{ fontWeight: "bold", color: ROUTE_COLORS[route], fontSize: 24 }}>{count}</div>
+                <div style={{ fontWeight: "bold", color: routeColor(route), fontSize: 24 }}>{count}</div>
                 <div style={{ fontSize: 11, color: "#94a3b8" }}>/ {cap} learners</div>
                 <div style={{ width: 90, height: 6, background: "#f1f5f9", borderRadius: 99, marginTop: 6, marginBottom: 2 }}>
-                  <div style={{ width: `${Math.min(pct, 100)}%`, height: "100%", borderRadius: 99, background: pct > 90 ? "#b91c1c" : ROUTE_COLORS[route] }} />
+                  <div style={{ width: `${Math.min(pct, 100)}%`, height: "100%", borderRadius: 99, background: pct > 90 ? "#b91c1c" : routeColor(route) }} />
                 </div>
                 <div style={{ fontSize: 10, color: "#94a3b8" }}>{pct}% full</div>
-                {user.role === "admin" && <button onClick={() => { setEditRoute(isEditing ? null : route); setEditStopIdx(null); setNewStop(""); }} style={{ marginTop: 8, background: isEditing ? "#ede9fe" : "#f5f3ff", color: isEditing ? "#1d4ed8" : "#7c3aed", border: "none", borderRadius: 7, padding: "5px 12px", cursor: "pointer", fontSize: 11, fontFamily: "Georgia,serif", fontWeight: "bold" }}>{isEditing ? "✓ Done" : "✏️ Edit"}</button>}
+                {user.role === "admin" && <button onClick={() => { setEditRoute(isEditing ? null : route); setEditStopIdx(null); setNewStop(""); }} style={{ marginTop: 8, background: isEditing ? "#ede9fe" : "#f5f3ff", color: isEditing ? "#1d4ed8" : "#7c3aed", border: "none", borderRadius: 7, padding: "5px 12px", cursor: "pointer", fontSize: 11, fontFamily: "Georgia,serif", fontWeight: "bold" }}>{isEditing ? "✓ Done" : "✏️ Edit"}</button><button onClick={()=>deleteRoute(route)} style={{marginTop:4,background:"none",color:"#b91c1c",border:"none",cursor:"pointer",fontSize:10,fontFamily:"Georgia,serif"}}>🗑️ Delete Route</button>}
               </div>
             </div>
           </Card>;
         })}
       </div>}
+
+      {/* Add new route */}
+      {tab === "routes" && user.role === "admin" && <Card style={{marginTop:14,borderLeft:"4px dashed #c4b5fd"}}>
+        <div style={{fontWeight:"bold",color:"#3b0764",marginBottom:10,fontSize:13}}>➕ Add New Route</div>
+        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+          <input value={newRouteName} onChange={e=>setNewRouteName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addRoute()} placeholder="Route name (e.g. Route D, Chuka Route...)" style={{flex:1,minWidth:200,border:"1.5px solid #c4b5fd",borderRadius:8,padding:"7px 10px",fontSize:13,fontFamily:"Georgia,serif",outline:"none"}}/>
+          <Btn onClick={addRoute} v="primary" style={{fontSize:12}}>Add Route</Btn>
+        </div>
+        <div style={{fontSize:11,color:"#94a3b8",marginTop:6}}>Tip: Click ✏️ next to any route name to rename it. Click "🗑️ Delete Route" to remove (only if no students assigned).</div>
+      </Card>}
 
       {/* ── ASSIGN STUDENTS ── */}
       {tab === "assign" && user.role === "admin" && <Card>
@@ -8420,13 +8488,13 @@ function TransportPage({ students, setStudents, user, transportRoutes: _transpor
             <label style={{ fontSize: 11, fontWeight: "bold", color: "#374151", display: "block", marginBottom: 3 }}>STUDENT</label>
             <select value={assignId} onChange={e => setAssignId(e.target.value)} style={{ width: "100%", border: "1.5px solid #e2e8f0", borderRadius: 8, padding: "8px 10px", fontSize: 13, fontFamily: "Georgia,serif" }}>
               <option value="">-- Select student --</option>
-              {sortStudentsByAdm(students.filter(s => s.status !== "transferred" && (tpGrade==="All"||s.class===tpGrade))).map(s => <option key={s.id} value={s.id}>{s.name} ({s.admNo||"—"}) — {s.class} {s.busRoute ? `[Currently: ${s.busRoute}]` : ""}</option>)}
+              {sortStudentsByAdm(students.filter(s => s.status !== "transferred" && (s.studentType||"Day Scholar")==="Day Scholar" && (tpGrade==="All"||s.class===tpGrade))).map(s => <option key={s.id} value={s.id}>{s.name} ({s.admNo||"—"}) — {s.class} {s.busRoute ? `[On: ${s.busRoute}]` : "[Unassigned]"}</option>)}
             </select>
           </div>
           <Btn onClick={assignStudent} v="blue">Assign to {selRoute}</Btn>
         </div>
         <div style={{ marginTop: 12, fontSize: 12, color: "#64748b" }}>
-          {ROUTES.map(r => { const c = busStudents(r).length; const cap = transportRoutes[r]?.capacity || 40; return <span key={r} style={{ marginRight: 16 }}><b style={{ color: ROUTE_COLORS[r] }}>{r}:</b> {c}/{cap} seats used</span>; })}
+          {ROUTES.map(r => { const c = busStudents(r).length; const cap = transportRoutes[r]?.capacity || 40; return <span key={r} style={{ marginRight: 16 }}><b style={{ color: routeColor(r) }}>{r}:</b> {c}/{cap} seats used</span>; })}
         </div>
       </Card>}
       {tab === "assign" && user.role !== "admin" && <div style={{ padding: 30, textAlign: "center", color: "#94a3b8" }}>Admin access required to assign students.</div>}
@@ -8434,10 +8502,10 @@ function TransportPage({ students, setStudents, user, transportRoutes: _transpor
       {/* ── BUS ROSTER ── */}
       {tab === "roster" && <>
         <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-          {ROUTES.map(r => <Btn key={r} onClick={() => setSelRoute(r)} v={selRoute === r ? "primary" : "ghost"} style={{ fontSize: 12, borderLeft: `3px solid ${ROUTE_COLORS[r]}` }}>{r} ({busStudents(r).length})</Btn>)}
+          {ROUTES.map(r => <Btn key={r} onClick={() => setSelRoute(r)} v={selRoute === r ? "primary" : "ghost"} style={{ fontSize: 12, borderLeft: `3px solid ${routeColor(r)}` }}>{r} ({busStudents(r).length})</Btn>)}
         </div>
         <Card style={{ padding: 0, overflow: "hidden" }}>
-          <div style={{ padding: "12px 16px", background: ROUTE_COLORS[selRoute] + "15", fontWeight: "bold", color: ROUTE_COLORS[selRoute], fontSize: 13, borderBottom: "1px solid #e2e8f0" }}>
+          <div style={{ padding: "12px 16px", background: routeColor(selRoute) + "15", fontWeight: "bold", color: routeColor(selRoute), fontSize: 13, borderBottom: "1px solid #e2e8f0" }}>
             {selRoute} Roster — {busStudents(selRoute).length} / {transportRoutes[selRoute]?.capacity || 40} learners
             {transportRoutes[selRoute]?.driver && <span style={{ marginLeft: 16, fontSize: 11, color: "#64748b", fontWeight: "normal" }}>Driver: {transportRoutes[selRoute].driver}</span>}
             {transportRoutes[selRoute]?.vehicle && <span style={{ marginLeft: 12, fontSize: 11, color: "#64748b", fontWeight: "normal" }}>Vehicle: {transportRoutes[selRoute].vehicle}</span>}
@@ -8490,7 +8558,7 @@ function TransportPage({ students, setStudents, user, transportRoutes: _transpor
         {/* Filter by route */}
         <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
           <Btn onClick={() => setSelRoute("All")} v={selRoute === "All" ? "purple" : "ghost"} style={{ fontSize: 11 }}>All Routes</Btn>
-          {ROUTES.map(r => <Btn key={r} onClick={() => setSelRoute(r)} v={selRoute === r ? "primary" : "ghost"} style={{ fontSize: 11, borderLeft: `3px solid ${ROUTE_COLORS[r]}` }}>{r}</Btn>)}
+          {ROUTES.map(r => <Btn key={r} onClick={() => setSelRoute(r)} v={selRoute === r ? "primary" : "ghost"} style={{ fontSize: 11, borderLeft: `3px solid ${routeColor(r)}` }}>{r}</Btn>)}
         </div>
 
         <Card style={{ padding: 0, overflow: "hidden" }}>
@@ -8503,7 +8571,7 @@ function TransportPage({ students, setStudents, user, transportRoutes: _transpor
                 const filtered = [...monLogs].reverse().filter(m => selRoute === "All" || m.route === selRoute);
                 return filtered.length ? filtered.map((m, i) => <tr key={m.id} style={{ background: i % 2 === 0 ? "white" : "#fafafa" }}>
                   <td style={{ ...td, fontFamily: "monospace", fontSize: 11 }}>{m.date}</td>
-                  <td style={td}><span style={{ fontSize: 10, fontWeight: "bold", color: ROUTE_COLORS[m.route], background: ROUTE_COLORS[m.route] + "15", padding: "2px 8px", borderRadius: 12 }}>{m.route}</span></td>
+                  <td style={td}><span style={{ fontSize: 10, fontWeight: "bold", color: routeColor(m.route), background: routeColor(m.route) + "15", padding: "2px 8px", borderRadius: 12 }}>{m.route}</span></td>
                   <td style={{ ...td, fontFamily: "monospace", fontSize: 11 }}>{m.timeDeparted || "—"}</td>
                   <td style={{ ...td, fontFamily: "monospace", fontSize: 11 }}>{m.timeArrived || "—"}</td>
                   <td style={{ ...td, fontWeight: "bold" }}>{m.destination}</td>
@@ -10750,7 +10818,7 @@ function StudentRoutesPage({ students, setStudents, user }) {
   const [filterCls, setFilterCls] = useState("All");
 
   const routeStudents = students.filter(s => s.busRoute===selRoute);
-  const unassigned = students.filter(s => !s.busRoute && s.status!=="transferred");
+  const unassigned = students.filter(s => !s.busRoute && (s.studentType||"Day Scholar")==="Day Scholar" && s.status!=="transferred");
 
   function assignStudent(studentId, route) {
     setStudents(p => p.map(s => s.id===studentId ? {...s, busRoute:route} : s));
