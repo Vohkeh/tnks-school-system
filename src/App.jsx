@@ -674,7 +674,10 @@ function Sidebar({view,setView,user,onLogout,logo,collapsed=false,onToggleCollap
     {
       id:"transport_grp", label:"Transport", icon:"🚌",
       items:[
-        {id:"transport", label:"Routes & Vehicles", icon:"🚌"},
+        {id:"transport",          label:"Transport Overview",  icon:"🚌"},
+        {id:"student_routes",     label:"Student Routes",      icon:"📍"},
+        {id:"vehicles",           label:"Vehicles",            icon:"🚐"},
+        {id:"transport_reports",  label:"Transport Reports",   icon:"📊"},
       ]
     },
     {
@@ -785,7 +788,7 @@ function Sidebar({view,setView,user,onLogout,logo,collapsed=false,onToggleCollap
       ]
     },
     {id:"inventory_grp", label:"Inventory", icon:"📦", items:[{id:"inventory",label:"Stock Manager",icon:"🏪"}]},
-    {id:"transport_grp", label:"Transport", icon:"🚌", items:[{id:"transport",label:"Routes & Vehicles",icon:"🚌"}]},
+    {id:"transport_grp", label:"Transport", icon:"🚌", items:[{id:"transport",label:"Transport Overview",icon:"🚌"},{id:"student_routes",label:"Student Routes",icon:"📍"},{id:"vehicles",label:"Vehicles",icon:"🚐"},{id:"transport_reports",label:"Transport Reports",icon:"📊"}]},
     {id:"school_life_grp", label:"School Life", icon:"🌟",
       items:[
         {id:"events",   label:"Events",   icon:"🎉"},
@@ -845,8 +848,10 @@ function Sidebar({view,setView,user,onLogout,logo,collapsed=false,onToggleCollap
     {id:"inventory_grp", label:"Inventory", icon:"📦", items:[{id:"inventory",label:"Stock Manager",icon:"🏪"}]},
     {id:"transport_grp", label:"Transport", icon:"🚌",
       items:[
-        {id:"transport",       label:"Routes & Vehicles", icon:"🚌"},
-        {id:"student_routes",  label:"Student Routes",    icon:"📍"},
+        {id:"transport",          label:"Transport Overview",  icon:"🚌"},
+        {id:"student_routes",     label:"Student Routes",      icon:"📍"},
+        {id:"vehicles",           label:"Vehicles",            icon:"🚐"},
+        {id:"transport_reports",  label:"Transport Reports",   icon:"📊"},
       ]
     },
     {id:"comms_grp", label:"Communication", icon:"💬",
@@ -8214,7 +8219,14 @@ function ClubsPage({ students, staff, user, clubs, setClubs }) {
 // ══════════════════════════════════════════════════════════
 // 8. TRANSPORT MANAGEMENT
 // ══════════════════════════════════════════════════════════
-function TransportPage({ students, setStudents, user, transportRoutes, setTransportRoutes, busMonitoring, setBusMonitoring }) {
+function TransportPage({ students, setStudents, user, transportRoutes: _transportRoutes, setTransportRoutes, busMonitoring, setBusMonitoring }) {
+  const DEFAULT_ROUTES = {
+    "Route A":{driver:"",vehicle:"",capacity:40,destinations:["Meru Town","Mukothima Junction","School Gate"],timeDeparted:"",timeArrived:""},
+    "Route B":{driver:"",vehicle:"",capacity:40,destinations:["Gatunga","Igamba","School Gate"],timeDeparted:"",timeArrived:""},
+    "Route C":{driver:"",vehicle:"",capacity:40,destinations:["Tharaka","Nkondi","School Gate"],timeDeparted:"",timeArrived:""},
+  };
+  const transportRoutes = (_transportRoutes && typeof _transportRoutes === "object" && _transportRoutes["Route A"])
+    ? _transportRoutes : DEFAULT_ROUTES;
   const [tpGrade, setTpGrade] = React.useState("All");
   const ROUTES = ["Route A", "Route B", "Route C"];
   const ROUTE_COLORS = { "Route A": "#7c3aed", "Route B": "#1d4ed8", "Route C": "#b45309" };
@@ -8237,7 +8249,7 @@ function TransportPage({ students, setStudents, user, transportRoutes, setTransp
     if (!assignId) return flash("Select a student.", false);
     const stu = students.find(s => s.id === assignId);
     if (!stu) return;
-    const cap = safeRoutes[selRoute]?.capacity || 40;
+    const cap = transportRoutes[selRoute]?.capacity || 40;
     const current = busStudents(selRoute).length;
     if (current >= cap) return flash(`⚠️ ${selRoute} is full (${cap} learners max).`, false);
     const routeKey = `Bus (${selRoute})`;
@@ -8250,23 +8262,23 @@ function TransportPage({ students, setStudents, user, transportRoutes, setTransp
   }
 
   function updateRoute(route, field, val) {
-    setTransportRoutes(p => { const base = (p && typeof p === "object" && !Array.isArray(p)) ? p : {}; return { ...base, [route]: { ...(base[route] || {}), [field]: val } }; });
+    setTransportRoutes(p => ({ ...p, [route]: { ...p[route], [field]: val } }));
   }
 
   function addStop(route) {
     if (!newStop.trim()) return;
-    const stops = [...(safeRoutes[route]?.destinations || []), newStop.trim()];
+    const stops = [...(transportRoutes[route]?.destinations || []), newStop.trim()];
     updateRoute(route, "destinations", stops);
     setNewStop("");
   }
 
   function removeStop(route, idx) {
-    const stops = (safeRoutes[route]?.destinations || []).filter((_, i) => i !== idx);
+    const stops = (transportRoutes[route]?.destinations || []).filter((_, i) => i !== idx);
     updateRoute(route, "destinations", stops);
   }
 
   function editStopName(route, idx, val) {
-    const stops = [...(safeRoutes[route]?.destinations || [])];
+    const stops = [...(transportRoutes[route]?.destinations || [])];
     stops[idx] = val;
     updateRoute(route, "destinations", stops);
   }
@@ -8280,19 +8292,11 @@ function TransportPage({ students, setStudents, user, transportRoutes, setTransp
   }
 
   function deleteMonLog(id) {
-    if (window.confirm("Delete this log entry?")) setBusMonitoring(p => p.filter(x => x.id !== id));
+    setBusMonitoring(p => p.filter(x => x.id !== id));
   }
 
-  const DEFAULT_ROUTES = {
-    "Route A":{driver:"",vehicle:"",capacity:40,destinations:["Meru Town","Mukothima Junction","School Gate"],timeDeparted:"",timeArrived:""},
-    "Route B":{driver:"",vehicle:"",capacity:40,destinations:["Gatunga","Igamba","School Gate"],timeDeparted:"",timeArrived:""},
-    "Route C":{driver:"",vehicle:"",capacity:40,destinations:["Tharaka","Nkondi","School Gate"],timeDeparted:"",timeArrived:""},
-  };
-  const safeRoutes = (transportRoutes && typeof transportRoutes === "object" && !Array.isArray(transportRoutes))
-    ? {"Route A":{...DEFAULT_ROUTES["Route A"],...(transportRoutes["Route A"]||{})},"Route B":{...DEFAULT_ROUTES["Route B"],...(transportRoutes["Route B"]||{})},"Route C":{...DEFAULT_ROUTES["Route C"],...(transportRoutes["Route C"]||{})}}
-    : DEFAULT_ROUTES;
-  const busStudents = (route) => (students||[]).filter(s => s.busRoute === route || s.studentType === `Bus (${route})`);
-  const unassigned = (students||[]).filter(s => !s.busRoute && s.studentType !== "Boarder");
+  const busStudents = (route) => students.filter(s => s.busRoute === route || s.studentType === `Bus (${route})`);
+  const unassigned = students.filter(s => !s.busRoute && s.studentType !== "Boarder");
   const monLogs = (busMonitoring || []);
 
   const th = { textAlign: "left", padding: "9px 12px", fontWeight: "bold", fontSize: 11, color: "#7c3aed", background: "#f5f3ff" };
@@ -8304,7 +8308,7 @@ function TransportPage({ students, setStudents, user, transportRoutes, setTransp
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12, marginBottom: 18 }}>
         {ROUTES.map(r => {
           const count = busStudents(r).length;
-          const cap = safeRoutes[r]?.capacity || 40;
+          const cap = transportRoutes[r]?.capacity || 40;
           return <Stat key={r} icon="🚌" label={r} value={`${count}/${cap}`} color={ROUTE_COLORS[r]} sub={`KES ${ROUTE_FARES[r].toLocaleString()}/term`} />;
         })}
         <Stat icon="👥" label="Unassigned" value={unassigned.length} color="#64748b" sub="not on bus" />
@@ -8322,7 +8326,7 @@ function TransportPage({ students, setStudents, user, transportRoutes, setTransp
       {/* ── ROUTES OVERVIEW ── */}
       {tab === "routes" && <div style={{ display: "grid", gap: 14 }}>
         {ROUTES.map(route => {
-          const r = safeRoutes[route] || {};
+          const r = transportRoutes[route] || {};
           const count = busStudents(route).length;
           const cap = r.capacity || 40;
           const pct = Math.round(count / cap * 100);
@@ -8422,7 +8426,7 @@ function TransportPage({ students, setStudents, user, transportRoutes, setTransp
           <Btn onClick={assignStudent} v="blue">Assign to {selRoute}</Btn>
         </div>
         <div style={{ marginTop: 12, fontSize: 12, color: "#64748b" }}>
-          {ROUTES.map(r => { const c = busStudents(r).length; const cap = safeRoutes[r]?.capacity || 40; return <span key={r} style={{ marginRight: 16 }}><b style={{ color: ROUTE_COLORS[r] }}>{r}:</b> {c}/{cap} seats used</span>; })}
+          {ROUTES.map(r => { const c = busStudents(r).length; const cap = transportRoutes[r]?.capacity || 40; return <span key={r} style={{ marginRight: 16 }}><b style={{ color: ROUTE_COLORS[r] }}>{r}:</b> {c}/{cap} seats used</span>; })}
         </div>
       </Card>}
       {tab === "assign" && user.role !== "admin" && <div style={{ padding: 30, textAlign: "center", color: "#94a3b8" }}>Admin access required to assign students.</div>}
@@ -8434,9 +8438,9 @@ function TransportPage({ students, setStudents, user, transportRoutes, setTransp
         </div>
         <Card style={{ padding: 0, overflow: "hidden" }}>
           <div style={{ padding: "12px 16px", background: ROUTE_COLORS[selRoute] + "15", fontWeight: "bold", color: ROUTE_COLORS[selRoute], fontSize: 13, borderBottom: "1px solid #e2e8f0" }}>
-            {selRoute} Roster — {busStudents(selRoute).length} / {safeRoutes[selRoute]?.capacity || 40} learners
-            {safeRoutes[selRoute]?.driver && <span style={{ marginLeft: 16, fontSize: 11, color: "#64748b", fontWeight: "normal" }}>Driver: {safeRoutes[selRoute].driver}</span>}
-            {safeRoutes[selRoute]?.vehicle && <span style={{ marginLeft: 12, fontSize: 11, color: "#64748b", fontWeight: "normal" }}>Vehicle: {safeRoutes[selRoute].vehicle}</span>}
+            {selRoute} Roster — {busStudents(selRoute).length} / {transportRoutes[selRoute]?.capacity || 40} learners
+            {transportRoutes[selRoute]?.driver && <span style={{ marginLeft: 16, fontSize: 11, color: "#64748b", fontWeight: "normal" }}>Driver: {transportRoutes[selRoute].driver}</span>}
+            {transportRoutes[selRoute]?.vehicle && <span style={{ marginLeft: 12, fontSize: 11, color: "#64748b", fontWeight: "normal" }}>Vehicle: {transportRoutes[selRoute].vehicle}</span>}
           </div>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead><tr>{["#", "Name", "Class", "Adm No", "Parent", "Phone", user.role === "admin" ? "Action" : ""].filter(Boolean).map(h => <th key={h} style={th}>{h}</th>)}</tr></thead>
@@ -11560,7 +11564,7 @@ const [users,setUsers]=useState(DEFAULT_USERS);
         if(fs)setFeeStructure(fs);   // ← THE KEY FIX
         if(es)setExamSchedules(es);if(cl)setClubs(cl);
         if(pc)setParentComms(pc);if(inv)setInventory(inv);
-        if(tr && typeof tr === "object" && !Array.isArray(tr)) setTransportRoutes(prev => ({...prev,...tr}));if(bmon)setBusMonitoring(bmon);
+        if(tr)setTransportRoutes(tr);if(bmon)setBusMonitoring(bmon);
         if(pr)setPayroll(pr);if(pm)setPocketMoney(pm);
       }catch(e){console.error("Load error",e);}
       setReady(true);
