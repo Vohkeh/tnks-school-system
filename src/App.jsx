@@ -1597,6 +1597,7 @@ function buildHTMLDoc(title, bodyHTML, logo) {
     *{box-sizing:border-box;}
     body{margin:0;padding:16px;font-family:Georgia,serif;background:white;}
     @media print{
+    *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important;}
       @page{margin:6mm;size:A4 portrait;}
       .no-print{display:none!important;}
       body{padding:0;margin:0;}
