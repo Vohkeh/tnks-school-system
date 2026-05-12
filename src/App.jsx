@@ -11959,6 +11959,30 @@ export default function App(){
     window.addEventListener("orientationchange",onOrient);
     return()=>{window.removeEventListener("resize",onResize);window.removeEventListener("orientationchange",onOrient);};
   },[]);
+  useEffect(()=>{
+    function onEnterAdvance(e){
+      if(e.key!=="Enter") return;
+      const tag=e.target.tagName;
+      if(tag!=="INPUT"&&tag!=="SELECT") return;
+      const t=e.target.type||"";
+      if(t==="submit"||t==="button"||t==="reset") return;
+      const all=[...document.querySelectorAll(
+        'input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),button:not([disabled])'
+      )].filter(el=>el.offsetParent!==null&&!el.closest("[aria-hidden='true']"));
+      const idx=all.indexOf(e.target);
+      if(idx===-1) return;
+      for(let i=idx+1;i<all.length;i++){
+        const next=all[i];
+        if(next.tagName==="BUTTON") continue;
+        e.preventDefault();
+        next.focus();
+        if(typeof next.select==="function") next.select();
+        break;
+      }
+    }
+    document.addEventListener("keydown",onEnterAdvance);
+    return()=>document.removeEventListener("keydown",onEnterAdvance);
+  },[]);
   // Apply saved font + theme on mount
   useEffect(()=>{
     const font=localStorage.getItem("tnks_font")||"Georgia,serif";
