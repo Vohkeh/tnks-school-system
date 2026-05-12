@@ -1984,7 +1984,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
         const byId=(users||[]).find(u=>u.id===n);
         if(byId) return byId.name;
         // 2. Match by name — picks up name edits made in User Manager
-        const byName=(users||[]).find(u=>u.name===n||(u.name|||"").toLowerCase()===(n||"").toLowerCase());
+        const byName=(users||[]).find(u=>u.name===n||(u.name||"").toLowerCase()===(n||"").toLowerCase());
         if(byName) return byName.name;
         // 3. Fallback: stored string
         return n;
