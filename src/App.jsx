@@ -2182,11 +2182,11 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
       const dispTotal=dispM.filter(v=>v!==null).reduce((a,b)=>a+b,0);
       const _np=(s.name||"").trim().split(/\s+/);const _fn=_np[0]||"";const _ln=_np.slice(1).join(" ");
       return `<tr style="background:${i%2===0?"rgba(255,255,255,0.55)":"rgba(248,250,252,0.55)"}">
-        <td style="padding:5px 6px;font-weight:bold;color:${i<3?"#b45309":"#374151"};text-align:center;">${s.position||"—"}</td>
-        <td style="padding:5px 6px;font-weight:bold;line-height:1.25;white-space:nowrap;">${_fn}${_ln?`<br><span style="font-size:8.5px;font-weight:normal;color:#374151;">${_ln}</span>`:""}</td>
-        ${subs.map(su=>{const isComb=su===SCI_AGRI_COMBINED;const v=getPrintMark(sr,su);return`<td style="padding:5px 4px;text-align:center;font-weight:bold;${isComb?`background:${SCI_AGRI_BG};color:${SCI_AGRI_DARK};`:""}">${v!==null?(isComb?v.toFixed(1):v):"—"}</td>`;}).join("")}
-        <td style="padding:5px 6px;text-align:center;font-weight:bold;background:rgba(254,243,199,0.7);">${dispM.some(v=>v!==null)?dispTotal.toFixed(0):"—"}</td>
-        <td style="padding:5px 6px;font-weight:bold;color:${s.position<=3?"#b45309":"#374151"};text-align:center;">${s.position||"—"}</td>
+        <td style="padding:3px 5px;font-weight:bold;color:${i<3?"#b45309":"#374151"};text-align:center;">${s.position||"—"}</td>
+        <td style="padding:3px 5px;font-weight:bold;line-height:1.25;white-space:nowrap;">${_fn}${_ln?`<br><span style="font-size:8.5px;font-weight:normal;color:#374151;">${_ln}</span>`:""}</td>
+        ${subs.map(su=>{const isComb=su===SCI_AGRI_COMBINED;const v=getPrintMark(sr,su);return`<td style="padding:3px 3px;text-align:center;font-weight:bold;${isComb?`background:${SCI_AGRI_BG};color:${SCI_AGRI_DARK};`:""}">${v!==null?(isComb?v.toFixed(1):v):"—"}</td>`;}).join("")}
+        <td style="padding:3px 5px;text-align:center;font-weight:bold;background:rgba(254,243,199,0.7);">${dispM.some(v=>v!==null)?dispTotal.toFixed(0):"—"}</td>
+        <td style="padding:3px 5px;font-weight:bold;color:${s.position<=3?"#b45309":"#374151"};text-align:center;">${s.position||"—"}</td>
       </tr>`;
     }).join("");
     // Subject teacher row — full names
@@ -2202,11 +2202,11 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
       <div style="overflow-x:auto;">
       <table class="results-table" style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px;">
         <thead><tr style="background:#3b0764;">
-          <th style="padding:5px 6px;text-align:center;color:white;">Pos</th>
-          <th style="padding:5px 6px;text-align:left;color:white;">Name</th>
+          <th style="padding:3px 5px;text-align:center;color:white;">Pos</th>
+          <th style="padding:3px 5px;text-align:left;color:white;">Name</th>
           ${subs.map(s=>{const isComb=s===SCI_AGRI_COMBINED;const short=getSubShort(s);return`<th style="padding:4px 3px;text-align:center;max-width:40px;white-space:nowrap;vertical-align:bottom;background:${isComb?"#0d9488":"#3b0764"};"><div style="writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);font-size:9px;font-weight:bold;line-height:1.2;height:90px;display:flex;align-items:flex-end;justify-content:center;color:white;" title="${s}">${short}</div></th>`;}).join("")}
-          <th style="padding:5px 6px;text-align:center;background:rgba(180,83,9,0.85);color:white;">Total</th>
-          <th style="padding:5px 6px;text-align:center;background:#3b0764;color:white;">Pos</th>
+          <th style="padding:3px 5px;text-align:center;background:rgba(180,83,9,0.85);color:white;">Total</th>
+          <th style="padding:3px 5px;text-align:center;background:#3b0764;color:white;">Pos</th>
         </tr></thead>
         <tbody>
           ${rows}
@@ -2214,25 +2214,25 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
           <tr><td colspan="${subs.length+3}" style="padding:3px;border:none;background:rgba(255,255,255,0);"></td></tr>
           <tr><td colspan="${subs.length+3}" style="padding:3px;border:none;background:rgba(255,255,255,0);"></td></tr>
           <tr class="summary-row" style="background:rgba(254,243,199,0.7);font-weight:bold;border-top:2px solid #3b0764;">
-            <td style="padding:5px 6px;font-weight:bold;">TOTAL SCORES</td>
-            <td style="padding:5px 6px;"></td>
-            ${subs.map(su=>{const isComb=su===SCI_AGRI_COMBINED;const allMarks=getColMarks(ranked,su);const tot=allMarks.reduce((a,b)=>a+b,0);return`<td style="padding:5px 4px;text-align:center;font-weight:bold;${isComb?`background:${SCI_AGRI_BG};color:${SCI_AGRI_DARK};`:""}">${allMarks.length?(isComb?tot.toFixed(1):tot.toFixed(0)):"—"}</td>`;}).join("")}
-            <td style="padding:5px 6px;text-align:center;font-weight:bold;background:#fef3c7;">${ranked.length?ranked.map(s=>{const dispM=subs.map(su=>getPrintMark(s.subs,su)).filter(v=>v!==null);return dispM.reduce((a,b)=>a+b,0);}).reduce((a,b)=>a+b,0).toFixed(0):"—"}</td>
-            <td style="padding:5px 6px;"></td>
+            <td style="padding:3px 5px;font-weight:bold;">TOTAL SCORES</td>
+            <td style="padding:3px 5px;"></td>
+            ${subs.map(su=>{const isComb=su===SCI_AGRI_COMBINED;const allMarks=getColMarks(ranked,su);const tot=allMarks.reduce((a,b)=>a+b,0);return`<td style="padding:3px 3px;text-align:center;font-weight:bold;${isComb?`background:${SCI_AGRI_BG};color:${SCI_AGRI_DARK};`:""}">${allMarks.length?(isComb?tot.toFixed(1):tot.toFixed(0)):"—"}</td>`;}).join("")}
+            <td style="padding:3px 5px;text-align:center;font-weight:bold;background:#fef3c7;">${ranked.length?ranked.map(s=>{const dispM=subs.map(su=>getPrintMark(s.subs,su)).filter(v=>v!==null);return dispM.reduce((a,b)=>a+b,0);}).reduce((a,b)=>a+b,0).toFixed(0):"—"}</td>
+            <td style="padding:3px 5px;"></td>
           </tr>
           <tr class="mean-row" style="background:rgba(245,243,255,0.7);font-weight:bold;">
-            <td style="padding:5px 6px;">MEAN SCORE</td>
-            <td style="padding:5px 6px;"></td>
-            ${subs.map(su=>{const isComb=su===SCI_AGRI_COMBINED;const allMarks=getColMarks(ranked,su);const m=allMarks.length?allMarks.reduce((a,b)=>a+b,0)/allMarks.length:0;return`<td style="padding:5px 4px;text-align:center;font-weight:bold;${isComb?`background:${SCI_AGRI_BG};color:${SCI_AGRI_DARK};`:""}">${m>0?m.toFixed(2):"—"}</td>`;}).join("")}
-            <td style="padding:5px 6px;text-align:center;font-weight:bold;">${ranked.length?(ranked.map(s=>{const dm=subs.map(su=>getPrintMark(s.subs,su)).filter(v=>v!==null);return dm.reduce((a,b)=>a+b,0);}).reduce((a,b)=>a+b,0)/ranked.length).toFixed(2):"—"}</td>
-            <td style="padding:5px 6px;"></td>
+            <td style="padding:3px 5px;">MEAN SCORE</td>
+            <td style="padding:3px 5px;"></td>
+            ${subs.map(su=>{const isComb=su===SCI_AGRI_COMBINED;const allMarks=getColMarks(ranked,su);const m=allMarks.length?allMarks.reduce((a,b)=>a+b,0)/allMarks.length:0;return`<td style="padding:3px 3px;text-align:center;font-weight:bold;${isComb?`background:${SCI_AGRI_BG};color:${SCI_AGRI_DARK};`:""}">${m>0?m.toFixed(2):"—"}</td>`;}).join("")}
+            <td style="padding:3px 5px;text-align:center;font-weight:bold;">${ranked.length?(ranked.map(s=>{const dm=subs.map(su=>getPrintMark(s.subs,su)).filter(v=>v!==null);return dm.reduce((a,b)=>a+b,0);}).reduce((a,b)=>a+b,0)/ranked.length).toFixed(2):"—"}</td>
+            <td style="padding:3px 5px;"></td>
           </tr>
           <tr class="rank-row" style="background:rgba(240,249,255,0.7);font-weight:bold;">
-            <td style="padding:5px 6px;">RANK</td>
-            <td style="padding:5px 6px;"></td>
-            ${subs.map(su=>{const isComb=su===SCI_AGRI_COMBINED;const allMarks=getColMarks(ranked,su);const m=allMarks.length?allMarks.reduce((a,b)=>a+b,0)/allMarks.length:0;const subMeans=subs.map(s2=>{const am=getColMarks(ranked,s2);return am.length?am.reduce((a,b)=>a+b,0)/am.length:0;});const rank=subMeans.filter(v=>v>m).length+1;return`<td style="padding:5px 4px;text-align:center;font-weight:bold;${isComb?`background:${SCI_AGRI_BG};color:${SCI_AGRI_DARK}`:""}">${m>0?rank:"—"}</td>`;}).join("")}
-            <td style="padding:5px 6px;"></td>
-            <td style="padding:5px 6px;"></td>
+            <td style="padding:3px 5px;">RANK</td>
+            <td style="padding:3px 5px;"></td>
+            ${subs.map(su=>{const isComb=su===SCI_AGRI_COMBINED;const allMarks=getColMarks(ranked,su);const m=allMarks.length?allMarks.reduce((a,b)=>a+b,0)/allMarks.length:0;const subMeans=subs.map(s2=>{const am=getColMarks(ranked,s2);return am.length?am.reduce((a,b)=>a+b,0)/am.length:0;});const rank=subMeans.filter(v=>v>m).length+1;return`<td style="padding:3px 3px;text-align:center;font-weight:bold;${isComb?`background:${SCI_AGRI_BG};color:${SCI_AGRI_DARK}`:""}">${m>0?rank:"—"}</td>`;}).join("")}
+            <td style="padding:3px 5px;"></td>
+            <td style="padding:3px 5px;"></td>
           </tr>
           ${teacherRow}
         </tbody>
