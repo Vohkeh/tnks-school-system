@@ -1792,7 +1792,7 @@ function buildHTMLDoc(title, bodyHTML, logo) {
       }
       .results-table, .grade-table{
         width:100% !important;
-        table-layout:fixed;
+        table-layout:auto;
         font-size:11px !important;
       }
       .results-table td, .results-table th,
@@ -2200,7 +2200,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
       ${buildSectionHeader(logo)}
       <div style="background:#3b0764;color:white;padding:8px 14px;font-weight:bold;font-size:13px;border-radius:8px 8px 0 0;">${className} — ${examType} · ${term} ${year}</div>
       <div style="overflow-x:auto;">
-      <table class="results-table" style="width:100%;border-collapse:collapse;font-size:14px;min-width:600px;">
+      <table class="results-table" style="width:100%;border-collapse:collapse;font-size:14px;min-width:600px;table-layout:auto;">
         <thead><tr style="background:#3b0764;">
           <th style="padding:3px 5px;text-align:center;color:white;">Pos</th>
       <th style="padding:5px 6px;text-align:left;color:white;min-width:90px;">Name</th>
