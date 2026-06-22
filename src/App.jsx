@@ -2200,7 +2200,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
       ${buildSectionHeader(logo)}
       <div style="background:#3b0764;color:white;padding:8px 14px;font-weight:bold;font-size:13px;border-radius:8px 8px 0 0;">${className} — ${examType} · ${term} ${year}</div>
       <div style="overflow-x:auto;">
-      <table class="results-table" style="width:100%;border-collapse:collapse;font-size:10px;min-width:600px;">
+      <table class="results-table" style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px;">
         <thead><tr style="background:#3b0764;">
           <th style="padding:5px 6px;text-align:center;color:white;">Pos</th>
           <th style="padding:5px 6px;text-align:left;color:white;">Name</th>
@@ -2267,7 +2267,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
       ${buildSectionHeader(logo)}
       <div style="background:#1d4ed8;color:white;padding:8px 14px;font-weight:bold;font-size:13px;border-radius:8px 8px 0 0;">${className} — Grades · ${examType} · ${term} ${year}</div>
       <div style="overflow-x:auto;">
-      <table class="grade-table" style="width:100%;border-collapse:collapse;font-size:10px;min-width:600px;">
+      <table class="grade-table" style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px;">
         <thead><tr style="background:#1d4ed8;">
           <th style="padding:5px 6px;text-align:center;color:white;">Pos</th>
           <th style="padding:5px 6px;text-align:left;color:white;">Name</th>
