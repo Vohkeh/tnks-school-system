@@ -2183,7 +2183,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
       const _np=(s.name||"").trim().split(/\s+/);const _fn=_np[0]||"";const _ln=_np.slice(1).join(" ");
       return `<tr style="background:${i%2===0?"rgba(255,255,255,0.55)":"rgba(248,250,252,0.55)"}">
         <td style="padding:3px 5px;font-weight:bold;color:${i<3?"#b45309":"#374151"};text-align:center;">${s.position||"—"}</td>
-        <td style="padding:3px 5px;font-weight:bold;line-height:1.25;white-space:nowrap;">${_fn}${_ln?`<br><span style="font-size:8.5px;font-weight:normal;color:#374151;">${_ln}</span>`:""}</td>
+        <td style="padding:3px 5px;font-weight:bold;line-height:1.25;white-space:nowrap;min-width:90px;">${_fn}${_ln?`<br><span style="font-size:8.5px;font-weight:normal;color:#374151;">${_ln}</span>`:""}</td>
         ${subs.map(su=>{const isComb=su===SCI_AGRI_COMBINED;const v=getPrintMark(sr,su);return`<td style="padding:3px 3px;text-align:center;font-weight:bold;${isComb?`background:${SCI_AGRI_BG};color:${SCI_AGRI_DARK};`:""}">${v!==null?(isComb?v.toFixed(1):v):"—"}</td>`;}).join("")}
         <td style="padding:3px 5px;text-align:center;font-weight:bold;background:rgba(254,243,199,0.7);">${dispM.some(v=>v!==null)?dispTotal.toFixed(0):"—"}</td>
         <td style="padding:3px 5px;font-weight:bold;color:${s.position<=3?"#b45309":"#374151"};text-align:center;">${s.position||"—"}</td>
@@ -2203,7 +2203,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
       <table class="results-table" style="width:100%;border-collapse:collapse;font-size:14px;min-width:600px;">
         <thead><tr style="background:#3b0764;">
           <th style="padding:3px 5px;text-align:center;color:white;">Pos</th>
-          <th style="padding:3px 5px;text-align:left;color:white;">Name</th>
+      <th style="padding:5px 6px;text-align:left;color:white;min-width:90px;">Name</th>
           ${subs.map(s=>{const isComb=s===SCI_AGRI_COMBINED;const short=getSubShort(s);return`<th style="padding:4px 3px;text-align:center;max-width:40px;white-space:nowrap;vertical-align:bottom;background:${isComb?"#0d9488":"#3b0764"};"><div style="writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);font-size:9px;font-weight:bold;line-height:1.2;height:90px;display:flex;align-items:flex-end;justify-content:center;color:white;" title="${s}">${short}</div></th>`;}).join("")}
           <th style="padding:3px 5px;text-align:center;background:rgba(180,83,9,0.85);color:white;">Total</th>
           <th style="padding:3px 5px;text-align:center;background:#3b0764;color:white;">Pos</th>
