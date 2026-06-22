@@ -2184,7 +2184,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
       return `<tr style="background:${i%2===0?"rgba(255,255,255,0.55)":"rgba(248,250,252,0.55)"}">
         <td style="padding:3px 5px;font-weight:bold;color:${i<3?"#b45309":"#374151"};text-align:center;">${s.position||"—"}</td>
         <td style="padding:3px 5px;font-weight:bold;line-height:1.25;white-space:nowrap;min-width:90px;">${_fn}${_ln?`<br><span style="font-size:8.5px;font-weight:normal;color:#374151;">${_ln}</span>`:""}</td>
-        ${subs.map(su=>{const isComb=su===SCI_AGRI_COMBINED;const v=getPrintMark(sr,su);return`<td style=\"padding:5px 4px;text-align:center;font-weight:bold;min-width:32px;width:32px;${isComb?`background:${SCI_AGRI_BG};color:${SCI_AGRI_DARK};`:\"\"}\">${v!==null?(isComb?v.toFixed(1):v):\"—\"}</td>`;}).join("")}
+${subs.map(su=>{const isComb=su===SCI_AGRI_COMBINED;const v=getPrintMark(sr,su);return`<td style="padding:5px 4px;text-align:center;font-weight:bold;min-width:32px;width:32px;${isComb?`background:${SCI_AGRI_BG};color:${SCI_AGRI_DARK};`:""}">${v!==null?(isComb?v.toFixed(1):v):"—"}</td>`;}).join("")}
         <td style="padding:3px 5px;text-align:center;font-weight:bold;background:rgba(254,243,199,0.7);">${dispM.some(v=>v!==null)?dispTotal.toFixed(0):"—"}</td>
         <td style="padding:3px 5px;font-weight:bold;color:${s.position<=3?"#b45309":"#374151"};text-align:center;">${s.position||"—"}</td>
       </tr>`;
