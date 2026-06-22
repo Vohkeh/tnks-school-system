@@ -2184,7 +2184,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
       return `<tr style="background:${i%2===0?"rgba(255,255,255,0.55)":"rgba(248,250,252,0.55)"}">
         <td style="padding:3px 5px;font-weight:bold;color:${i<3?"#b45309":"#374151"};text-align:center;">${s.position||"—"}</td>
         <td style="padding:3px 5px;font-weight:bold;line-height:1.25;white-space:nowrap;min-width:90px;">${_fn}${_ln?`<br><span style="font-size:8.5px;font-weight:normal;color:#374151;">${_ln}</span>`:""}</td>
-        ${subs.map(su=>{const isComb=su===SCI_AGRI_COMBINED;const v=getPrintMark(sr,su);return`<td style="padding:3px 3px;text-align:center;font-weight:bold;${isComb?`background:${SCI_AGRI_BG};color:${SCI_AGRI_DARK};`:""}">${v!==null?(isComb?v.toFixed(1):v):"—"}</td>`;}).join("")}
+        ${subs.map(su=>{const isComb=su===SCI_AGRI_COMBINED;const v=getPrintMark(sr,su);return`<td style=\"padding:5px 4px;text-align:center;font-weight:bold;min-width:32px;width:32px;${isComb?`background:${SCI_AGRI_BG};color:${SCI_AGRI_DARK};`:\"\"}\">${v!==null?(isComb?v.toFixed(1):v):\"—\"}</td>`;}).join("")}
         <td style="padding:3px 5px;text-align:center;font-weight:bold;background:rgba(254,243,199,0.7);">${dispM.some(v=>v!==null)?dispTotal.toFixed(0):"—"}</td>
         <td style="padding:3px 5px;font-weight:bold;color:${s.position<=3?"#b45309":"#374151"};text-align:center;">${s.position||"—"}</td>
       </tr>`;
@@ -2192,7 +2192,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
     // Subject teacher row — full names
     const teacherRow=`<tr style="background:#f0f9ff;border-top:2px solid #3b0764;">
       <td colspan="2" style="padding:4px 6px;font-size:9px;font-weight:bold;color:#3b0764;">Subject Teacher:</td>
-      ${subs.map(s=>{const isComb=s===SCI_AGRI_COMBINED;const ts=isComb?[...new Set(["Integrated Science","Agriculture and Nutrition"].flatMap(p=>getSubjectTeachersForResult(className,p)).filter(Boolean))]:getSubjectTeachersForResult(className,s);const name=ts.length?ts.join(" / "):"—";return`<td style="padding:4px 3px;text-align:center;font-size:7.5px;color:${isComb?SCI_AGRI_DARK:"#3b0764"};font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px;;">${name}</td>`;}).join("")}
+      ${subs.map(s=>{const isComb=s===SCI_AGRI_COMBINED;const ts=isComb?[...new Set(["Integrated Science","Agriculture and Nutrition"].flatMap(p=>getSubjectTeachersForResult(className,p)).filter(Boolean))]:getSubjectTeachersForResult(className,s);return`<td style=\"padding:4px 3px;text-align:center;font-size:7.5px;color:${isComb?SCI_AGRI_DARK:\"#3b0764\"};font-weight:bold;\">${ts.length?ts.map(t=>`<div style=\"writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);display:inline-block;\">${t}</div>`).join(\"\"):\"—\"}</td>`;}).join("")}
       <td style="padding:4px 6px;font-size:9px;color:#64748b;"></td>
       <td style="padding:4px 6px;"></td>
     </tr>`;
