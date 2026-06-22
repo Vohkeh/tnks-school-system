@@ -1793,12 +1793,12 @@ function buildHTMLDoc(title, bodyHTML, logo) {
       .results-table, .grade-table{
         width:100% !important;
         table-layout:fixed;
-        font-size:14px !important;
+        font-size:11px !important;
       }
       .results-table td, .results-table th,
       .grade-table td, .grade-table th{
         padding:3px 2px !important;
-        font-size:14px !important;
+        font-size:11px !important;
       }
       .results-table th div, .grade-table th div{
         height:60px !important;
