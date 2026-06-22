@@ -2192,7 +2192,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
     // Subject teacher row — full names
     const teacherRow=`<tr style="background:#f0f9ff;border-top:2px solid #3b0764;">
       <td colspan="2" style="padding:4px 6px;font-size:9px;font-weight:bold;color:#3b0764;">Subject Teacher:</td>
-      ${subs.map(s=>{const isComb=s===SCI_AGRI_COMBINED;const ts=isComb?[...new Set(["Integrated Science","Agriculture and Nutrition"].flatMap(p=>getSubjectTeachersForResult(className,p)).filter(Boolean))]:getSubjectTeachersForResult(className,s);const name=ts.length?ts.join(" / "):"—";return`<td style="padding:4px 3px;text-align:center;font-size:7.5px;color:${isComb?SCI_AGRI_DARK:"#3b0764"};font-weight:bold;white-space:normal;word-break:break-word;max-width:60px;">${name}</td>`;}).join("")}
+      ${subs.map(s=>{const isComb=s===SCI_AGRI_COMBINED;const ts=isComb?[...new Set(["Integrated Science","Agriculture and Nutrition"].flatMap(p=>getSubjectTeachersForResult(className,p)).filter(Boolean))]:getSubjectTeachersForResult(className,s);const name=ts.length?ts.join(" / "):"—";return`<td style="padding:4px 3px;text-align:center;font-size:7.5px;color:${isComb?SCI_AGRI_DARK:"#3b0764"};font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px;;">${name}</td>`;}).join("")}
       <td style="padding:4px 6px;font-size:9px;color:#64748b;"></td>
       <td style="padding:4px 6px;"></td>
     </tr>`;
