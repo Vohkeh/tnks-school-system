@@ -2192,7 +2192,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
     // Subject teacher row — full names
     const teacherRow=`<tr style="background:#f0f9ff;border-top:2px solid #3b0764;">
       <td colspan="2" style="padding:4px 6px;font-size:9px;font-weight:bold;color:#3b0764;">Subject Teacher:</td>
-      ${subs.map(s=>{const isComb=s===SCI_AGRI_COMBINED;const ts=isComb?[...new Set(["Integrated Science","Agriculture and Nutrition"].flatMap(p=>getSubjectTeachersForResult(className,p)).filter(Boolean))]:getSubjectTeachersForResult(className,s);return`<td style="padding:4px 3px;text-align:center;font-size:7.5px;color:${isComb?SCI_AGRI_DARK:"#3b0764"};font-weight:bold;"><div style="display:flex;flex-direction:row;justify-content:center;gap:2px;">${ts.length?ts.map(t=>`<div style="writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);font-size:7px;font-weight:bold;">${t}</div>`).join(""):"—"}</div></td>`;}).join("")}
+      ${subs.map(s=>{const isComb=s===SCI_AGRI_COMBINED;const ts=isComb?[...new Set(["Integrated Science","Agriculture and Nutrition"].flatMap(p=>getSubjectTeachersForResult(className,p)).filter(Boolean))]:getSubjectTeachersForResult(className,s);return`<td style="padding:4px 3px;text-align:center;font-size:14.5px;color:${isComb?SCI_AGRI_DARK:"#3b0764"};font-weight:bold;"><div style="display:flex;flex-direction:row;justify-content:center;gap:2px;min-height:50px">${ts.length?ts.map(t=>`<div style="writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);font-size:14px;font-weight:bold;">${t}</div>`).join(""):"—"}</div></td>`;}).join("")}
       <td style="padding:4px 6px;font-size:9px;color:#64748b;"></td>
       <td style="padding:4px 6px;"></td>
     </tr>`;
@@ -2204,7 +2204,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
         <thead><tr style="background:#3b0764;">
           <th style="padding:5px 6px;text-align:center;color:white;">Pos</th>
           <th style="padding:5px 6px;text-align:left;color:white;">Name</th>
-          ${subs.map(s=>{const isComb=s===SCI_AGRI_COMBINED;const short=getSubShort(s);return`<th style="padding:4px 3px;text-align:center;max-width:50px;white-space:nowrap;vertical-align:bottom;background:${isComb?"#0d9488":"#3b0764"};"><div style="writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);font-size:14px;font-weight:bold;line-height:2.3;height:120px;display:flex;align-items:flex-end;justify-content:center;color:white;" title="${s}">${short}</div></th>`;}).join("")}
+          ${subs.map(s=>{const isComb=s===SCI_AGRI_COMBINED;const short=getSubShort(s);return`<th style="padding:4px 3px;text-align:center;max-width:50px;white-space:nowrap;vertical-align:bottom;background:${isComb?"#0d9488":"#3b0764"};"><div style="writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);font-size:14px;font-weight:900;line-height:2.3;height:120px;display:flex;align-items:flex-end;justify-content:center;color:white;" title="${s}">${short}</div></th>`;}).join("")}
           <th style="padding:5px 6px;text-align:center;background:rgba(180,83,9,0.85);color:white;">Total</th>
           <th style="padding:5px 6px;text-align:center;background:#3b0764;color:white;">Pos</th>
         </tr></thead>
@@ -2271,7 +2271,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
         <thead><tr style="background:#1d4ed8;">
           <th style="padding:5px 6px;text-align:center;color:white;">Pos</th>
           <th style="padding:5px 6px;text-align:left;color:white;">Name</th>
-          ${subs.map(s=>{const isComb=s===SCI_AGRI_COMBINED;const short=getSubShort(s);return`<th style="padding:4px 3px;text-align:center;max-width:50px;white-space:nowrap;vertical-align:bottom;background:${isComb?"#0d9488":"#1d4ed8"};"><div style="writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);font-size:13px;font-weight:bold;line-height:2.3;height:120px;display:flex;align-items:flex-end;justify-content:center;color:white;" title="${s}">${short}</div></th>`;}).join("")}
+          ${subs.map(s=>{const isComb=s===SCI_AGRI_COMBINED;const short=getSubShort(s);return`<th style="padding:4px 3px;text-align:center;max-width:50px;white-space:nowrap;vertical-align:bottom;background:${isComb?"#0d9488":"#1d4ed8"};"><div style="writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);font-size:13px;font-weight:900;line-height:2.3;height:120px;display:flex;align-items:flex-end;justify-content:center;color:white;" title="${s}">${short}</div></th>`;}).join("")}
           <th style="padding:5px 6px;text-align:center;background:rgba(124,58,237,0.85);color:white;">Mean/Grade</th>
         </tr></thead>
         <tbody>
