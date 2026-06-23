@@ -2183,7 +2183,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
       const _np=(s.name||"").trim().split(/\s+/);const _fn=_np[0]||"";const _ln=_np.slice(1).join(" ");
       return `<tr style="background:${i%2===0?"rgba(255,255,255,0.55)":"rgba(248,250,252,0.55)"}">
         <td style="padding:5px 6px;font-weight:bold;color:${i<3?"#b45309":"#374151"};text-align:center;">${s.position||"—"}</td>
-        <td style="padding:5px 8px;font-weight:bold;font-size:13px;line-height:2.25;white-space:nowrap;min-width:100px;">${_fn}${_ln?`<br><span style="font-size:8.5px;font-weight:normal;color:#374151;">${_ln}</span>`:""}</td>
+        <td style="padding:5px 8px;font-weight:bold;font-size:13px;line-height:2.25;white-space:nowrap;min-width:100px;">${_fn}${_ln?`<br><span style="font-size:13px;font-weight:bold;color:#374151;">${_ln}</span>`:""}</td>
         ${subs.map(su=>{const isComb=su===SCI_AGRI_COMBINED;const v=getPrintMark(sr,su);return`<td style="padding:5px 4px;text-align:center;font-weight:bold;min-width:32px;width:32px;${isComb?`background:${SCI_AGRI_BG};color:${SCI_AGRI_DARK};`:""}">${v!==null?(isComb?v.toFixed(1):v):"—"}</td>`;}).join("")}
         <td style="padding:5px 6px;text-align:center;font-weight:bold;background:rgba(254,243,199,0.7);">${dispM.some(v=>v!==null)?dispTotal.toFixed(0):"—"}</td>
         <td style="padding:5px 6px;font-weight:bold;color:${s.position<=3?"#b45309":"#374151"};text-align:center;">${s.position||"—"}</td>
@@ -2204,7 +2204,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
         <thead><tr style="background:#3b0764;">
           <th style="padding:5px 6px;text-align:center;color:white;">Pos</th>
           <th style="padding:5px 6px;text-align:left;color:white;">Name</th>
-          ${subs.map(s=>{const isComb=s===SCI_AGRI_COMBINED;const short=getSubShort(s);return`<th style="padding:4px 3px;text-align:center;max-width:50px;white-space:nowrap;vertical-align:bottom;background:${isComb?"#0d9488":"#3b0764"};"><div style="writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);font-size:14px;font-weight:900;line-height:2.3;height:120px;display:flex;align-items:flex-end;justify-content:center;color:white;" title="${s}">${short}</div></th>`;}).join("")}
+          ${subs.map(s=>{const isComb=s===SCI_AGRI_COMBINED;const short=getSubShort(s);return`<th style="padding:4px 3px;text-align:center;max-width:50px;white-space:nowrap;vertical-align:bottom;background:${isComb?"#0d9488":"#3b0764"};"><div style="writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);font-size:16px;font-weight:900;line-height:2.3;height:150px;display:flex;align-items:flex-end;justify-content:center;color:white;" title="${s}">${short}</div></th>`;}).join("")}
           <th style="padding:5px 6px;text-align:center;background:rgba(180,83,9,0.85);color:white;">Total</th>
           <th style="padding:5px 6px;text-align:center;background:#3b0764;color:white;">Pos</th>
         </tr></thead>
@@ -2271,7 +2271,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
         <thead><tr style="background:#1d4ed8;">
           <th style="padding:5px 6px;text-align:center;color:white;">Pos</th>
           <th style="padding:5px 6px;text-align:left;color:white;">Name</th>
-          ${subs.map(s=>{const isComb=s===SCI_AGRI_COMBINED;const short=getSubShort(s);return`<th style="padding:4px 3px;text-align:center;max-width:50px;white-space:nowrap;vertical-align:bottom;background:${isComb?"#0d9488":"#1d4ed8"};"><div style="writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);font-size:13px;font-weight:900;line-height:2.3;height:120px;display:flex;align-items:flex-end;justify-content:center;color:white;" title="${s}">${short}</div></th>`;}).join("")}
+          ${subs.map(s=>{const isComb=s===SCI_AGRI_COMBINED;const short=getSubShort(s);return`<th style="padding:4px 3px;text-align:center;max-width:50px;white-space:nowrap;vertical-align:bottom;background:${isComb?"#0d9488":"#1d4ed8"};"><div style="writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);font-size:13px;font-weight:900;line-height:2.3;height:150px;display:flex;align-items:flex-end;justify-content:center;color:white;" title="${s}">${short}</div></th>`;}).join("")}
           <th style="padding:5px 6px;text-align:center;background:rgba(124,58,237,0.85);color:white;">Mean/Grade</th>
         </tr></thead>
         <tbody>
