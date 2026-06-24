@@ -2651,7 +2651,7 @@ function ReportsPage({students,results,comments,term,setTerm,year,setYear,examTy
     });
 
     // ── Freeze panes: logo+header+colheaders ──
-    ws.views=[{state:"frozen",xSplit:2,ySplit:8}];
+    ws.views=[{}];
   }
 
   function downloadClassExcel(className,mode){
